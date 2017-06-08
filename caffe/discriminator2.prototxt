@@ -1,0 +1,234 @@
+force_backward:true
+layer {
+  name: "ECAL"
+  type: "Input"
+  top: "ECAL"
+  input_param {
+    shape {
+      dim: 100
+      dim: 1
+      dim: 25
+      dim: 25
+      dim: 25
+    }
+  }
+}
+layer {
+  name: "TAG"
+  type: "Input"
+  top: "TAG"
+  input_param {
+    shape {
+      dim: 100
+    }
+  }
+}
+layer {
+  name: "event"
+  type: "Input"
+  top: "event"
+  input_param {
+    shape {
+      dim: 100
+      dim: 1
+    }
+  }
+}
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "ECAL"
+  top: "conv1"
+  convolution_param {
+    num_output: 32
+    pad: 2
+    kernel_size: 5
+    engine: CAFFE
+  }
+}
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "relu1"
+  relu_param {
+    negative_slope: 0.300000011921
+    engine: CAFFE
+  }
+}
+layer {
+  name: "drpout1"
+  type: "Dropout"
+  bottom: "relu1"
+  top: "drpout1"
+  dropout_param {
+    dropout_ratio: 0.20000000298
+  }
+}
+layer {
+  name: "conv2"
+  type: "Convolution"
+  bottom: "drpout1"
+  top: "conv2"
+  convolution_param {
+    num_output: 8
+    pad: 2
+    kernel_size: 5
+    engine: CAFFE
+  }
+}
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "conv2"
+  top: "relu2"
+  relu_param {
+    negative_slope: 0.300000011921
+    engine: CAFFE
+  }
+}
+layer {
+  name: "bn2"
+  type: "BatchNorm"
+  bottom: "relu2"
+  top: "relu2"
+}
+layer {
+  name: "drpout2"
+  type: "Dropout"
+  bottom: "relu2"
+  top: "drpout2"
+  dropout_param {
+    dropout_ratio: 0.20000000298
+  }
+}
+layer {
+  name: "conv3"
+  type: "Convolution"
+  bottom: "drpout2"
+  top: "conv3"
+  convolution_param {
+    num_output: 8
+    pad: 2
+    kernel_size: 5
+    engine: CAFFE
+  }
+}
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "conv3"
+  top: "relu3"
+  relu_param {
+    negative_slope: 0.300000011921
+    engine: CAFFE
+  }
+}
+layer {
+  name: "bn3"
+  type: "BatchNorm"
+  bottom: "relu3"
+  top: "relu3"
+}
+layer {
+  name: "drpout3"
+  type: "Dropout"
+  bottom: "relu3"
+  top: "drpout3"
+  dropout_param {
+    dropout_ratio: 0.20000000298
+  }
+}
+layer {
+  name: "conv4"
+  type: "Convolution"
+  bottom: "drpout3"
+  top: "conv4"
+  convolution_param {
+    num_output: 8
+    pad: 1
+    kernel_size: 5
+    stride: 2
+    engine: CAFFE
+  }
+}
+layer {
+  name: "relu4"
+  type: "ReLU"
+  bottom: "conv4"
+  top: "relu4"
+  relu_param {
+    negative_slope: 0.300000011921
+    engine: CAFFE
+  }
+}
+layer {
+  name: "bn4"
+  type: "BatchNorm"
+  bottom: "relu4"
+  top: "relu4"
+}
+layer {
+  name: "drpout4"
+  type: "Dropout"
+  bottom: "relu4"
+  top: "drpout4"
+  dropout_param {
+    dropout_ratio: 0.20000000298
+  }
+}
+layer {
+  name: "pool4"
+  type: "Pooling"
+  bottom: "drpout4"
+  top: "pool4"
+  pooling_param {
+    pool: AVE
+    kernel_size: 2
+    stride: 1
+  }
+}
+layer {
+  name: "tag"
+  type: "InnerProduct"
+  bottom: "pool4"
+  top: "tag"
+  inner_product_param {
+    num_output: 1
+  }
+}
+layer {
+  name: "tag_loss"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "tag"
+  bottom: "TAG"
+  top: "tag_loss"
+  loss_weight: 0.5
+}
+layer {
+  name: "aux"
+  type: "InnerProduct"
+  bottom: "drpout4"
+  top: "aux"
+  inner_product_param {
+    num_output: 1
+  }
+}
+layer {
+  name: "aux_loss"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "aux"
+  bottom: "event"
+  top: "aux_loss"
+  loss_weight: 0.5
+}
+layer {
+  name: "loss"
+  type: "Eltwise"
+  bottom: "tag_loss"
+  bottom: "aux_loss"
+  top: "loss"
+  eltwise_param {
+    operation: SUM
+  }
+}

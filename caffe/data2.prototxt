@@ -1,0 +1,10 @@
+layer {
+  name: "ECAL"
+  type: "HDF5Data"
+  top: "ECAL"
+  top: "TAG"
+  hdf5_data_param {
+    source: "train.txt"
+    batch_size: 100
+  }
+}
