@@ -61,6 +61,7 @@ if __name__ == '__main__':
     adam_beta_1 = 0.5
 
     print('[INFO] Building discriminator')
+    discriminator=discriminator()
     discriminator.summary()
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
@@ -70,6 +71,7 @@ if __name__ == '__main__':
 
     # build the generator
     print('[INFO] Building generator')
+    generator=generator()
     generator.summary()
     generator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
