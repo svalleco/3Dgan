@@ -7,7 +7,7 @@ gROOT.ProcessLine("#include <vector>");
 events = []
 
 if len(sys.argv) != 4:
-  print('Usage: python h5toroot.py [h5 input file name] [json output file name] [max number of events]')
+  print('Usage: python h5toroot.py [h5 input file name] [root output file name] [max number of events]')
   sys.exit()
 
 ifile = h5py.File(sys.argv[1],'r')
