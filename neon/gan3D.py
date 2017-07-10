@@ -3,7 +3,7 @@ from datetime import datetime
 from neon.callbacks.callbacks import Callbacks, GANCostCallback
 from neon.callbacks.plotting_callbacks import GANPlotCallback
 from neon.initializers import Gaussian
-from neon.layers import GeneralizedGANCost, Sequential, Conv, Deconv, Dropout
+from neon.layers import GeneralizedGANCost, Sequential, Conv, Deconv, Dropout, Polling
 from neon.layers.layer import Linear, Reshape
 from neon.layers.container import GenerativeAdversarial
 from neon.models.model import GAN
@@ -40,6 +40,8 @@ D_layers = [Conv((5, 5, 5, 32), name="D11", **conv1),
 
             Conv((5, 5, 5, 8), name="D22", **conv3),
             Dropout(keep = 0.8),
+
+            #Polling((2, 2, 2)),
             
             Linear(1, init=init, name="D_out")]
 
