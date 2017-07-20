@@ -1,3 +1,7 @@
+#!/usr/bin/env python
+"""
+A GAN using 3D conv layers
+"""
 import os
 from datetime import datetime
 from neon.callbacks.callbacks import Callbacks, GANCostCallback
@@ -41,7 +45,7 @@ D_layers = [Conv((5, 5, 5, 32), **conv1),
             Conv((5, 5, 5, 8), **conv3),
             Dropout(keep = 0.8),
 
-            #Pooling((2, 2, 2)),
+            Pooling((2, 2, 2)),
             # what's about the Flatten Layer?
             Linear(1, init=init)] #what's about the activation function?
 
@@ -49,14 +53,14 @@ D_layers = [Conv((5, 5, 5, 32), **conv1),
 # generator using covolution layers
 latent_size = 200
 relu = Rectlin(slope=0)  # relu for generator
-conv4 = dict(init=init, batch_norm=True, activation=lrelu, dilation=[2, 2, 2])
-conv5 = dict(init=init, batch_norm=True, activation=lrelu, padding=[2, 2, 0], dilation=[2, 2, 3])
-conv6 = dict(init=init, batch_norm=False, activation=lrelu, padding=[1, 0, 3])
+conv4 = dict(init=init, batch_norm=True, activation=lrelu, dilation=dict(dil_h=2, dil_w=2, dil_d=2))
+conv5 = dict(init=init, batch_norm=True, activation=lrelu, padding=dict(pad_h=2, pad_w=2, pad_d=0), dilation=dict(dil_h=2, dil_w=2, dil_d=3))
+conv6 = dict(init=init, batch_norm=False, activation=lrelu, padding=dict(pad_h=1, pad_w=0, pad_d=3))
 G_layers = [Linear(64 * 7 * 7, init=init), # what's about the input volume
-            Reshape((7, 7, 8, 8)), 
+            Reshape((7, 7, 8, 8)),
             Conv((6, 6, 8, 64), **conv4),
             Conv((6, 5, 8, 6), **conv5),
-            Conv((3, 3, 8, 6), **conv6), 
+            Conv((3, 3, 8, 6), **conv6),
             Conv((2, 2, 2, 1), init=init, batch_norm=False, activation=relu)]
             # what's about Embedding
 
@@ -65,6 +69,3 @@ layers = GenerativeAdversarial(generator=Sequential(G_layers, name="Generator"),
 
 # setup cost function as CrossEntropy
 cost = GeneralizedGANCost(costfunc=GANCost(func="modified"))
-
-
-
