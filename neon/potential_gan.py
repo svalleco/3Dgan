@@ -15,18 +15,20 @@ from neon.data.dataiterator import ArrayIterator
 from neon.optimizers import GradientDescentMomentum, RMSProp
 from gen_data_norm import gen_rhs
 from neon.backends import gen_backend
-
+from temporary_utils import temp_3Ddata
 import numpy as np
+from sklearn.cross_validation import train_test_split
 
 # load up the data set
-train_data, data_y = gen_rhs(100)
-eval_data, eval_y = gen_rhs(10)
+X, y = temp_3Ddata()
+print(X.shape, 'X shape')
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
+print(X_train.shape, 'X train shape')
+print(y_train.shape, 'y train shape')
 
-train_data /= 30.0
-
-gen_backend(backend='cpu', batch_size=10)
-train_set = ArrayIterator(X=train_data, y=data_y, nclass=2, lshape=(1, 25, 25, 25))
-valid_set = ArrayIterator(X=eval_data, y=eval_y, nclass=2)
+gen_backend(backend='mkl', batch_size=100)
+train_set = ArrayIterator(X=X_train, y=y_train, nclass=2, lshape=(1, 25, 25, 25))
+valid_set = ArrayIterator(X=X_test, y=y_test, nclass=2)
 
 # setup weight initialization function
 init = Gaussian(scale=0.0001)
@@ -70,15 +72,7 @@ G_layers = [
             Deconv((5, 5, 5, 64), **conv2), #27x27x27
             Conv((3, 3, 3, 1), **conv3)
            ]
-            # what's about the Embedding layer
 
-#G_layers = [Affine(128, init=init, activation=lrelu),
-#            Affine(128, init=init, activation=lrelu),
-#            Affine(25 * 25 * 25, init=init, activation=Tanh()),
-#            Reshape((1, 25, 25, 25))
-#            ]
-
-#G_layers = [Affine(25*25*25, init=init, activation=Logistic()), Reshape((1, 25, 25, 25))]
 layers = GenerativeAdversarial(generator=Sequential(G_layers, name="Generator"),
                                discriminator=Sequential(D_layers, name="Discriminator"))
 
