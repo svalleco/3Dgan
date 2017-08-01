@@ -22,11 +22,12 @@ from sklearn.cross_validation import train_test_split
 # load up the data set
 X, y = temp_3Ddata()
 print(X.shape, 'X shape')
+#print(X[0])
 X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
 print(X_train.shape, 'X train shape')
 print(y_train.shape, 'y train shape')
 
-gen_backend(backend='mkl', batch_size=100)
+gen_backend(backend='cpu', batch_size=100)
 train_set = ArrayIterator(X=X_train, y=y_train, nclass=2, lshape=(1, 25, 25, 25))
 valid_set = ArrayIterator(X=X_test, y=y_test, nclass=2)
 
@@ -39,7 +40,8 @@ lrelu = Rectlin(slope=0.1)  # leaky relu for discriminator
 conv1 = dict(init=init, batch_norm=False, activation=lrelu) # what's about BatchNorm Layer and batch_norm parameter?
 conv2 = dict(init=init, batch_norm=True, activation=lrelu, padding=2)
 conv3 = dict(init=init, batch_norm=True, activation=lrelu, padding=1)
-D_layers = [Conv((5, 5, 5, 32), **conv1),
+D_layers = [
+            Conv((5, 5, 5, 32), **conv1),
             Dropout(keep = 0.8),
             Conv((5, 5, 5, 8), **conv2),
             BatchNorm(),
@@ -51,25 +53,28 @@ D_layers = [Conv((5, 5, 5, 32), **conv1),
             BatchNorm(),
             Dropout(keep = 0.8),
             Pooling((2, 2, 2)),
-            Affine(1, init=init, activation=Logistic())] #what's about the activation function?
+            Affine(1, init=init, activation=Logistic())
+            ] #what's about the activation function?
 
 # generator using convolution layers
-latent_size = 200
+init_gen = Gaussian(scale=0.1)
 relu = Rectlin(slope=0)  # relu for generator
 pad1 = dict(pad_h=2, pad_w=2, pad_d=2)
 str1 = dict(str_h=2, str_w=2, str_d=2)
-conv1 = dict(init=init, batch_norm=True, activation=lrelu, padding=pad1, strides=str1)
+conv1 = dict(init=init_gen, batch_norm=True, activation=lrelu, padding=pad1, strides=str1)
 pad2 = dict(pad_h=2, pad_w=2, pad_d=2)
 str2 = dict(str_h=2, str_w=2, str_d=2)
-conv2 = dict(init=init, batch_norm=True, activation=lrelu, padding=pad2, strides=str2)
+conv2 = dict(init=init_gen, batch_norm=True, activation=lrelu, padding=pad2, strides=str2)
 pad3 = dict(pad_h=0, pad_w=0, pad_d=0)
 str3 = dict(str_h=1, str_w=1, str_d=1)
-conv3 = dict(init=init, batch_norm=True, activation=Logistic(), padding=pad3, strides=str3)
+conv3 = dict(init=init_gen, batch_norm=True, activation=relu, padding=pad3, strides=str3)
 G_layers = [
             Affine(8 * 7 * 7 * 7, init=init),
             Reshape((8, 7, 7, 7)),
             Deconv((6, 6, 6, 6), **conv1), #14x14x14
+            BatchNorm(),
             Deconv((5, 5, 5, 64), **conv2), #27x27x27
+            BatchNorm(),
             Conv((3, 3, 3, 1), **conv3)
            ]
 
@@ -80,7 +85,7 @@ layers = GenerativeAdversarial(generator=Sequential(G_layers, name="Generator"),
 optimizer = RMSProp(learning_rate=1e-3, decay_rate=0.99, epsilon=1e-8)
 
 # setup cost function as Binary CrossEntropy
-cost = GeneralizedGANCost(costfunc=GANCost(func="modified"))
+cost = GeneralizedGANCost(costfunc=GANCost(func="original"))
 
 nb_epochs = 3
 batch_size = 100
