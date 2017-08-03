@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from neon.callbacks.callbacks import Callbacks, GANCostCallback
-from neon.callbacks.plotting_callbacks import GANPlotCallback
+#from neon.callbacks.plotting_callbacks import GANPlotCallback
 from neon.initializers import Gaussian
 from neon.layers import GeneralizedGANCost, Affine, Sequential, Conv, Deconv, Dropout, Pooling, BatchNorm
 from neon.layers.layer import Linear, Reshape
@@ -27,7 +27,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
 print(X_train.shape, 'X train shape')
 print(y_train.shape, 'y train shape')
 
-gen_backend(backend='cpu', batch_size=100)
+gen_backend(backend='gpu', batch_size=100)
 train_set = ArrayIterator(X=X_train, y=y_train, nclass=2, lshape=(1, 25, 25, 25))
 valid_set = ArrayIterator(X=X_test, y=y_test, nclass=2)
 
@@ -57,7 +57,7 @@ D_layers = [
             ] #what's about the activation function?
 
 # generator using convolution layers
-init_gen = Gaussian(scale=0.1)
+init_gen = Gaussian(scale=0.001)
 relu = Rectlin(slope=0)  # relu for generator
 pad1 = dict(pad_h=2, pad_w=2, pad_d=2)
 str1 = dict(str_h=2, str_w=2, str_d=2)
@@ -82,15 +82,16 @@ layers = GenerativeAdversarial(generator=Sequential(G_layers, name="Generator"),
                                discriminator=Sequential(D_layers, name="Discriminator"))
 
 # setup optimizer
-optimizer = RMSProp(learning_rate=1e-3, decay_rate=0.99, epsilon=1e-8)
+#optimizer = RMSProp(learning_rate=1e-5, decay_rate=0.9, epsilon=1e-8)
+optimizer = GradientDescentMomentum(learning_rate=1e-6, momentum_coef = 0.9)
 
 # setup cost function as Binary CrossEntropy
-cost = GeneralizedGANCost(costfunc=GANCost(func="original"))
+cost = GeneralizedGANCost(costfunc=GANCost(func="modified"))
 
-nb_epochs = 3
+nb_epochs = 30
 batch_size = 100
 latent_size = 200
-nb_classes = 2
+inb_classes = 2
 nb_test = 100
 
 # initialize model
