@@ -45,8 +45,8 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    from gancheck import generator
-    from gancheck import discriminator 
+    from EnergyGan import generator
+    from EnergyGan import discriminator 
 
     generator=generator()
     discriminator=discriminator()
