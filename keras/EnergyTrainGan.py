@@ -69,7 +69,7 @@ if __name__ == '__main__':
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'kullback_leibler_divergence']
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error']
     )
 
     # build the generator
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'kullback_leibler_divergence']
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error']
     )
 
 
