@@ -45,8 +45,8 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    from gancheck import generator
-    from gancheck import discriminator 
+    from EnergyGan import generator
+    from EnergyGan import discriminator 
 
     generator=generator()
     discriminator=discriminator()
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'kullback_leibler_divergence']
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error']
     )
 
     # build the generator
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'kullback_leibler_divergence']
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error']
     )
 
 
