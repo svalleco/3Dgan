@@ -1,0 +1,53 @@
+import numpy as np
+import matplotlib.pyplot as plt
+plt.switch_backend('Agg')
+
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+with open('lossweights.pkl', 'rb') as f:
+    x = pickle.load(f)
+gen_test = np.asarray(x['test']['generator'])
+gen_train = np.asarray(x['train']['generator'])
+disc_test = np.asarray(x['test']['discriminator'])
+disc_train = np.asarray(x['train']['discriminator'])
+plt.figure(1)
+plt.subplot(221)
+plt.title('Training loss for Discriminator')
+plt.plot(disc_train[:,0], label='tot')
+plt.plot(disc_train[:,1], label='gen')
+plt.plot(disc_train[:,2], label='aux')
+plt.legend()                                                                                                                                                                                              
+plt.subplot(222)
+plt.title('\nTraining loss for Generator')
+plt.plot(gen_train[:,0], label='tot')
+plt.plot(gen_train[:,1], label='gen')
+plt.plot(gen_train[:,2], label='aux')
+plt.legend()                                                                                                                                                                                             
+plt.subplot(223)
+plt.title('\nTesting loss for Discriminator')
+plt.plot(disc_test[:,0], label='tot')
+plt.plot(disc_test[:,1], label='gen')
+plt.plot(disc_test[:,2], label='aux')
+plt.legend()    
+plt.subplot(224)
+plt.title('\nTesting loss for Generator')
+plt.plot(gen_test[:,0], label='tot')
+plt.plot(gen_test[:,1], label='gen')
+plt.plot(gen_test[:,2], label='aux')
+plt.legend()
+plt.savefig('losses.pdf') 
+
+plt.figure(2)
+plt.title('Training losses for GAN')
+plt.plot(disc_train[:,0], label='Disc tot', color='red')
+plt.plot(disc_train[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
+plt.plot(disc_train[:,2], label='Disc aux (Mean Absolute Error)', color='blue')
+plt.plot(gen_train[:,0], label='GAN tot', color='red', linestyle='--')
+plt.plot(gen_train[:,1], label='GAN gen (Binary Cross Entropy)', color='green', linestyle='--')
+plt.plot(gen_train[:,2], label='GAN aux (Mean Absolute Error)', color='blue', linestyle='--')
+plt.legend()
+plt.xlabel('Epochs')  
+plt.ylabel('Loss')                            
+plt.savefig('Combined_losses.pdf')
