@@ -23,8 +23,6 @@ def bit_flip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
-
-
 if __name__ == '__main__':
 
     import keras.backend as K
@@ -62,8 +60,8 @@ if __name__ == '__main__':
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mae', 'mae'],
-        #loss_weights=[3, 1]
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=[6, 0.1, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
 
@@ -91,8 +89,8 @@ if __name__ == '__main__':
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mae', 'mae'],
-        #loss_weights=[3, 1]
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=[6, 0.1, 0.1]
     )
 
 
