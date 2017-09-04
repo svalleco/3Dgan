@@ -12,8 +12,8 @@ from vegan import discriminator as build_discriminator
 from vegan import generator as build_generator
 
 #Get VEGAN params
-gen_weights='veganweights/params_generator_epoch_029.hdf5'
-disc_weights='veganweights/params_discriminator_epoch_029.hdf5'
+gen_weights='veganweights/params_generator_epoch_049.hdf5'
+disc_weights='veganweights/params_discriminator_epoch_049.hdf5'
 batch_size=100
 latent_space =200                                                            
 
@@ -21,7 +21,7 @@ num_events_act=5000
 num_events_gan=5000
 
 plots_dir = 'fixed_plots/'
-filename= 'Gen_ecal_3000'
+filename= 'Gen_ecal_' + str(num_events_gan) + '3000'  # Filename from which generated events are to loaded or saved to.
 # Other params
 save = 0
 get_actual = 1    # Get actual data from file
@@ -207,7 +207,7 @@ if (get_actual):  # if actual data has to be used
       var["max_pos_act_" + str(energy)] = np.zeros((num_events_act, 3))
       var["sum_act" + str(energy)] = np.zeros((num_events_act, 3, 25))
       var["energy_act" + str(energy)] = np.zeros((num_events_act, 1))
-      var["isreal_act" + str(energy)] =np.zeros((num_events_act, 1))
+      #var["isreal_act" + str(energy)] =np.zeros((num_events_act, 1))
              
 ### Get Generated Data                                                                   
 if get_gen:    # if generated data is to be loaded from file
@@ -249,7 +249,7 @@ if get_actual:
      for energy in denergies:
         if (get_gen == 0):
            var["image" + str(energy)] = np.expand_dims(var["X" + str(energy)], axis=-1)
-           var["isreal2_" +str(energy)], var["aux_out2_" + str(energy)] = np.array(d.predict(var["image" + str(energy)], verbose=False, batch_size=batch_size))
+           var["isreal_act" +str(energy)], var["aux_out2_" + str(energy)] = np.array(d.predict(var["image" + str(energy)], verbose=False, batch_size=batch_size))
            var["energy_act" +str(energy)] = var["aux_out2_" + str(energy)]
         #calculations for actual
         for j in range(num_events_act):
@@ -258,6 +258,7 @@ if get_actual:
            var["sum_act" + str(energy)][j, 0] = np.sum(var["events_act" + str(energy)][j], axis=(1,2))
            var["sum_act" + str(energy)][j, 1] = np.sum(var["events_act" + str(energy)][j], axis=(0,2))
            var["sum_act" + str(energy)][j, 2] = np.sum(var["events_act" + str(energy)][j], axis=(0,1))
+           
    
 ### Calculations for generated
 for energy in energies:                                                             
