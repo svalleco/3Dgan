@@ -12,8 +12,8 @@ from vegan import discriminator as build_discriminator
 from vegan import generator as build_generator
 
 #Get VEGAN params
-gen_weights='veganweights/params_generator_epoch_049.hdf5'
-disc_weights='veganweights/params_discriminator_epoch_049.hdf5'
+gen_weights='veganweights/params_generator_epoch_029.hdf5'
+disc_weights='veganweights/params_discriminator_epoch_029.hdf5'
 batch_size=100
 latent_space =200                                                            
 
@@ -150,7 +150,7 @@ def plot_real(array, index, out_file, num_fig, plot_label):
    bins = np.arange(0, 1, 0.01)
    plt.figure(num_fig)
    plt.title('Real/ Fake')
-   label= plot_label + '{:.2f}'.format(np.mean(array[0:index-1, 0]))+ '({:.2f})'.format(np.std(array[0:index-1, 0]))
+   label= plot_label + '\n{:.2f}'.format(np.mean(array[0:index-1, 0]))+ '({:.2f})'.format(np.std(array[0:index-1, 0]))
    plt.hist(array[0:index-1, 0], bins=bins, histtype='step', label= label, normed =1)
    plt.legend()
    plt.ylabel('Events')
