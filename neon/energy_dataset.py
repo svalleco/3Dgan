@@ -5,7 +5,7 @@ from neon.data import NervanaDataIterator
 
 def temp_3Ddata():
 
-   f = h5py.File("/afs/cern.ch/work/s/svalleco/public/Eshuffled100-200.h5","r")
+   f = h5py.File("/Users/svalleco/GAN/data/Ele_v1_total1.h5","r")
    data = f.get('ECAL')
    #dtag =f.get('TAG')
    xtr = np.array(data)
@@ -21,7 +21,7 @@ def temp_3Ddata():
    #return xtr.reshape((xtr.shape[0], 25 * 25 * 25)).astype(np.float32), labels.astype(np.float32)
 
 def get_output():
-   f = h5py.File("/afs/cern.ch/work/s/svalleco/GAN/3Dgan_neon_test/neon/output_data.h5","r")
+   f = h5py.File("/Users/svalleco/GAN/data/output_data.h5","r")
    data = f.get("dataset_1")
    x = np.array(data)
    return x.astype(np.float32)
@@ -48,7 +48,7 @@ class EnergyData(NervanaDataIterator):
             # 3a. grab the right slice from the numpy arrays
             inputs = self.X[:index,:]
             sumE = ecal_train = np.sum(inputs, axis=(1)) 
-            targets =(self.Y(:index), sumE)
+            targets =(self.Y[:index], sumE)
             
             # The arrays X and Y data are in shape (batch_size, num_features),
             # but the iterator needs to return data with shape (num_features, batch_size).

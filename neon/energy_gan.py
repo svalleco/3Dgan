@@ -11,11 +11,11 @@ from neon.transforms import Rectlin, Logistic, GANCost, Tanh
 from neon.util.argparser import NeonArgparser
 from neon.util.persist import ensure_dirs_exist
 from neon.layers.layer import Dropout
-from neon.data.dataiterator import HDF5Iterator
+from neon.data.hdf5iterator import HDF5Iterator
 from neon.optimizers import GradientDescentMomentum, RMSProp, Adam
 from gen_data_norm import gen_rhs
 from neon.backends import gen_backend
-from temporary_utils import temp_3Ddata
+from energy_dataset import temp_3Ddata, EnergyData
 import numpy as np
 from sklearn.model_selection import train_test_split
 # import matplotlib.pyplot as plt
@@ -279,7 +279,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9, random
 print(X_train.shape, 'X train shape')
 print(y_train.shape, 'y train shape')
 
-gen_backend(backend='gpu', batch_size=100)
+gen_backend(backend='cpu', batch_size=100)
 
 
 # setup datasets
@@ -315,7 +315,7 @@ conv3 = dict(init=init, batch_norm=False, activation=lrelu, padding=1, bias=init
 b1 = BranchNode("b1")
 b2 = BranchNode("b2")
 branch1 = [   
-            b1
+            b1,
             Conv((5, 5, 5, 32), **conv1),
             Dropout(keep = 0.8),
             Conv((5, 5, 5, 8), **conv2),
@@ -367,7 +367,7 @@ G_layers = [
            ]
 
 layers = GenerativeAdversarial(generator=Tree(G_layers, name="Generator"),
-                               D_layers)
+                               discriminator=D_layers)
                                #discriminator=Sequential(D_layers, name="Discriminator"))
 print 'layers defined'
 # setup optimizer
