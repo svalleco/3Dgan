@@ -118,6 +118,17 @@ class myGAN(Model):
         else:
             z[:] = 2 * self.be.rand() - 1.
 
+    def fill_noise_sampledE(self, z, normal=True, minE=0., maxE=5.):
+        """
+        Fill z with either uniform or normally distributed random numbers
+        """
+        if normal:
+            # Note fill_normal is not deterministic
+            self.be.fill_normal(z)
+        else:
+            z[:] = 2 * self.be.rand() - 1.
+        z[:] = z[:]*(self.be.rand()*(maxE -minE)+minE)
+
     def initialize(self, dataset, cost=None):
         """
         Propagate shapes through the layers to configure, then allocate space.
@@ -131,9 +142,9 @@ class myGAN(Model):
             return
 
         # Propagate shapes through the layers to configure
-        prev_input = dataset
-        #prev_input = self.layers.configure(self.noise_dim)
-        prev_input = self.layers.configure(prev_input)
+        #prev_input = dataset
+        prev_input = self.layers.configure(self.noise_dim)
+        #prev_input = self.layers.configure(prev_input)
 
         if cost is not None:
             cost.initialize(prev_input)
@@ -148,8 +159,7 @@ class myGAN(Model):
         self.zbuf = self.be.iobuf(self.noise_dim)
         self.ybuf = self.be.iobuf((1,))
         self.z0 = self.be.iobuf(self.noise_dim)  # a fixed noise buffer for generating images
-        self.z0 = prev_input
-        #self.fill_noise(self.z0, normal=(self.noise_type == 'normal'))
+        self.fill_noise_sampledE(self.z0, normal=(self.noise_type == 'normal'))
         self.cost_dis = np.empty((1,), dtype=np.float32)
         self.current_batch = self.gen_iter = self.last_gen_batch = 0
 
@@ -188,7 +198,7 @@ class myGAN(Model):
                                           self.wgan_param_clamp)
 
             # train discriminator on noise
-            self.fill_noise(z, normal=(self.noise_type == 'normal'))
+            self.fill_noise_sampledE(z, normal=(self.noise_type == 'normal'))
             #z = self.z0
             Gz = self.fprop_gen(z)
             y_noise = self.fprop_dis(Gz)
@@ -210,7 +220,7 @@ class myGAN(Model):
 
             # train generator
             if self.current_batch == self.last_gen_batch + self.get_k(self.gen_iter):
-                self.fill_noise(z, normal=(self.noise_type == 'normal'))
+                self.fill_noise_sampledE(z, normal=(self.noise_type == 'normal'))
                 Gz = self.fprop_gen(z)
                 y_temp[:] = y_data
                 y_noise = self.fprop_dis(Gz)
@@ -397,21 +407,21 @@ gan.fit(train_set, num_epochs=nb_epochs, optimizer=optimizer,
 
 # gan.save_params('our_gan.prm')
 
-x_new = np.random.randn(100, latent_size) 
-inference_set = HDF5Iterator(x_new, None, nclass=2, lshape=(latent_size))
-my_generator = Model(gan.layers.generator)
-my_generator.save_params('our_gen.prm')
-my_discriminator = Model(gan.layers.discriminator)
-my_discriminator.save_params('our_disc.prm')
-test = my_generator.get_outputs(inference_set)
-test = np.float32(test*max_elem + mean)
-test =  test.reshape((100, 25, 25, 25))
+#x_new = np.random.randn(100, latent_size) 
+#inference_set = HDF5Iterator(x_new, None, nclass=2, lshape=(latent_size))
+#my_generator = Model(gan.layers.generator)
+#my_generator.save_params('our_gen.prm')
+#my_discriminator = Model(gan.layers.discriminator)
+#my_discriminator.save_params('our_disc.prm')
+#test = my_generator.get_outputs(inference_set)
+#test = np.float32(test*max_elem + mean)
+#test =  test.reshape((100, 25, 25, 25))
 
-print(test.shape, 'generator output')
+#print(test.shape, 'generator output')
 
 #plt.plot(test[0, :, 12, :])
 # plt.savefigure('output_img.png')
 
-h5f = h5py.File('output_data.h5', 'w')
-h5f.create_dataset('dataset_1', data=test)
+#h5f = h5py.File('output_data.h5', 'w')
+#h5f.create_dataset('dataset_1', data=test)
 
