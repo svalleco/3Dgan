@@ -8,8 +8,9 @@ def temp_3Ddata():
    data = f.get('ECAL')
    #dtag =f.get('TAG')
    xtr = np.array(data)
-   #print (xtr.shape)
+   print (xtr.shape)
    labels = np.ones(xtr.shape[0])
+   #labels =f.get('TAG')
    #tag=numpy.array(dtag)
    #xtr=xtr[...,numpy.newaxis]
    #xtr=numpy.rollaxis(xtr,4,1)
