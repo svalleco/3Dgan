@@ -23,8 +23,6 @@ def bit_flip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
-
-
 if __name__ == '__main__':
 
     import keras.backend as K
@@ -40,8 +38,8 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    from vegan import generator
-    from vegan import discriminator 
+    from ecalvegan import generator
+    from ecalvegan import discriminator 
 
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
@@ -62,8 +60,8 @@ if __name__ == '__main__':
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mae'],
-        #loss_weights=[3, 1]
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=[6, 0.2, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
 
@@ -82,17 +80,17 @@ if __name__ == '__main__':
     fake_image = generator( latent)
 
     discriminator.trainable = False
-    fake, aux = discriminator(fake_image)
+    fake, aux, ecal = discriminator(fake_image)
     combined = Model(
         input=[latent],
-        output=[fake, aux],
+        output=[fake, aux, ecal],
         name='combined_model'
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mae'],
-        #loss_weights=[3, 1]
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=[6, 0.2, 0.1]
     )
 
 
@@ -111,7 +109,7 @@ if __name__ == '__main__':
 
     
    # remove unphysical values
-   # X[X < 1e-6] = 0
+    X[X < 1e-6] = 0
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
 
@@ -133,11 +131,13 @@ if __name__ == '__main__':
     X_test = X_test.astype(np.float32)
     y_train = y_train.astype(np.float32)
     y_test = y_test.astype(np.float32)
+    ecal_train = np.sum(X_train, axis=(1, 2, 3))
+    ecal_test = np.sum(X_test, axis=(1, 2, 3))
 
     print(X_train.shape)
     print(X_test.shape)
-    print(y_train.shape)
-    print(y_test.shape)
+    print(ecal_train.shape)
+    print(ecal_test.shape)
     print('*************************************************************************************')
     train_history = defaultdict(list)
     test_history = defaultdict(list)
@@ -162,16 +162,19 @@ if __name__ == '__main__':
 
             image_batch = X_train[index * batch_size:(index + 1) * batch_size]
             energy_batch = y_train[index * batch_size:(index + 1) * batch_size]
+            ecal_batch = ecal_train[index * batch_size:(index + 1) * batch_size]
+
             print(image_batch.shape)
-            print(energy_batch.shape)
-            sampled_energies = np.random.uniform(1, 5,( batch_size,1 ))
+            print(ecal_batch.shape)
+            sampled_energies = np.random.uniform(0, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
+            ecal_ip = np.multiply(2, sampled_energies)
             generated_images = generator.predict(generator_ip, verbose=0)
 
          #   loss_weights=[np.ones(batch_size), 0.05 * np.ones(batch_size)]
              
-            real_batch_loss = discriminator.train_on_batch(image_batch, [bit_flip(np.ones(batch_size)), energy_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [bit_flip(np.zeros(batch_size)), sampled_energies])
+            real_batch_loss = discriminator.train_on_batch(image_batch, [bit_flip(np.ones(batch_size)), energy_batch, ecal_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [bit_flip(np.zeros(batch_size)), sampled_energies, ecal_ip])
                 #    print(real_batch_loss)
                  #   print(fake_batch_loss)
 
@@ -187,11 +190,13 @@ if __name__ == '__main__':
 
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size))
-                sampled_energies = np.random.uniform(1, 5, ( batch_size,1 ))
+                sampled_energies = np.random.uniform(0, 5, ( batch_size,1 ))
                 generator_ip = np.multiply(sampled_energies, noise)
+                ecal_ip = np.multiply(2, sampled_energies)
+
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
-                    [trick, sampled_energies.reshape((-1, 1))]))
+                    [trick, sampled_energies.reshape((-1, 1)), ecal_ip]))
 
             epoch_gen_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
@@ -201,29 +206,33 @@ if __name__ == '__main__':
 
         noise = np.random.normal(0, 1, (nb_test, latent_size))
 
-        sampled_energies = np.random.uniform(1, 5, (nb_test, 1))
+        sampled_energies = np.random.uniform(0, 5, (nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
         generated_images = generator.predict(generator_ip, verbose=False)
+        ecal_ip = np.multiply(2, sampled_energies)
         sampled_energies = np.squeeze(sampled_energies, axis=(1,))
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
-        print(y.shape)
+        ecal = np.concatenate((ecal_test, ecal_ip))
+        print(ecal.shape)
         print(y_test.shape)
         print(sampled_energies.shape)
         aux_y = np.concatenate((y_test, sampled_energies), axis=0)
         print(aux_y.shape)
         discriminator_test_loss = discriminator.evaluate(
-            X, [y, aux_y], verbose=False, batch_size=batch_size)
+            X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
 
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
         sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
+        ecal_ip = np.multiply(2, sampled_energies)
+
         trick = np.ones(2 * nb_test)
 
         generator_test_loss = combined.evaluate(generator_ip,
-                    [trick, sampled_energies.reshape((-1, 1))], verbose=False, batch_size=batch_size)
+                                                [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
 
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
 
@@ -233,11 +242,11 @@ if __name__ == '__main__':
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
 
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}'.format(
+        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
 
-        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}'
+        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
         print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',
