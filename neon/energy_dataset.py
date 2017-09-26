@@ -34,7 +34,7 @@ class EnergyData(NervanaDataIterator):
         self.shape = lshape
         self.start = 0
         self.ndata = X.shape[0]
-        self.nfeatures =1*25*25*25
+        self.nfeatures =1*25*25*25  #Nchannels*W*H*D
         self.nbatches = int(self.ndata/self.be.bsz)
         self.dev_X = (self.nfeatures, self.be.bsz)
         self.dev_Y = (self.be.bsz, self.be.bsz, self.be.bsz)  # 3 targets: real/fake, primaryE, sumEcal
