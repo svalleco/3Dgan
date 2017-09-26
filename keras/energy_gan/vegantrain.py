@@ -61,7 +61,7 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[6, 0.2, 0.1]
+        loss_weights=[6, 0.1, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
 
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[6, 0.2, 0.1]
+        loss_weights=[6, 0.1, 0.1]
     )
 
 
