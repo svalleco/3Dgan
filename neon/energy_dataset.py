@@ -5,19 +5,25 @@ from neon.data import NervanaDataIterator
 
 def temp_3Ddata():
 
-   f = h5py.File("/Users/svalleco/GAN/data/Ele_v1_total1.h5","r")
+   f = h5py.File("/Users/svalleco/GAN/data/small_test.h5","r")
+   #f = h5py.File("/Users/svalleco/GAN/data/Ele_v1_1_2.h5","r")
    data = f.get('ECAL')
    #dtag =f.get('TAG')
    xtr = np.array(data)
    print (xtr.shape)
    #labels = np.ones(xtr.shape[0])
-   labels =f.get('TAG')
-   #tag=numpy.array(dtag)
+   dtag =f.get('target')
+   temp = np.array(dtag[:,1])
+   print (temp.shape)
+   aa=np.reshape(xtr, (xtr.shape[0], 25*25*25))
+   print (aa.shape)
+   sumE = np.sum(aa, axis=(1)) 
+   labels=np.stack((np.array(dtag[:,1]),sumE),axis=1)
    #xtr=xtr[...,numpy.newaxis]
    #xtr=numpy.rollaxis(xtr,4,1)
-   #print xtr.shape
+   print labels.shape
    
-   return xtr.astype(np.float32), labels.astype(np.float32)
+   return aa.astype(np.float32), labels.astype(np.float32)
    #return xtr.reshape((xtr.shape[0], 25 * 25 * 25)).astype(np.float32), labels.astype(np.float32)
 
 def get_output():
@@ -33,11 +39,12 @@ class EnergyData(NervanaDataIterator):
         self.Y = Y
         self.shape = lshape
         self.start = 0
-        self.ndata = X.shape[0]
-        self.nfeatures =1*25*25*25  #Nchannels*W*H*D
+        self.ndata = self.X.shape[0]
+        self.nfeatures =self.X.shape[1] #Nchannels*W*H*D
+        self.nyfeatures =self.Y.shape[1] #Nchannels*W*H*D
         self.nbatches = int(self.ndata/self.be.bsz)
-        self.dev_X = (self.nfeatures, self.be.bsz)
-        self.dev_Y = (self.be.bsz, self.be.bsz, self.be.bsz)  # 3 targets: real/fake, primaryE, sumEcal
+        self.dev_X = self.be.zeros((self.nfeatures, self.be.bsz))
+        self.dev_Y = self.be.zeros((self.nyfeatures, self.be.bsz))  # 3 targets: real/fake, primaryE, sumEcal
 
     def reset(self):
         self.start = 0
@@ -46,9 +53,8 @@ class EnergyData(NervanaDataIterator):
         # 3. loop through minibatches in the dataset
         for index in range(self.start, self.ndata, self.be.bsz):
             # 3a. grab the right slice from the numpy arrays
-            inputs = self.X[:index,:]
-            sumE = ecal_train = np.sum(inputs, axis=(1)) 
-            targets =(self.Y[:index], sumE)
+            inputs = self.X[index:(index+self.be.bsz),:]
+            targets = self.Y[index:(index+self.be.bsz),:]
             
             # The arrays X and Y data are in shape (batch_size, num_features),
             # but the iterator needs to return data with shape (num_features, batch_size).

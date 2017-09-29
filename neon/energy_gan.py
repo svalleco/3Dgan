@@ -2,12 +2,12 @@ import os
 from datetime import datetime
 from neon.callbacks.callbacks import Callbacks, GANCostCallback
 #from neon.callbacks.plotting_callbacks import GANPlotCallback
-from neon.initializers import Gaussian
-from neon.layers import GeneralizedGANCost, Affine, Linear, Sequential, Conv, Deconv, Dropout, Pooling, BatchNorm
+from neon.initializers import Gaussian, Constant
+from neon.layers import GeneralizedGANCost, Affine, Linear, Sequential, Conv, Deconv, Dropout, Pooling, BatchNorm, BranchNode, GeneralizedCost
 from neon.layers.layer import Linear, Reshape
-from neon.layers.container import Tree, Multicost
+from neon.layers.container import Tree, Multicost, LayerContainer
 from neon.models.model import Model
-from neon.transforms import Rectlin, Logistic, GANCost, Tanh
+from neon.transforms import Rectlin, Logistic, GANCost, Tanh, MeanSquared
 from neon.util.argparser import NeonArgparser
 from neon.util.persist import ensure_dirs_exist
 from neon.layers.layer import Dropout
@@ -26,7 +26,7 @@ import logging
 main_logger = logging.getLogger('neon')
 main_logger.setLevel(10)
 
-class myGenerativeAdversarial(Tree):
+class myGenerativeAdversarial(LayerContainer):
     """
     Container for Generative Adversarial Net (GAN). It contains the Generator
     and Discriminator stacks as sequential containers.
@@ -35,7 +35,7 @@ class myGenerativeAdversarial(Tree):
         layers (list): A list containing two Sequential containers
     """
     def __init__(self, generator, discriminator, name=None):
-        super(Tree, self).__init__(name)
+        super(LayerContainer, self).__init__(name)
 
         self.generator = generator
         self.discriminator = discriminator
@@ -58,6 +58,9 @@ class myGenerativeAdversarial(Tree):
         ss += '\n' + '  ' * level + 'Discriminator:\n'
         ss += padstr.join([l.nested_str(level + 1) for l in self.discriminator.layers])
         return ss
+    def get_terminal(self):
+        return self.generator.get_terminal() + self.discriminator.get_terminal()
+
 
 
 class myGAN(Model):
@@ -78,7 +81,7 @@ class myGAN(Model):
         wgan_param_clamp (float or None): In case of WGAN weight clamp value, None for others
         wgan_train_sched (bool): Whether to use the FAIR WGAN training schedule of critics
     """
-    def __init__(self, layers, noise_dim, noise_type='normal', weights_only=False,
+    def __init__(self, layers, noise_dim, dataset, noise_type='normal', weights_only=False,
                  name="model", optimizer=None, k=1,
                  wgan_param_clamp=None, wgan_train_sched=False):
         self.noise_dim = noise_dim
@@ -88,7 +91,7 @@ class myGAN(Model):
         self.wgan_train_sched = wgan_train_sched
         self.nbatches = 0
         self.ndata = 0
-        super(GAN, self).__init__(layers, weights_only=weights_only, name=name,
+        super(myGAN, self).__init__(layers, weights_only=weights_only, name=name,
                                   optimizer=optimizer)
 
     @staticmethod
@@ -142,18 +145,18 @@ class myGAN(Model):
             return
 
         # Propagate shapes through the layers to configure
-        #prev_input = dataset
-        prev_input = self.layers.configure(self.noise_dim)
-        #prev_input = self.layers.configure(prev_input)
+        prev_input = dataset
+        prev_input = self.layers.generator.configure(self.noise_dim)
+        prev_input = self.layers.discriminator.configure(dataset)
 
         if cost is not None:
-            cost.initialize(prev_input)
+            cost.initialize(self.layers)
             self.cost = cost
 
         # Now allocate space
         self.layers.generator.allocate(accumulate_updates=False)
         self.layers.discriminator.allocate(accumulate_updates=True)
-        self.layers.allocate_deltas()
+        self.layers.allocate_deltas(None)
         self.initialized = True
 
         self.zbuf = self.be.iobuf(self.noise_dim)
@@ -277,20 +280,21 @@ class myGAN(Model):
 # load up the data set
 X, y = temp_3Ddata()
 X[X < 1e-6] = 0
-mean = np.mean(X, axis=0, keepdims=True)
-max_elem = np.max(np.abs(X))
-print(np.max(np.abs(X)),'max abs element')
-print(np.min(X),'min element')
-X = (X- mean)/max_elem
-print(X.shape, 'X shape')
-print(np.max(X),'max element after normalisation')
-print(np.min(X),'min element after normalisation')
-X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9, random_state=42)
+#mean = np.mean(X, axis=0, keepdims=True)
+#max_elem = np.max(np.abs(X))
+#print(np.max(np.abs(X)),'max abs element')
+#print(np.min(X),'min element')
+#X = (X- mean)/max_elem
+#print(X.shape, 'X shape')
+#print(np.max(X),'max element after normalisation')
+#print(np.min(X),'min element after normalisation')
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.1, test_size=0.1, random_state=42)
 print(X_train.shape, 'X train shape')
 print(y_train.shape, 'y train shape')
 
 gen_backend(backend='cpu', batch_size=100)
 
+#X_train.reshape((X_train.shape[0], 25 * 25 * 25))
 
 # setup datasets
 train_set = EnergyData(X=X_train, Y=y_train, lshape=(1,25,25,25))
@@ -303,7 +307,7 @@ print Y  # this should be shape (Y1,Y2) of shapes (1)(1)
 assert X.is_contiguous
 assert Y.is_contiguous
 
-in_set.reset()
+train_set.reset()
 
 # generate test set
 valid_set =EnergyData(X=X_test, Y=y_test, lshape=(1,25,25,25))
@@ -343,11 +347,11 @@ branch1 = [
             Affine(1024, init=init, activation=lrelu),
             BatchNorm(),
             b2,
-            Affine(1, init=init, bias=init, activation=Logistic())
+            Affine(nout=1, init=init, bias=init, activation=Logistic())
             ] #real/fake
 branch2 = [b2, 
-           Affine(1, init=init, bias=init, activation=Linear())] #E primary
-branch3 = [b1,Linear(1, init=Constant(1.0))] #SUM ECAL
+           Affine(nout=1, init=init, bias=init, activation=lrelu)] #E primary
+branch3 = [b1,Linear(1, init=Constant(val=1.0))] #SUM ECAL
 
 D_layers = Tree([branch1, branch2, branch3], name="Discriminator") #keep weight between branches equal to 1. for now (alphas=(1.,1.,1.) as by default )
 # generator using convolution layers
@@ -362,7 +366,8 @@ conv2 = dict(init=init_gen, batch_norm=False, activation=lrelu, padding=pad2, st
 pad3 = dict(pad_h=0, pad_w=0, pad_d=0)
 str3 = dict(str_h=1, str_w=1, str_d=1)
 conv3 = dict(init=init_gen, batch_norm=False, activation=Tanh(), padding=pad3, strides=str3, bias=init_gen)
-G_layers = [
+bg = BranchNode("bg")
+branchg  = [bg,
             Affine(1024, init=init_gen, bias=init_gen, activation=relu),
             BatchNorm(),
             Affine(8 * 7 * 7 * 7, init=init_gen, bias=init_gen),
@@ -376,10 +381,14 @@ G_layers = [
             Conv((3, 3, 3, 1), **conv3)
            ]
 
-layers = GenerativeAdversarial(generator=Tree(G_layers, name="Generator"),
-                               discriminator=D_layers)
+G_layers = Tree([branchg], name="Generator")
+
+print D_layers
+print G_layers
+layers = myGenerativeAdversarial(generator=G_layers, discriminator=D_layers)
                                #discriminator=Sequential(D_layers, name="Discriminator"))
 print 'layers defined'
+print layers
 # setup optimizer
 # optimizer = RMSProp(learning_rate=1e-4, decay_rate=0.9, epsilon=1e-8)
 optimizer = GradientDescentMomentum(learning_rate=1e-3, momentum_coef = 0.9)
@@ -387,14 +396,13 @@ optimizer = GradientDescentMomentum(learning_rate=1e-3, momentum_coef = 0.9)
 
 # setup cost function as Binary CrossEntropy
 #cost = GeneralizedGANCost(costfunc=GANCost(func="wasserstein"))
-cost = Multicost([GANCost(func="wasserstein"), MeanSquared, MeanSquared])
+#cost = GeneralizedGANCost(costfunc=Multicost[GANCost(func="wasserstein"), MeanSquared, MeanSquared])
+cost = Multicost(costs=[GeneralizedGANCost(costfunc=GANCost(func="wasserstein")), GeneralizedCost(costfunc=MeanSquared), GeneralizedCost(costfunc=MeanSquared)])
 nb_epochs = 15
 latent_size = 200
-
 # initialize model
 noise_dim = (latent_size)
-gan = GAN(layers=layers, noise_dim=noise_dim, k=5, wgan_param_clamp=0.9)
-
+gan = myGAN(layers=layers, noise_dim=noise_dim, dataset=train_set, k=5, wgan_param_clamp=0.9)
 # configure callbacks
 callbacks = Callbacks(gan, eval_set=valid_set)
 callbacks.add_callback(GANCostCallback())
