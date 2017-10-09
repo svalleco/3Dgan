@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-   
 
+# This file has a function that will take a list of params as input and run training using that. Finally it will run analysis to get a single matric that we will need to optimize
+
+
 from __future__ import print_function
 from collections import defaultdict
 try:
@@ -8,12 +11,14 @@ try:
 except ImportError:
     import pickle
 
-#from h5py import File as HDF5File
 import sys
 import h5py
 import os
 
 import numpy as np
+
+#this does not work so far
+#from skopt import gp_minimize
 
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
@@ -30,10 +35,7 @@ K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
 
-def ecal_sum(image):
-    sum = K.sum(image, axis=(1, 2, 3))
-    return sum
-
+# Fuction used to flip random bits for training
 def bit_flip(x, prob=0.05):
     """ flips a int array's values with some probability """
     x = np.array(x)
@@ -41,6 +43,7 @@ def bit_flip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
+# Architecture that can have additional parametrized layer
 def discriminator(dflag=0, df=8, dx=5, dy=5, dz=5):
 
     image = Input(shape=(25, 25, 25, 1))
@@ -87,7 +90,7 @@ def discriminator(dflag=0, df=8, dx=5, dy=5, dz=5):
     Model(input=image, output=[fake, aux, ecal])
     return Model(input=image, output=[fake, aux, ecal])
 
-def generator(latent_size=200, return_intermediate=False, gflag=0, gf=8, gx=5, gy=5, gz=5):
+def generator(latent_size=200, gflag=0, gf=8, gx=5, gy=5, gz=5):
     
     latent = Input(shape=(latent_size, ))
 
@@ -121,6 +124,7 @@ def generator(latent_size=200, return_intermediate=False, gflag=0, gf=8, gx=5, g
     Model(input=[latent], output=fake_image)
     return Model(input=[latent], output=fake_image)
 
+## Training Function
 def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, dflag=0, df= 16, dx=8, dy=8, dz= 8, gflag=0, gf= 16, gx=8, gy=8, gz= 8):
     g_weights = 'params_generator_epoch_'
     d_weights = 'params_discriminator_epoch_'
@@ -131,7 +135,7 @@ def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_wei
     print('[INFO] Building discriminator')
     d.summary()
     d.compile(
-        optimizer=RMSprop(lr, m, decay, nesterov),
+        optimizer=RMSprop(lr, rho=rho, decay=decay),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ecal_weight]
     )
@@ -156,39 +160,25 @@ def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_wei
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ecal_weight])
     
-    d=h5py.File("/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5",'r')
-    e=d.get('target')
-    X=np.array(d.get('ECAL'))
+    #get data for training
+    f=h5py.File("/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5",'r')
+    e=f.get('target')
+    X=np.array(f.get('ECAL'))
     y=(np.array(e[:,1]))
-    print(X.shape)
-    print(y[:10])
-    print('*************************************************************************************')
-
     # remove unphysical values                                       
     X[X < 1e-6] = 0
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)                                                                                                                                                                                    
+    X_train = X
+    y_train = y                                                                                                                                                                                    
     X_train =np.array(np.expand_dims(X_train, axis=-1))
-    X_test = np.array(np.expand_dims(X_test, axis=-1))
     y_train= np.array(y_train)/100
-    y_test=np.array(y_test)/100
-    print(X_train.shape)
-    print(X_test.shape)
-    print(y_train.shape)
-    print(y_test.shape)
-    print('*************************************************************************************')
-
-
-    nb_train, nb_test = X_train.shape[0], X_test.shape[0]
+       
+    nb_train= X_train.shape[0]
     X_train = X_train.astype(np.float32)
-    X_test = X_test.astype(np.float32)
     y_train = y_train.astype(np.float32)
-    y_test = y_test.astype(np.float32)
     ecal_train = np.sum(X_train, axis=(1, 2, 3))
-    ecal_test = np.sum(X_test, axis=(1, 2, 3))
-
+    
     train_history = defaultdict(list)
-    test_history = defaultdict(list)
-
+    
     for epoch in range(epochs):
 
         print('Epoch {} of {}'.format(epoch + 1, epochs))
@@ -199,15 +189,17 @@ def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_wei
         epoch_disc_loss = []
 
         for index in range(nb_batches):
-            
+            if index % 100 == 0:
+                    print('processed {}/{} batches'.format(index + 1, nb_batches))
+
             noise = np.random.normal(0, 1, (batch_size, latent_size))
 
             image_batch = X_train[index * batch_size:(index + 1) * batch_size]
             energy_batch = y_train[index * batch_size:(index + 1) * batch_size]
             ecal_batch = ecal_train[index * batch_size:(index + 1) * batch_size]
 
-            print(image_batch.shape)
-            print(ecal_batch.shape)
+            #print(image_batch.shape)
+            #print(ecal_batch.shape)
             sampled_energies = np.random.uniform(0, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
             ecal_ip = np.multiply(2, sampled_energies)
@@ -236,57 +228,30 @@ def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_wei
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
 
-        print('\nTesting for epoch {}:'.format(epoch + 1))
-
-        noise = np.random.normal(0, 1, (nb_test, latent_size))
-
-        sampled_energies = np.random.uniform(0, 5, (nb_test, 1))
-        generator_ip = np.multiply(sampled_energies, noise)
-        generated_images = g.predict(generator_ip, verbose=False)
-        ecal_ip = np.multiply(2, sampled_energies)
-        sampled_energies = np.squeeze(sampled_energies, axis=(1,))
-        X = np.concatenate((X_test, generated_images))
-        y = np.array([1] * nb_test + [0] * nb_test)
-        ecal = np.concatenate((ecal_test, ecal_ip))
-        print(ecal.shape)
-        print(y_test.shape)
-        print(sampled_energies.shape)
-        aux_y = np.concatenate((y_test, sampled_energies), axis=0)
-        print(aux_y.shape)
-        discriminator_test_loss = d.evaluate(
-            X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
-
+        #The testing portion was removed 
+        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)      
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
 
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
 
-        test_history['generator'].append(generator_test_loss)
-        test_history['discriminator'].append(discriminator_test_loss)
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
-            'component', *discriminator.metrics_names))
+        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format('component', *d.metrics_names))
         print('-' * 65)
 
         ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
-        print(ROW_FMT.format('generator (train)',
-                             *train_history['generator'][-1]))
-        print(ROW_FMT.format('generator (test)',
-                             *test_history['generator'][-1]))
-        print(ROW_FMT.format('discriminator (train)',
-                             *train_history['discriminator'][-1]))
-        print(ROW_FMT.format('discriminator (test)',
-                             *test_history['discriminator'][-1]))
-        
-        pickle.dump({'train': train_history, 'test': test_history},open('dcgan-history.pkl', 'wb'))
+        print(ROW_FMT.format('generator (train)', *train_history['generator'][-1]))
+        print(ROW_FMT.format('discriminator (train)', *train_history['discriminator'][-1]))
+              
+        pickle.dump({'train': train_history},open('dcgan-history.pkl', 'wb'))
 
-        # save weights at last epoch                                                                                                                                                                                 
+    #save weights at last epoch                                                                                          
     g.save_weights('gen_weights.hdf5'.format(g_weights, epoch), overwrite=True)
     d.save_weights('disc_weights.hdf5'.format(d_weights, epoch), overwrite=True)
 
-def analyse(latent, gen_weights, disc_weights, datafile):
+# This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
+def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5, gy=5, gz=5, dflag=0, df=8, dx=5, dy=5, dz=5):
    print ("Started")
    num_events=3000
-   #datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
    data=h5py.File(datafile,'r')
    X=np.array(data.get('ECAL'))
    y=np.array(data.get('target'))
@@ -295,9 +260,9 @@ def analyse(latent, gen_weights, disc_weights, datafile):
    print("Data is loaded")
    energies=[50, 100, 150, 200, 300, 400, 500] 
    tolerance = 5
-   g = generator()
+   g = generator(latent_size=latent, gflag=0, gf=8, gx=5, gy=5, gz=5)
    g.load_weights(gen_weights)
-   d = discriminator()
+   d = discriminator(dflag=0, df=8, dx=5, dy=5, dz=5)
    d.load_weights(disc_weights)
 
    # Initialization of parameters  
@@ -308,15 +273,9 @@ def analyse(latent, gen_weights, disc_weights, datafile):
      var["max_pos_act_" + str(energy)] = np.zeros((num_events, 3))
      var["sumact" + str(energy)] = np.zeros((num_events, 3, 25))
      var["energy_sampled" + str(energy)] = np.zeros((num_events, 1))
-     #var["energy_act" + str(energy)] = np.zeros((num_events, 1))
-     #var["isreal_act" + str(energy)] =np.zeros((num_events, 1))
-     #var["events_gan" + str(energy)] = np.zeros((num_events, 25, 25, 25))
      var["max_pos_gan_" + str(energy)] = np.zeros((num_events, 3))
      var["sumgan" + str(energy)] = np.zeros((num_events, 3, 25))
-     #var["energy_sampled" + str(energy)] = np.zeros((num_events, 1))
-     #var["energy_gan" + str(energy)] = np.zeros((num_events, 1))
-     #var["isreal_gan" + str(energy)] =np.zeros((num_events, 1))
-     
+          
    ## Sorting data in bins                                                         
    size_data = int(X.shape[0])
    print ("Sorting data")
@@ -369,7 +328,6 @@ def analyse(latent, gen_weights, disc_weights, datafile):
        var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_error"+ str(energy)]**2)/num_events
        var["eprofile_total"+ str(energy)]= 400000 * var["eprofile_total"+ str(energy)]/(energy* energy)
        metrice += var["eprofile_total"+ str(energy)]
-       #print(var["pos_total"+ str(energy)])
    tot = metricp + metrice
    for energy in energies:
        print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]), str(np.unravel_index(var["events_gan" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_gan" + str(energy)]), np.amin(var["events_gan" + str(energy)]), var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
@@ -377,20 +335,33 @@ def analyse(latent, gen_weights, disc_weights, datafile):
        print(" Total Error =  %.4f" %(tot))
    return(tot)
 
+#Function to return a single value for a network performnace metric. The metric needs to be minimized.
 def objective(params):
-   epochs, batch_size, gen_weight, aux_weight, ecal_weight, lr, rho, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz= params
-   vegantrain(10*epochs, pow(2,batch_size), gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
-   score = analyse(pow(2,batch_size), gen_weights, disc_weights, datafile)
+   gen_weights = "gen_weights.hdf5"
+   disc_weights = "disc_weights.hdf5"
+   datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
+   
+   # Just done to print the parameter setting to screen
+   epochs, batch_size, latent, gen_weight, aux_weight, ecal_weight, lr, rho, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz= params
+   params1= [1*epochs, pow(2,batch_size), latent, gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz]
+   print(len(params1))
+   print("epochs= {}   batchsize={}   Latent space={}\nGeneration loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}\nLearning rate={}   rho={}   decay={}\nDiscriminator: extra layer={}  filters={}  x={}  y={}  z{\
+}\nGenerator: extra layer={}  filters={}  x={}  y={}  z{}\n".format(*params1))
+
+   vegantrain(1*epochs, pow(2,batch_size), latent, gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
+   score = analyse(gen_weights, disc_weights, datafile, latent, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
    return score
 
-space = [(3, 5), #epochs 
-         (5, 8), #batch_size
+def main():
+    space = [(3, 5), #epochs x 10 
+         (5, 8), #batch_size power of 2
+         [256, 512], #latent size
          (1, 10), #gen_weight
          (0.01, 0.1), #aux_weight
          (0.01, 0.1), #ecal_weight
          (-8, -1), #lr
          (2, 9), #rho
-         [0, 0.001], #decay
+         [0, 0.001], #decay 
          [True,False], # dflag
          (4, 64), #df
          (2, 16), #dx
@@ -402,14 +373,10 @@ space = [(3, 5), #epochs
          (2, 16), #gy
          (2, 16), #gz
         ]
-gen_weights = "gen_weights.hdf5"
-disc_weights = "disc_weights.hdf5"
-datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-
-#vegantrain(epochs=1)
-tot1 = analyse(200, "bug_removed/6p2p1/6p2p1lossweights/params_generator_epoch_028.hdf5", "bug_removed/6p2p1/6p2p1lossweights/params_discriminator_epoch_028.hdf5", datafile)
-tot2 = analyse(200, "bug_removed/bug_removedweights/params_generator_epoch_028.hdf5", "bug_removed/bug_removedweights/params_discriminator_epoch_028.hdf5", datafile)
-tot3 = analyse(200, "arch_ecal_vegan/network2/ecal_loss_5_1_1_network2/params_generator_epoch_049.hdf5", "arch_ecal_vegan/network2/ecal_loss_5_1_1_network2/params_discriminator_epoch_049.hdf5", datafile)
-print (" The negative performance metric for first = %.4f"%(tot1))
-print (" The negative performance metric for second = %.4f"%(tot2))
-print (" The negative performance metric for third = %.4f"%(tot3))
+    #Instead of scan parameters are provided as lits and objective value is calculated
+    params1 =[1, 7, 256, 10, 0.1, 0.2, -3, 9 , 0, False, 12, 5, 5, 5, False, 12, 5, 5, 5]
+    tot1 = objective(params1)
+    print (" The negative performance metric for first = %.4f"%(tot1))
+    
+if __name__ == "__main__":
+    main()
