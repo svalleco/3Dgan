@@ -53,12 +53,12 @@ def discriminator():
 
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-    aux = Dense(1, activation='LeakyReLU', name='auxiliary')(dnn_out)
+    aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
 
     Model(input=image, output=[fake, aux]).summary()
     return Model(input=image, output=[fake, aux])
 
-def generator(latent_size=200, return_intermediate=False):
+def generator(latent_size=1024, return_intermediate=False):
 
     loc = Sequential([
         Dense(64 * 7* 7, input_dim=latent_size),
@@ -83,15 +83,8 @@ def generator(latent_size=200, return_intermediate=False):
     ])
    
     latent = Input(shape=(latent_size, ))
+     
+    fake_image = loc(latent)
 
-    image_class = Input(shape=(1, ), dtype='float32')
-    emb = Flatten()(Embedding(500, latent_size, input_length=1,
-                              init='glorot_normal')(image_class))
-
-    h = merge([latent, emb], mode='mul')
-
-    fake_image = loc(h)
-
-    Model(input=[latent, image_class], output=fake_image).summary()
-    return Model(input=[latent, image_class], output=fake_image)
-
+    Model(input=[latent], output=fake_image).summary()
+    return Model(input=[latent], output=fake_image)

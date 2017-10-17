@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-   
 
-# This file has a function that will take a list of params as input and run training using that. Finally it will run analysis to get a single matric that we will need to optimize
+# This file has a function that will take a list of params as input and run training using that. Finally it will run analysis to get a single metric that we will need to optimize
 
 
 from __future__ import print_function
