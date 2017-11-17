@@ -38,8 +38,7 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    from ecalvegan import generator
-    from ecalvegan import discriminator 
+    from EcalEnergyGan import generator, discriminator
 
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
