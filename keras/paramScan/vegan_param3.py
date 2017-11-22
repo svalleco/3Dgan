@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-   
 
-# This file has a function that will take a list of params as input and run training using that. Finally it will run analysis to get a single metric that we will need to optimize
+# This file has a function that will take a list of params as input and run training using that. Finally it will run analysis to get a single matric that we will need to optimize
 
 
 from __future__ import print_function
@@ -18,7 +18,7 @@ import os
 import numpy as np
 
 #this does not work so far
-#from skopt import gp_minimize
+from skopt import gp_minimize
 
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
@@ -129,13 +129,13 @@ def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_wei
     g_weights = 'params_generator_epoch_'
     d_weights = 'params_discriminator_epoch_'
 
-    d= discriminator(dflag, df= df, dx=dx, dy=dy, dz= dz)
+    d= discriminator(dflag=dflag, df= df, dx=dx, dy=dy, dz= dz)
     g= generator(latent_size=latent_size, gflag=gflag, gf=gf, gx=gx, gy=gy, gz=gz)
 
     print('[INFO] Building discriminator')
     d.summary()
     d.compile(
-        optimizer=RMSprop(lr, rho=rho, decay=decay),
+        optimizer=RMSprop(lr=lr, rho=rho, decay=decay),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ecal_weight]
     )
@@ -254,7 +254,7 @@ def vegantrain(epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_wei
     d.save_weights('disc_weights.hdf5'.format(d_weights, epoch), overwrite=True)
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5, gy=5, gz=5, dflag=0, df=8, dx=5, dy=5, dz=5):
+def analyse(gen_weights, disc_weights, datafile, latent=200, dflag=0, df=8, dx=5, dy=5, dz=5, gflag=0, gf=8, gx=5, gy=5, gz=5):
    print ("Started")
    num_events=3000
    data=h5py.File(datafile,'r')
@@ -265,9 +265,9 @@ def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5
    print("Data is loaded")
    energies=[50, 100, 150, 200, 300, 400, 500] 
    tolerance = 5
-   g = generator(latent_size=latent, gflag=0, gf=8, gx=5, gy=5, gz=5)
+   g = generator(latent_size=latent, gflag=gflag, gf=gf, gx=gx, gy=gy, gz=gz)
    g.load_weights(gen_weights)
-   d = discriminator(dflag=0, df=8, dx=5, dy=5, dz=5)
+   d = discriminator(dflag=dflag, df=df, dx=dx, dy=dy, dz=dz)
    d.load_weights(disc_weights)
 
    # Initialization of parameters  
@@ -348,25 +348,25 @@ def objective(params):
    
    # Just done to print the parameter setting to screen
    epochs, batch_size, latent, gen_weight, aux_weight, ecal_weight, lr, rho, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz= params
-   params1= [1*epochs, pow(2,batch_size), latent, gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz]
+   params1= [1*epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, lr, rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz]
    print(len(params1))
    print("epochs= {}   batchsize={}   Latent space={}\nGeneration loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}\nLearning rate={}   rho={}   decay={}\nDiscriminator: extra layer={}  filters={}  x={}  y={}  z{\
 }\nGenerator: extra layer={}  filters={}  x={}  y={}  z{}\n".format(*params1))
-
-   vegantrain(1*epochs, pow(2,batch_size), latent, gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
-   score = analyse(gen_weights, disc_weights, datafile, latent, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
+   print(epochs)
+   vegantrain(1*epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, lr, rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
+   score = analyse(gen_weights, disc_weights, datafile, pow(2,latent), dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
    return score
 
 def main():
-    space = [(3, 5), #epochs x 10 
+    space = [[1, 2], #epochs x 10 
          (5, 8), #batch_size power of 2
-         [256, 512], #latent size
+         [8, 10], #latent size
          (1, 10), #gen_weight
          (0.01, 0.1), #aux_weight
          (0.01, 0.1), #ecal_weight
-         (-8, -1), #lr
-         (2, 9), #rho
-         [0, 0.001], #decay 
+         (10**-5, 10**0, "log-uniform"), #lr
+         (8, 9), #rho
+         [0, 0.0001], #decay 
          [True,False], # dflag
          (4, 64), #df
          (2, 16), #dx
@@ -386,14 +386,17 @@ def main():
     gen_weights3="veganweights/params_generator_epoch_039.hdf5"
     disc_weights3="veganweights/params_discriminator_epoch_039.hdf5"
 
-    params1 =[1, 7, 256, 10, 0.1, 0.2, -3, 9 , 0, False, 12, 5, 5, 5, False, 12, 5, 5, 5]
-    #tot1 = objective(params1)
+#    params1 =[1, 7, 256, 10, 0.1, 0.2, -3, 9 , 0, False, 12, 5, 5, 5, False, 12, 5, 5, 5]
+#    tot1 = objective(params1)
+#    print (" The negative performance metric for first = %.4f"%(tot1))
+    res_gp = gp_minimize(objective, space, n_calls=100, random_state=0)
+
+    "Best score=%.4f" % res_gp.fun
+    #tot1 = analyse(gen_weights1, disc_weights1, datafile)
+    #tot2 = analyse(gen_weights2, disc_weights2, datafile)
+    #tot3 = analyse(gen_weights3, disc_weights3, datafile)
     #print (" The negative performance metric for first = %.4f"%(tot1))
-    tot1 = analyse(gen_weights1, disc_weights1, datafile)
-    tot2 = analyse(gen_weights2, disc_weights2, datafile)
-    tot3 = analyse(gen_weights3, disc_weights3, datafile)
-    print (" The negative performance metric for first = %.4f"%(tot1))
-    print (" The negative performance metric for first = %.4f"%(tot2))
-    print (" The negative performance metric for first = %.4f"%(tot3))
+    #print (" The negative performance metric for first = %.4f"%(tot2))
+    #print (" The negative performance metric for first = %.4f"%(tot3))
 if __name__ == "__main__":
     main()
