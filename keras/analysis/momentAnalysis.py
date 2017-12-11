@@ -9,8 +9,8 @@ plt.switch_backend('Agg')
 import time
 import numpy.core.umath_tests as umath
 
-from normalInit import discriminator as build_discriminator
-from normalInit import generator as build_generator
+from arch11 import discriminator as build_discriminator
+from arch11 import generator as build_generator
 
 #Get VEGAN params
 n_jets = 150000         #events to take from data file
@@ -21,11 +21,11 @@ get_gen=0             # whether load from file. In that case discrimination will
 m=2                   #moments
 
 #Get weights
-gen_weights='params_generator_epoch_029.hdf5'
-disc_weights='params_discriminator_epoch_029.hdf5'
+gen_weights='veganweights/params_generator_epoch_039.hdf5'
+disc_weights='veganweights/params_discriminator_epoch_039.hdf5'
 filename = 'Gen_cont_' + str(n_jets) + 'events.h5'
 datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-plots_dir = 'randNormalplots/'
+plots_dir = 'ecal2_epoch40arch11/'
 ## Get Full data                                                               
 d=h5py.File(datafile,'r')
 c=np.array(d.get('ECAL'))
@@ -211,24 +211,8 @@ def plot_error(array1, array2, index, out_file, num_fig, plot_label, pos=2):
    plt.legend(title='                       Mean     ( std )', loc=pos)
    plt.savefig(out_file)
 
-def plot_ecal(array, index, out_file, num_fig, plot_label):
-   # plot ecal sum                                                                                                    
-   bins = np.arange(0, 600, 5)
-   plt.figure(num_fig)
-   ecal_array=np.sum(array, axis=(1, 2, 3))
-   ecal_array= np.multiply(50, ecal_array[:index-1])
-   label= plot_label + '\n{:.2f}'.format(np.mean(ecal_array))+ '({:.2f})'.format(np.std(ecal_array))
-   plt.title('ECAL SUM')
-   plt.xlabel('ECAL SUM GeV')
-   plt.ylabel('Events')
-   plt.hist(ecal_array, bins=bins, histtype='step', label=label, normed=1)
-   pos = 0 if energy <= 300 else 2                                      
-   plt.legend(loc=pos)
-   plt.savefig(out_file)
-   
-
 def plot_ecal_error(array1, array2, index, out_file, num_fig, plot_label, pos=2):
-   # plot error                                                                                                                                             
+   # plot error                                                                                                                                                                                                    
    plt.figure(num_fig)
    bins = np.linspace(-150, 150, 30)
    parray = np.multiply(100, array2[:index-1])
@@ -246,6 +230,21 @@ def plot_ecal_error(array1, array2, index, out_file, num_fig, plot_label, pos=2)
    plt.legend(title='                       Mean     ( std )', loc=pos)
    plt.savefig(out_file)
 
+def plot_ecal(array, index, out_file, num_fig, plot_label):
+   # plot ecal sum                                                                                                    
+   bins = np.arange(0, 600, 5)
+   plt.figure(num_fig)
+   ecal_array=np.sum(array, axis=(1, 2, 3))
+   ecal_array= np.multiply(50, ecal_array[:index-1])
+   label= plot_label + '\n{:.2f}'.format(np.mean(ecal_array))+ '({:.2f})'.format(np.std(ecal_array))
+   plt.title('ECAL SUM')
+   plt.xlabel('ECAL SUM GeV')
+   plt.ylabel('Events')
+   plt.hist(ecal_array, bins=bins, histtype='step', label=label, normed=1)
+   pos = 0 if energy <= 300 else 2                                      
+   plt.legend(loc=pos)
+   plt.savefig(out_file)
+   
 def plot_hits(array, index, out_file, num_fig, plot_label):
    # plot ecal sum                                                                                                                                        
    bins = np.arange(0, 600, 5)
@@ -322,7 +321,7 @@ def plot_e_normalized(array, index, out_file, num_fig, energy, color, bar=0):
       plt.errorbar(energy, np.mean(array[0:index-1]), yerr= np.std(array[0:index]), fmt='o', label=label, color =color)
    plt.ylabel('Ep - Er / Ep')
    plt.xlabel('Energy')
-   plt.ylim(ymax = 0.2, ymin = -0.1)
+   #plt.ylim(ymax = 0.2, ymin = -0.1)
    plt.legend(title='Data = red & GAN = blue', fontsize='xx-small')
    plt.savefig(out_file)
 
@@ -336,7 +335,7 @@ def plot_ecal_normalized(array, index, out_file, num_fig, energy, color, bar=0):
       plt.errorbar(energy, np.mean(array[0:index - 1]), yerr= np.std(array[0:index-1]), fmt='o', label=label, color =color)
    plt.ylabel('Ep - Ecal / Ep')
    plt.xlabel('Energy')
-   plt.ylim(ymax = 0.2, ymin = -0.2)
+   #plt.ylim(ymax = 0.2, ymin = -0.2)
    plt.legend(title='Data = red & GAN = blue', fontsize='xx-small')
    plt.savefig(out_file)
 
