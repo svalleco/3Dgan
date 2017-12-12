@@ -14,8 +14,7 @@ os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
 import tensorflow
-#from keras.utils.training_utils import multi_gpu_model
-from keras.utils import training_utils
+from keras.utils.training_utils import multi_gpu_model
 import h5py 
 import numpy as np
 def bit_flip(x, prob=0.05):
@@ -64,7 +63,7 @@ if __name__ == '__main__':
     print('[INFO] Building discriminator')
     #discriminator.summary()
     #discriminator.load_weights('veganweights/params_discriminator_epoch_019.hdf5')
-    parallel_discr = multi_gpu_model(discriminator, gpus=2)
+    parallel_discr = multi_gpu_model(discriminator, gpus=1)
 
     #discriminator.compile(
     parallel_discr.compile(
@@ -79,7 +78,7 @@ if __name__ == '__main__':
     print('[INFO] Building generator')
     #generator.summary()
     #generator.load_weights('veganweights/params_generator_epoch_019.hdf5')
-    parallel_gener = multi_gpu_model(generator, gpus=2)
+    parallel_gener = multi_gpu_model(generator, gpus=1)
     #generator.compile(
     parallel_gener.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
@@ -98,7 +97,7 @@ if __name__ == '__main__':
         output=[fake, aux, ecal],
         name='combined_model'
     )
-    parallel_comb = multi_gpu_model(combined, gpus=2)
+    parallel_comb = multi_gpu_model(combined, gpus=1)
     parallel_comb.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
