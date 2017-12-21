@@ -180,8 +180,8 @@ if __name__ == '__main__':
     targetNorm=100.
     multiplier=1
     n_threads=3
-    NTest = NTestSamples=50000
-    NTrain = 500000
+    NTest = NTestSamples=500
+    NTrain = 5000
     #This function will setup Generators
     Train_genC,Test_genC,Norms,shapes,TrainSampleList,TestSampleList= mySetupData(FileSearch,
     						          ECAL,
@@ -278,8 +278,8 @@ if __name__ == '__main__':
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))     
         if verbose:
 	    progress_bar = Progbar(target=nb_batches)
-	epoch_gen_loss = []
-        epoch_disc_loss = []
+	epoch_gen_train_loss = []
+        epoch_disc_train_loss = []
 
         for D in Traingen:
 	    X_train, y_train= D
@@ -304,17 +304,10 @@ if __name__ == '__main__':
             generator_ip = np.multiply(sampled_energies, noise)
             ecal_ip = np.multiply(2, sampled_energies)
             generated_images = generator.predict(generator_ip, verbose=0)
-
-         #   loss_weights=[np.ones(batch_size), 0.05 * np.ones(batch_size)]
-             
+         
             real_batch_loss = discriminator.train_on_batch(image_batch, [bit_flip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [bit_flip(np.zeros(batch_size)), sampled_energies, ecal_ip])
-                #    print(real_batch_loss)
-                 #   print(fake_batch_loss)
-
-#            fake_batch_loss = discriminator.train_on_batch(disc_in_fake, disc_op_fake, loss_weights)
-
-            epoch_disc_loss.append([
+            epoch_disc_train_loss.append([
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
 
@@ -332,43 +325,47 @@ if __name__ == '__main__':
                     [generator_ip],
                     [trick, sampled_energies.reshape((-1, 1)), ecal_ip]))
 
-            epoch_gen_loss.append([
+            epoch_gen_train_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
-"""
+
         print('\nTesting for epoch {}:'.format(epoch + 1))
+        epoch_gen_test_loss = []
+        epoch_disc_test_loss = []
 
-        noise = np.random.normal(0, 1, (nb_test, latent_size))
-
-        sampled_energies = np.random.uniform(0, 5, (nb_test, 1))
-        generator_ip = np.multiply(sampled_energies, noise)
-        generated_images = generator.predict(generator_ip, verbose=False)
-        ecal_ip = np.multiply(2, sampled_energies)
-        sampled_energies = np.squeeze(sampled_energies, axis=(1,))
-        X = np.concatenate((X_test, generated_images))
-        y = np.array([1] * nb_test + [0] * nb_test)
-        ecal = np.concatenate((ecal_test, ecal_ip))
-        print(ecal.shape)
-        print(y_test.shape)
-        print(sampled_energies.shape)
-        aux_y = np.concatenate((y_test, sampled_energies), axis=0)
-        print(aux_y.shape)
-        discriminator_test_loss = discriminator.evaluate(
-            X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
-
-        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
-
-        noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
-        sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
-        generator_ip = np.multiply(sampled_energies, noise)
-        ecal_ip = np.multiply(2, sampled_energies)
-
-        trick = np.ones(2 * nb_test)
-
-        generator_test_loss = combined.evaluate(generator_ip,
+        for D in Testgen:
+            X_test, y_test = D
+            noise = np.random.normal(0, 1, (batch_size, latent_size))
+            sampled_energies = np.random.uniform(0, 5, (batch_size, 1))
+            generator_ip = np.multiply(sampled_energies, noise)
+            generated_images = generator.predict(generator_ip, verbose=False)
+            ecal_ip = np.multiply(2, sampled_energies)
+            sampled_energies = np.squeeze(sampled_energies, axis=(1,))
+            X = np.concatenate((X_test, generated_images))
+            y = np.array([1] * batch_size + [0] * batch_size)
+            ecal = np.concatenate((ecal_test, ecal_ip))
+            print(ecal.shape)
+            print(y_test.shape)
+            print(sampled_energies.shape)
+            aux_y = np.concatenate((y_test, sampled_energies), axis=0)
+            print(aux_y.shape)
+            discriminator_test_loss = discriminator.evaluate(
+                         X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
+            noise = np.random.normal(0, 1, (2 * batch_size, latent_size))
+            sampled_energies = np.random.uniform(0, 5, (2 * batch_size, 1))
+            generator_ip = np.multiply(sampled_energies, noise)
+            ecal_ip = np.multiply(2, sampled_energies)
+            trick = np.ones(2 * batch_size)
+            generator_test_loss = combined.evaluate(generator_ip,
                                                 [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
+            epoch_disc_test_loss.append(discriminator_test_loss)
+	    epoch_gen_test_loss.append(generator_test_loss)
 
-        generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
+        discriminator_test_loss = np.mean(np.array(epoch_disc_test_loss), axis=0)
+        generator_test_loss = np.mean(np.array(epoch_gen_test_loss), axis=0)
+
+        discriminator_train_loss = np.mean(np.array(epoch_disc_train_loss), axis=0)
+        generator_train_loss = np.mean(np.array(epoch_gen_train_loss), axis=0)
 
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
@@ -391,10 +388,10 @@ if __name__ == '__main__':
                              *test_history['discriminator'][-1]))
 
         # save weights every epoch
-        generator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(g_weights, epoch),
+        generator.save_weights('veganweights2/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
-        discriminator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(d_weights, epoch),
+        discriminator.save_weights('veganweights2/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
 
         pickle.dump({'train': train_history, 'test': test_history},
-open('dcgan-history.pkl', 'wb'))"""
+open('dcgan-history2.pkl', 'wb'))
