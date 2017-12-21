@@ -40,7 +40,7 @@ def myNorm(Norms):
             Norm=Norms[i]
             if i == 0:
                 D[D < 1e-666666] = 0
-		D = np.expand_dims(D, axis=-1)
+                D=np.expand_dims(D, axis=-1)
             if i == 1:
                 D = D[:,1]
             if Norm != 0.:
@@ -277,12 +277,12 @@ if __name__ == '__main__':
     for epoch in range(nb_epochs):
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))     
         if verbose:
-	    progress_bar = Progbar(target=nb_batches)
-	epoch_gen_train_loss = []
+            progress_bar = Progbar(target=nb_batches)
+        epoch_gen_train_loss = []
         epoch_disc_train_loss = []
 
         for D in Traingen:
-	    X_train, y_train= D
+            X_train, y_train= D
             print('Train generated')
             batches+=1
             if verbose:
@@ -359,7 +359,7 @@ if __name__ == '__main__':
             generator_test_loss = combined.evaluate(generator_ip,
                                                 [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
             epoch_disc_test_loss.append(discriminator_test_loss)
-	    epoch_gen_test_loss.append(generator_test_loss)
+            epoch_gen_test_loss.append(generator_test_loss)
 
         discriminator_test_loss = np.mean(np.array(epoch_disc_test_loss), axis=0)
         generator_test_loss = np.mean(np.array(epoch_gen_test_loss), axis=0)
