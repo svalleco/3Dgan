@@ -14,8 +14,9 @@ os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
 from DLTools.ThreadedGenerator import DLh5FileGenerator
+#from DLTools.GeneratorCacher import * 
 import glob
-import h5py 
+import h5py
 import numpy as np
 from CaloDNN.NeuralNets.LoadData import *
 from adlkit.data_provider.cached_data_providers import GeneratorCacher
@@ -88,6 +89,9 @@ def mySetupData(FileSearch,
     TrainSampleList,TestSampleList=DivideFiles(FileSearch,f,
                                                datasetnames=datasets,
                                                Particles=Particles)
+    print('Train Events in files = {}'.format(len(TrainSampleList) * 10000)
+    print('Test Events in files = {}'.format(len(TestSampleList) * 10000)
+
     sample_spec_train = list()
     for item in TrainSampleList:
         sample_spec_train.append((item[0], item[1] , item[2], 1))
@@ -146,11 +150,11 @@ if __name__ == '__main__':
 
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
-  
+
     from ecalvegan import generator
     from ecalvegan import discriminator
 
-    nb_epochs = 1
+    nb_epochs = 30
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -163,7 +167,8 @@ if __name__ == '__main__':
 
     ECALShape= None, 25, 25, 25
     HCALShape= None, 5, 5, 60
-    FileSearch="/bigdata/shared/LCD/NewV1/*scan/*.h5"
+    FileSearch="/eos/project/d/dshep/LCD/V1/*scan/*.h5"
+    #FileSearch="/afs/cern.ch/work/g/gkhattak/public/Ele_v1*.h5"
     train_file="/tmp/gulrukh-CaloDNN-LCD-TrainEvent-Cache.h5"
     test_file="/tmp/gulrukh-CaloDNN-LCD-TestEvent-Cache.h5"
     Particles=["Ele"]
@@ -180,11 +185,11 @@ if __name__ == '__main__':
     targetNorm=100.
     multiplier=1
     n_threads=3
-    NTest = NTestSamples=500
-    NTrain = 5000
+    NTest = NTestSamples=20000
+    NTrain = 180000
     #This function will setup Generators
     Train_genC,Test_genC,Norms,shapes,TrainSampleList,TestSampleList= mySetupData(FileSearch,
-    						          ECAL,
+                                                          ECAL,
                                                           HCAL,
                                                           target,
                                                           NClasses,
@@ -204,7 +209,7 @@ if __name__ == '__main__':
 
     Train_genC.start()
     Train_gen = Train_genC.first().generate()
-    
+
     Test_genC.start()
     Test_gen = Test_genC.first().generate()
 
@@ -225,8 +230,8 @@ if __name__ == '__main__':
     Testgen = Test_cache.PreloadGenerator()
 
 
-    g_weights = 'params_generator_epoch_' 
-    d_weights = 'params_discriminator_epoch_' 
+    g_weights = 'params_generator_epoch_'
+    d_weights = 'params_discriminator_epoch_'
 
     print('[INFO] Building discriminator')
     discriminator.summary()
@@ -238,7 +243,7 @@ if __name__ == '__main__':
         loss_weights=[8, 0.2, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
-    
+
     # build the generator
     print('[INFO] Building generator')
     generator.summary()
@@ -250,7 +255,7 @@ if __name__ == '__main__':
     )
 
     latent = Input(shape=(latent_size, ), name='combined_z')
-     
+
     fake_image = generator( latent)
 
     discriminator.trainable = False
@@ -268,23 +273,25 @@ if __name__ == '__main__':
         loss_weights=[8, 0.2, 0.1]
     )
 
-         
+
     nb_train, nb_test = NTrain, NTest
     nb_batches = NTrain/batch_size
+    nb_testbatches= NTest/batch_size
     print('*************************************************************************************')
     train_history = defaultdict(list)
     test_history = defaultdict(list)
+    
     for epoch in range(nb_epochs):
-        print('Epoch {} of {}'.format(epoch + 1, nb_epochs))     
+        print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         if verbose:
             progress_bar = Progbar(target=nb_batches)
         epoch_gen_train_loss = []
         epoch_disc_train_loss = []
 
-        for D in Traingen:
-            X_train, y_train= D
+        for batches in range(nb_batches):
+            X_train, y_train= Traingen.next()
             print('Train generated')
-            batches+=1
+            #batches+=1
             if verbose:
                 progress_bar.update(batches)
             else:
@@ -304,7 +311,7 @@ if __name__ == '__main__':
             generator_ip = np.multiply(sampled_energies, noise)
             ecal_ip = np.multiply(2, sampled_energies)
             generated_images = generator.predict(generator_ip, verbose=0)
-         
+
             real_batch_loss = discriminator.train_on_batch(image_batch, [bit_flip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [bit_flip(np.zeros(batch_size)), sampled_energies, ecal_ip])
             epoch_disc_train_loss.append([
@@ -328,26 +335,30 @@ if __name__ == '__main__':
             epoch_gen_train_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
-
+        
         print('\nTesting for epoch {}:'.format(epoch + 1))
         epoch_gen_test_loss = []
         epoch_disc_test_loss = []
 
-        for D in Testgen:
-            X_test, y_test = D
+        for D in range(nb_testbatches):
+            X_test, y_test = Testgen.next()
+            image_batch = X_train.astype(np.float32)
+            energy_batch = y_train.astype(np.float32)
+            ecal_batch = np.sum(image_batch, axis=(1, 2, 3))
+
             noise = np.random.normal(0, 1, (batch_size, latent_size))
             sampled_energies = np.random.uniform(0, 5, (batch_size, 1))
             generator_ip = np.multiply(sampled_energies, noise)
             generated_images = generator.predict(generator_ip, verbose=False)
             ecal_ip = np.multiply(2, sampled_energies)
             sampled_energies = np.squeeze(sampled_energies, axis=(1,))
-            X = np.concatenate((X_test, generated_images))
+            X = np.concatenate((image_batch, generated_images))
             y = np.array([1] * batch_size + [0] * batch_size)
-            ecal = np.concatenate((ecal_test, ecal_ip))
+            ecal = np.concatenate((ecal_batch, ecal_ip))
             print(ecal.shape)
             print(y_test.shape)
             print(sampled_energies.shape)
-            aux_y = np.concatenate((y_test, sampled_energies), axis=0)
+            aux_y = np.concatenate((energy_batch, sampled_energies), axis=0)
             print(aux_y.shape)
             discriminator_test_loss = discriminator.evaluate(
                          X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
@@ -369,7 +380,6 @@ if __name__ == '__main__':
 
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
-
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
 
