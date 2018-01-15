@@ -13,14 +13,16 @@ import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
-from DLTools.ThreadedGenerator import DLh5FileGenerator
+#from DLTools.ThreadedGenerator import DLh5FileGenerator
 #from DLTools.GeneratorCacher import * 
 import glob
 import h5py
 import numpy as np
-from CaloDNN.NeuralNets.LoadData import *
+#from CaloDNN.NeuralNets.LoadData import *
 from adlkit.data_provider.cached_data_providers import GeneratorCacher
+from adlkit.data_provider import H5FileDataProvider
 import time
+import math
 
 def bit_flip(x, prob=0.05):
     """ flips a int array's values with some probability """
@@ -53,6 +55,7 @@ def myNorm(Norms):
                 out.append(D)
         return out
     return NormalizationFunction
+
 
 def mySetupData(FileSearch,
               ECAL,HCAL,target,
@@ -89,8 +92,8 @@ def mySetupData(FileSearch,
     TrainSampleList,TestSampleList=DivideFiles(FileSearch,f,
                                                datasetnames=datasets,
                                                Particles=Particles)
-    print('Train Events in files = {}'.format(len(TrainSampleList) * 10000)
-    print('Test Events in files = {}'.format(len(TestSampleList) * 10000)
+    print('Train Events in files = {}'.format(len(TrainSampleList) * 10000))
+    print('Test Events in files = {}'.format(len(TestSampleList) * 10000))
 
     sample_spec_train = list()
     for item in TrainSampleList:
@@ -100,9 +103,9 @@ def mySetupData(FileSearch,
     for item in TestSampleList:
         sample_spec_test.append((item[0], item[1] , item[2], 1))
 
-    q_multipler = 2
+    q_multipler = 20
     read_multiplier = 1
-    n_buckets = 1
+    n_buckets = 4
 
     Train_genC = H5FileDataProvider(sample_spec_train,
                                     max=math.ceil(float(NTrain)/BatchSize),
@@ -128,12 +131,53 @@ def mySetupData(FileSearch,
                                    read_multiplier=read_multiplier,
                                    #make_one_hot=True,
                                    sleep_duration=1,
-                                   wrap_examples=False)
+                                   wrap_examples=True)
 
     print ("Class Index Map:", Train_genC.config.class_index_map)
 
     return Train_genC,Test_genC,Norms,shapes,TrainSampleList,TestSampleList
 
+def DivideFiles(FileSearch="/data/LCD/*/*.h5",Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+    print ("Searching in :",FileSearch)
+    Files = glob.glob(FileSearch)
+
+    print ("Found",len(Files),"files.")
+    
+    FileCount=0
+    Samples={}
+    for F in Files:
+        FileCount+=1
+        basename=os.path.basename(F)
+        ParticleName=basename.split("_")[0].replace("Escan","")
+
+        if ParticleName in Particles:
+            try:
+                Samples[ParticleName].append((F,datasetnames,ParticleName))
+            except:
+                Samples[ParticleName]=[(F,datasetnames,ParticleName)]
+
+        if MaxFiles>0:
+            if FileCount>MaxFiles:
+                break
+    
+    out=[] 
+
+    print ("Electron are in ", FileCount ," files.")
+    for j in range(len(Fractions)):
+        out.append([])
+        
+    SampleI=len(Samples.keys())*[int(0)]
+    
+    for i,SampleName in enumerate(Samples):
+        Sample=Samples[SampleName]
+        NFiles=len(Sample)
+
+        for j,Frac in enumerate(Fractions):
+            EndI=int(SampleI[i]+round(NFiles*Frac))
+            out[j]+=Sample[SampleI[i]:EndI]
+            SampleI[i]=EndI
+
+    return out
 
 
 if __name__ == '__main__':
@@ -155,7 +199,7 @@ if __name__ == '__main__':
     from ecalvegan import discriminator
 
     nb_epochs = 30
-    batch_size = 128
+    batch_size = 100
     latent_size = 200
     verbose = 'false'
     batches = 0
@@ -172,7 +216,7 @@ if __name__ == '__main__':
     train_file="/tmp/gulrukh-CaloDNN-LCD-TrainEvent-Cache.h5"
     test_file="/tmp/gulrukh-CaloDNN-LCD-TestEvent-Cache.h5"
     Particles=["Ele"]
-    MaxEvents=int(8.e5)
+    #MaxEvents=int(8.e5)
     NClasses=len(Particles)
     BatchSize= batch_size
     NSamples=BatchSize*10
@@ -184,9 +228,10 @@ if __name__ == '__main__':
     HCALNorm= None
     targetNorm=100.
     multiplier=1
-    n_threads=3
+    n_threads=4
     NTest = NTestSamples=20000
     NTrain = 180000
+    start = time.time()
     #This function will setup Generators
     Train_genC,Test_genC,Norms,shapes,TrainSampleList,TestSampleList= mySetupData(FileSearch,
                                                           ECAL,
@@ -214,7 +259,7 @@ if __name__ == '__main__':
     Test_gen = Test_genC.first().generate()
 
     Test_cache = GeneratorCacher(Test_gen, BatchSize, max=NSamples,
-                          wrap=False,
+                          wrap=True,
                           delivery_function=None,
                           cache_filename=train_file,
                           delete_cache_file=False)
@@ -227,9 +272,8 @@ if __name__ == '__main__':
                           delete_cache_file=False)
 
     Traingen = Train_cache.DiskCacheGenerator()
-    Testgen = Test_cache.PreloadGenerator()
-
-
+    #Testgen = Test_cache.PreloadGenerator()
+    Testgen = Test_cache.DiskCacheGenerator()                                                             
     g_weights = 'params_generator_epoch_'
     d_weights = 'params_discriminator_epoch_'
 
@@ -290,6 +334,8 @@ if __name__ == '__main__':
 
         for batches in range(nb_batches):
             X_train, y_train= Traingen.next()
+            if batches==0:
+               print('Energy for first 10 events...', y_train[:10])
             print('Train generated')
             #batches+=1
             if verbose:
@@ -405,3 +451,5 @@ if __name__ == '__main__':
 
         pickle.dump({'train': train_history, 'test': test_history},
 open('dcgan-history2.pkl', 'wb'))
+end = time.time()
+print('Total time for {} epochs = {} sec'.format(nb_epochs, end - start))
