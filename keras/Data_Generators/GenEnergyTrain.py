@@ -117,7 +117,7 @@ def mySetupData(FileSearch,
                                     n_buckets=n_buckets,
                                     read_multiplier=read_multiplier,
                                     #make_one_hot=True,
-                                    sleep_duration=1,
+                                    sleep_duration=0.1,
                                     wrap_examples=True)
 
     Test_genC = H5FileDataProvider(sample_spec_test,
@@ -130,7 +130,7 @@ def mySetupData(FileSearch,
                                    n_buckets=n_buckets,
                                    read_multiplier=read_multiplier,
                                    #make_one_hot=True,
-                                   sleep_duration=1,
+                                   sleep_duration=0.1,
                                    wrap_examples=True)
 
     print ("Class Index Map:", Train_genC.config.class_index_map)
@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     from ecalvegan import generator
     from ecalvegan import discriminator
-
+    init_start = time.time()
     nb_epochs = 30
     batch_size = 100
     latent_size = 200
@@ -211,8 +211,9 @@ if __name__ == '__main__':
 
     ECALShape= None, 25, 25, 25
     HCALShape= None, 5, 5, 60
-    FileSearch="/eos/project/d/dshep/LCD/V1/*scan/*.h5"
+    #FileSearch="/eos/project/d/dshep/LCD/V1/*scan/*.h5"
     #FileSearch="/afs/cern.ch/work/g/gkhattak/public/Ele_v1*.h5"
+    FileSearch="/bigdata/shared/LCD/NewV1/*scan/*.h5"
     train_file="/tmp/gulrukh-CaloDNN-LCD-TrainEvent-Cache.h5"
     test_file="/tmp/gulrukh-CaloDNN-LCD-TestEvent-Cache.h5"
     Particles=["Ele"]
@@ -258,14 +259,14 @@ if __name__ == '__main__':
     Test_genC.start()
     Test_gen = Test_genC.first().generate()
 
-    Test_cache = GeneratorCacher(Test_gen, BatchSize, max=NSamples,
+    Test_cache = GeneratorCacher(Test_gen, BatchSize, max=NTrain,
                           wrap=True,
                           delivery_function=None,
                           cache_filename=train_file,
                           delete_cache_file=False)
 
 
-    Train_cache = GeneratorCacher(Train_gen, BatchSize, max=NSamples,
+    Train_cache = GeneratorCacher(Train_gen, BatchSize, max=NTest,
                           wrap=True,
                           delivery_function=None,
                           cache_filename=test_file,
@@ -324,14 +325,15 @@ if __name__ == '__main__':
     print('*************************************************************************************')
     train_history = defaultdict(list)
     test_history = defaultdict(list)
-    
+    init_time = time.time() - init_start
+    print('Initialization time was {} seconds'.format(init_time))
     for epoch in range(nb_epochs):
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         if verbose:
             progress_bar = Progbar(target=nb_batches)
         epoch_gen_train_loss = []
         epoch_disc_train_loss = []
-
+        epoch_start = time.time()
         for batches in range(nb_batches):
             X_train, y_train= Traingen.next()
             if batches==0:
@@ -381,7 +383,8 @@ if __name__ == '__main__':
             epoch_gen_train_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
-        
+        epoch_time = time.time() - epoch_start
+        print('Time for {} epoch was {} seconds'.format(epoch, epoch_time))
         print('\nTesting for epoch {}:'.format(epoch + 1))
         epoch_gen_test_loss = []
         epoch_disc_test_loss = []
