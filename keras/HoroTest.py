@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -9,11 +9,11 @@ except ImportError:
     import pickle
 import keras
 import argparse
-import os
-os.environ['LD_LIBRARY_PATH'] = os.getcwd()
+#import os
+#os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
-from keras.utils.training_utils import multi_gpu_model
+#from keras.utils.training_utils import multi_gpu_model
 import h5py 
 import numpy as np
 def bit_flip(x, prob=0.05):
@@ -35,8 +35,8 @@ if __name__ == '__main__':
     from keras.utils.generic_utils import Progbar
     from sklearn.cross_validation import train_test_split
 
-    import tensorflow as tf
-    config = tf.ConfigProto(log_device_placement=True)
+    #import tensorflow as tf
+    #config = tf.ConfigProto(log_device_placement=True)
   
     from EcalEnergyGan import generator, discriminator
 
@@ -49,7 +49,10 @@ if __name__ == '__main__':
    # Pin GPU to be used to process local rank (one GPU per process)
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-    config.gpu_options.visible_device_list = str(hvd.local_rank())
+    import time
+    time.sleep( 10* hvd.local_rank())
+    import setGPU
+    #config.gpu_options.visible_device_list = str(hvd.local_rank())
     tf.Session(config=config)
 
 
@@ -57,7 +60,7 @@ if __name__ == '__main__':
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
 
-    nb_epochs = 30 
+    nb_epochs = 25 
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -117,7 +120,9 @@ if __name__ == '__main__':
     )
 
 
-    d=h5py.File("/bigdata/shared/LCD/Pions_fullSpectrum/ChPiEscan_1_2.h5",'r')
+    #d=h5py.File("/bigdata/shared/LCD/Pions_fullSpectrum/ChPiEscan_1_2.h5",'r')
+    #d=h5py.File("/bigdata/shared/LCD/small_test.h5",'r')
+    d=h5py.File("/bigdata/shared/LCD/Electrons_fullSpectrum/Ele_v1_1_2.h5",'r')
     e=d.get('target')
     X=np.array(d.get('ECAL'))
     y=(np.array(e[:,1]))
@@ -134,13 +139,13 @@ if __name__ == '__main__':
    # remove unphysical values
     X[X < 1e-6] = 0
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.2, test_size=0.1)
 
     # tensorflow ordering
-    X_train =np.array(np.expand_dims(X_train, axis=-1))
-    X_test = np.array(np.expand_dims(X_test, axis=-1))
-    y_train= np.array(y_train)/100
-    y_test=np.array(y_test)/100
+    X_train =np.expand_dims(X_train, axis=-1)
+    X_test = np.expand_dims(X_test, axis=-1)
+    y_train= y_train/100
+    y_test=y_test/100
     print(X_train.shape)
     print(X_test.shape)
     print(y_train.shape)
@@ -169,12 +174,21 @@ if __name__ == '__main__':
     # This is necessary to ensure consistent initialization of all workers when
     # training is started with random weights or restored from a checkpoint.
     #callbacks = [
-    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+    #    
     #]
 
-    bcast_op = hvd.broadcast_global_variables(0)
-    tf.get_session().run(bcast_op)
+    gcb =hvd.callbacks.BroadcastGlobalVariablesCallback(0)
+    dcb =hvd.callbacks.BroadcastGlobalVariablesCallback(0)
+    ccb =hvd.callbacks.BroadcastGlobalVariablesCallback(0)
+    gcb.set_model( generator )
+    dcb.set_model( discriminator )
+    ccb.set_model( combined )
 
+
+    gcb.on_train_begin()
+    dcb.on_train_begin()
+    ccb.on_train_begin()
+    
     for epoch in range(nb_epochs):
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
 
@@ -290,10 +304,14 @@ if __name__ == '__main__':
 #                             *test_history['discriminator'][-1]))
 
         # save weights every epoch
-        generator.save_weights('weights/{0}{1:03d}.hdf5'.format(g_weights, epoch),
-                               overwrite=True)
-        discriminator.save_weights('weights/{0}{1:03d}.hdf5'.format(d_weights, epoch),
+        ## this needs to done only on one process. overwise each worker is writing it
+        if hvd.rank()==0:
+            print ("saving weights of gen")
+            generator.save_weights('weights/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                    overwrite=True)
-
-        pickle.dump({'train': train_history, 'test': test_history},
-open('pion-dcgan-history.pkl', 'wb'))
+            print ("saving weights of disc")        
+            discriminator.save_weights('weights/{0}{1:03d}.hdf5'.format(d_weights, epoch),
+                                       overwrite=True)
+            
+            pickle.dump({'train': train_history, 'test': test_history},
+                        open('pion-dcgan-history.pkl', 'wb'))
