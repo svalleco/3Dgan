@@ -16,11 +16,10 @@ import h5py
 import os
 
 import numpy as np
+import glob
 
-#this does not work so far
 from skopt import gp_minimize
 from skopt.space import Real, Integer, Categorical
-#from skopt.utils import use_named_args
 
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
@@ -37,7 +36,12 @@ K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
 import time
-
+import numpy.core.umath_tests as umath
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from matplotlib.colors import LogNorm, Normalize
+plt.switch_backend('Agg')
 
 # Fuction used to flip random bits for training
 def bit_flip(x, prob=0.05):
@@ -137,7 +141,8 @@ def get_data(datafile):
     y=(np.array(y[:,1]))
     X[X < 1e-6] = 0
     X = np.expand_dims(X, axis=-1)
-    y = y/100
+    #y=np.expand_dims(y[:,1], axis=-1)
+    #y = y/100
     X = X.astype(np.float32)
     y = y.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
@@ -147,13 +152,14 @@ def get_data(datafile):
     return X_train, X_test, y_train, y_test, ecal_train, ecal_test
   
 ## Training Function
-def vegantrain(X_train, y_train, ecal_train, epochs=10, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, dflag=0, df= 16, dx=8, dy=8, dz= 8, dp=0.2, gflag=0, gf= 16, gx=8, gy=8, gz= 8):
+def vegantrain(d, g, X_train, y_train, ecal_train, epochs=10, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0):
+#dflag=0, df= 16, dx=8, dy=8, dz= 8, dp=0.2, gflag=0, gf= 16, gx=8, gy=8, gz= 8):
     init_start = time.time()
     g_weights = 'params_generator_epoch_'
     d_weights = 'params_discriminator_epoch_'
 
-    d= discriminator(dflag=dflag, df= df, dx=dx, dy=dy, dz= dz, dp=dp)
-    g= generator(latent_size=latent_size, gflag=gflag, gf=gf, gx=gx, gy=gy, gz=gz)
+    #d= discriminator(dflag=dflag, df= df, dx=dx, dy=dy, dz= dz, dp=dp)
+    #g= generator(latent_size=latent_size, gflag=gflag, gf=gf, gx=gx, gy=gy, gz=gz)
 
     print('[INFO] Building discriminator')
     d.compile(
@@ -167,7 +173,7 @@ def vegantrain(X_train, y_train, ecal_train, epochs=10, batch_size=128, latent_s
     g.compile(
         optimizer=RMSprop(lr=lr, rho=rho, decay=decay),
         loss='binary_crossentropy')
-
+    y_train= y_train/100
     latent = Input(shape=(latent_size, ), name='combined_z')
     fake_image = g(latent)
     d.trainable = False
@@ -256,18 +262,17 @@ def vegantrain(X_train, y_train, ecal_train, epochs=10, batch_size=128, latent_s
     d.save_weights('disc_weights.hdf5'.format(d_weights, epoch), overwrite=True)
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(X_train, X_test, y_train, y_test, ecal_train, ecal_test, gen_weights, disc_weights, latent=200, dflag=0, df=8, dx=5, dy=5, dz=5, dp = 0.2, gflag=0, gf=8, gx=5, gy=5, gz=5):
+def analyse(d, g, X, Y, gen_weights, disc_weights, latent=200):
    print ("Started")
    num_events=1000
    energies=[50, 100, 150, 200, 300, 400, 500] 
    tolerance = 5
-   g = generator(latent_size=latent, gflag=gflag, gf=gf, gx=gx, gy=gy, gz=gz)
+   m = 2
    g.load_weights(gen_weights)
-   d = discriminator(dflag=dflag, df=df, dx=dx, dy=dy, dz=dz)
    d.load_weights(disc_weights)
-   X = np.concatenate(X_train, X_test)
-   y = np.concatenate(y_train, y_test)
-   ecal = np.concatenate(ecal_train, ecal_test)
+   #X = np.concatenate(X_train, X_test)
+   Y = np.reshape(Y, (-1, 1))
+   #ecal = np.concatenate(ecal_train, ecal_test)
    # Initialization of parameters  
    var = {}
    for energy in energies:
@@ -278,20 +283,31 @@ def analyse(X_train, X_test, y_train, y_test, ecal_train, ecal_test, gen_weights
      var["energy_sampled" + str(energy)] = np.zeros((num_events, 1))
      var["max_pos_gan_" + str(energy)] = np.zeros((num_events, 3))
      var["sumgan" + str(energy)] = np.zeros((num_events, 3, 25))
+     var["x_act" + str(energy)] = np.zeros((num_events, m))
+     var["y_act" + str(energy)] =np.zeros((num_events, m))
+     var["z_act" + str(energy)] =np.zeros((num_events, m))
+     var["x_gan" + str(energy)] =np.zeros((num_events, m))
+     var["y_gan" + str(energy)] =np.zeros((num_events, m))
+     var["z_gan" + str(energy)] =np.zeros((num_events, m))
           
    ## Sorting data in bins                                                         
    size_data = int(X.shape[0])
    print ("Sorting data")
-   print(Y[:10])
+   print (X.shape)
+   print (Y.shape)
+   print (Y[:10])
    for i in range(size_data):
      for energy in energies:
         if Y[i][0] > energy-tolerance and Y[i][0] < energy+tolerance and var["index" + str(energy)] < num_events:
-            var["events_act" + str(energy)][var["index" + str(energy)]]= X[i]
+            var["events_act" + str(energy)][var["index" + str(energy)]]= np.squeeze(X[i])
             var["energy_sampled" + str(energy)][var["index" + str(energy)]] = Y[i]/100
             var["index" + str(energy)]= var["index" + str(energy)] + 1
+            
+        #print('The energy {} has {} events'.format(energy, var["index" + str(energy)]))
    # Generate images
    for energy in energies:        
         noise = np.random.normal(0, 1, (var["index" + str(energy)], latent))
+        print(energy, var["index" + str(energy)], noise.shape)
         sampled_labels = var["energy_sampled" + str(energy)]
         generator_in = np.multiply(sampled_labels, noise)
         generated_images = g.predict(generator_in, verbose=False, batch_size=100)
@@ -301,42 +317,86 @@ def analyse(X_train, X_test, y_train, y_test, ecal_train, ecal_test, gen_weights
         #print(var["events_gan" + str(energy)].shape)
         #print(var["events_act" + str(energy)].shape)
 # calculations                                                                                        
-   for j in range(num_events):
-    for energy in energies:
-      var["max_pos_act_" + str(energy)][j] = np.unravel_index(var["events_act" + str(energy)][j].argmax(), (25, 25, 25))
-      var["sumact" + str(energy)][j, 0] = np.sum(var["events_act" + str(energy)][j], axis=(1,2))
-      var["sumact" + str(energy)][j, 1] = np.sum(var["events_act" + str(energy)][j], axis=(0,2))
-      var["sumact" + str(energy)][j, 2] = np.sum(var["events_act" + str(energy)][j], axis=(0,1))
-      var["max_pos_gan_" + str(energy)][j] = np.unravel_index(var["events_gan" + str(energy)][j].argmax(), (25, 25, 25))
-      var["sumgan" + str(energy)][j, 0] = np.sum(var["events_gan" + str(energy)][j], axis=(1,2))
-      var["sumgan" + str(energy)][j, 1] = np.sum(var["events_gan" + str(energy)][j], axis=(0,2))
-      var["sumgan" + str(energy)][j, 2] = np.sum(var["events_gan" + str(energy)][j], axis=(0,1))
-   #### Generate Data table to screen                                                                    
-   print ("Actual Data")
-   print ("Energy\t\t Events\t\tMaximum Value\t\t Maximum loc\t\t\t Mean\t\t\t Minimum\t\t")
    for energy in energies:
-       print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), str(np.unravel_index(var["events_act" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_act" + str(energy)]), np.amin(var["events_act" + str(energy)])))
+     for j in range(var["index" + str(energy)]):
+        var["max_pos_act_" + str(energy)][j] = np.unravel_index(var["events_act" + str(energy)][j].argmax(), (25, 25, 25))
+        var["sumact" + str(energy)][j, 0] = np.sum(var["events_act" + str(energy)][j], axis=(1,2))
+        var["sumact" + str(energy)][j, 1] = np.sum(var["events_act" + str(energy)][j], axis=(0,2))
+        var["sumact" + str(energy)][j, 2] = np.sum(var["events_act" + str(energy)][j], axis=(0,1))
+        var["max_pos_gan_" + str(energy)][j] = np.unravel_index(var["events_gan" + str(energy)][j].argmax(), (25, 25, 25))
+        var["sumgan" + str(energy)][j, 0] = np.sum(var["events_gan" + str(energy)][j], axis=(1,2))
+        var["sumgan" + str(energy)][j, 1] = np.sum(var["events_gan" + str(energy)][j], axis=(0,2))
+        var["sumgan" + str(energy)][j, 2] = np.sum(var["events_gan" + str(energy)][j], axis=(0,1))
+     var["totalE_act" + str(energy)] = np.sum(var["events_act" + str(energy)][:var["index" + str(energy)]], axis=(1, 2, 3))
+     var["totalE_gan" + str(energy)] = np.sum(var["events_gan" + str(energy)][:var["index" + str(energy)]], axis=(1, 2, 3))
+     # Moments Computations                                                                                          
+     ecal_size = 25
+     ECAL_midX = np.zeros(var["index" + str(energy)])
+     ECAL_midY = np.zeros(var["index" + str(energy)])
+     ECAL_midZ = np.zeros(var["index" + str(energy)])
+     for i in range(m):
+        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
+        moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
+        sumx = var["sumact" + str(energy)][0:(var["index" + str(energy)]), 0]
+        ECAL_momentX = umath.inner1d(sumx, moments)/var["totalE_act" + str(energy)]
+        if i==0: ECAL_midX = ECAL_momentX.transpose()
+        var["x_act"+ str(energy)][:var["index" + str(energy)],i]= ECAL_momentX
+     for i in range(m):
+        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
+        moments = np.power((relativeIndices.transpose()-ECAL_midY).transpose(), i+1)
+        ECAL_momentY = umath.inner1d(var["sumact" + str(energy)][:var["index" + str(energy)], 1], moments)/var["totalE_act" + str(energy)]
+        if i==0: ECAL_midY = ECAL_momentY.transpose()
+        var["y_act"+ str(energy)][:var["index" + str(energy)],i]= ECAL_momentY
+     for i in range(m):
+        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
+        moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
+        ECAL_momentZ = umath.inner1d(var["sumact" + str(energy)][:var["index" + str(energy)], 2], moments)/var["totalE_act" + str(energy)]
+        if i==0: ECAL_midZ = ECAL_momentZ.transpose()
+        var["z_act"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentZ
 
-   #### Generate GAN table to screen                                                                 
-                                                                                                      
-   print ("Generated Data")
-   print ("Energy\t\t Events\t\tMaximum Value\t\t Maximum loc\t\t\t Mean\t\t\t Minimum\t\tPosition error\t\t Energy Profile error\t\t")
+     ECAL_midX = np.zeros(var["index" + str(energy)])
+     ECAL_midY = np.zeros(var["index" + str(energy)])
+     ECAL_midZ = np.zeros(var["index" + str(energy)])
+     for i in range(m):
+        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
+        moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
+        ECAL_momentX = umath.inner1d(var["sumgan" + str(energy)][:var["index" + str(energy)], 0], moments)/var["totalE_gan" + str(energy)]
+        if i==0: ECAL_midX = ECAL_momentX.transpose()
+        var["x_gan"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentX
+     for i in range(m):
+        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
+        moments = np.power((relativeIndices.transpose()-ECAL_midY).transpose(), i+1)
+        ECAL_momentY = umath.inner1d(var["sumgan" + str(energy)][:var["index" + str(energy)], 1], moments)/var["totalE_gan" + str(energy)]
+        if i==0: ECAL_midY = ECAL_momentY.transpose()
+        var["y_gan"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentY
+     for i in range(m):
+        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
+        moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
+        ECAL_momentZ = umath.inner1d(var["sumgan" + str(energy)][:var["index" + str(energy)], 2], moments)/var["totalE_gan" + str(energy)]
+        if i==0: ECAL_midZ = ECAL_momentZ.transpose()
+        var["z_gan"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentZ
    metricp = 0
    metrice = 0
    for energy in energies:
-       var["pos_error"+ str(energy)] = var["max_pos_act_" + str(energy)] - var["max_pos_gan_" + str(energy)]
-       var["pos_total"+ str(energy)] = np.sum(var["pos_error"+ str(energy)]**2)/num_events
+       var["posx_error"+ str(energy)]= (var["x_act"+ str(energy)]-var["x_gan"+ str(energy)])/25
+       var["posy_error"+ str(energy)]= (var["y_act"+ str(energy)]-var["y_gan"+ str(energy)])/25
+       var["posz_error"+ str(energy)]= (var["z_act"+ str(energy)]-var["z_gan"+ str(energy)])/25
+       var["pos_error"+ str(energy)]= ((var["posx_error"+ str(energy)])**2 + (var["posy_error"+ str(energy)])**2 + (var["posz_error"+ str(energy)])**2)
+       var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/var["index" + str(energy)]
        metricp += var["pos_total"+ str(energy)]
-       var["eprofile_error"+ str(energy)]= var["sumact" + str(energy)] - var["sumgan" + str(energy)]
-       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_error"+ str(energy)]**2)/num_events
-       var["eprofile_total"+ str(energy)]= 400000 * var["eprofile_total"+ str(energy)]/(energy* energy)
+       Ecal = np.tile(var["totalE_act" + str(energy)], (25,3, 1))
+       Ecal = Ecal.transpose()
+       var["eprofile_error"+ str(energy)]= np.divide((var["sumact" + str(energy)] - var["sumgan" + str(energy)]), Ecal)
+       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_error"+ str(energy)]**2)
+       var["eprofile_total"+ str(energy)]= var["eprofile_total"+ str(energy)]/var["index" + str(energy)]
        metrice += var["eprofile_total"+ str(energy)]
    tot = metricp + metrice
+
    for energy in energies:
        print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]), str(np.unravel_index(var["events_gan" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_gan" + str(energy)]), np.amin(var["events_gan" + str(energy)]), var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
-       print(" Position Error = %.4f\t Energy Profile Error =   %.4f" %(metricp, metrice))
-       print(" Total Error =  %.4f" %(tot))
-   return(tot)
+   print(" Position Error = %.4f\t Energy Profile Error =   %.4f" %(metricp, metrice))
+   print(" Total Error =  %.4f" %(tot))
+   return(tot, metricp, metrice)
 
 #Function to return a single value for a network performnace metric. The metric needs to be minimized.
 def objective(params):
@@ -350,12 +410,13 @@ def objective(params):
    epochs, batch_size, latent, gen_weight, aux_weight, ecal_weight, lr, rho, decay, dflag, df, dx, dy, dz, dp, gflag, gf, gx, gy, gz= params
    params1= [epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, lr, rho * 0.1, decay, dflag, df, dx, dy, dz, dp, gflag, gf, gx, gy, gz]
    print("epochs= {}   batchsize={}   Latent space={}\nGeneration loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}\nLearning rate={}   rho={}   decay={}\nDiscriminator: extra layer={}  filters={}  x={}  y={}  z={} dp={}\nGenerator: extra layer={}  filters={}  x={}  y={}  z{}\n".format(*params1))
-   vegantrain(X_train, y_train, ecal_train, 1*epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, 
-                                                                              lr, rho * 0.1, decay, dflag, df, dx, dy, dz, dp, gflag, gf, gx, gy, gz)
-   score = analyse(X_train, X_test, y_train, y_test, ecal_train, ecal_test, gen_weights, disc_weights, datafile, pow(2,latent), dflag, df, dx, dy, dz, dp, gflag, gf, gx, gy, gz)
+   d = discriminator(dflag, df, dx, dy, dz, dp)
+   g = generator(pow(2,latent), gflag, gf, gx, gy, gz)
+   vegantrain(d, g, X_train, y_train, ecal_train, 1*epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, lr, rho * 0.1, decay)
+   score = analyse(X_train, y_train, gen_weights, disc_weights, datafile, pow(2,latent), discriminator, generator)
    return score
 
-def main():
+def hpscan():
     space = [Integer(1, 25), #name ='epochs'),  
          Integer(5, 8), #name ='batch_size'),
          Integer(8, 10), #name='latent size'),
@@ -411,5 +472,53 @@ def main():
                                            res_gp.x[15], res_gp.x[16], res_gp.x[17],
                                            res_gp.x[18], res_gp.x[19]))
 
+def analysisTest(X, y, weightpath, resultfile):
+    from arch16 import generator, discriminator
+    genpath = weightpath +  "/params_generator*.hdf5"
+    discpath = weightpath + "/params_discriminator*.hdf5"
+    
+    gen_weights=[]
+    disc_weights=[]
+    for f in sorted(glob.glob(genpath)):
+      gen_weights.append(f)
+    for f in sorted(glob.glob(discpath)):
+      disc_weights.append(f)
+    print(len(gen_weights))
+    print(len(disc_weights))
+    print(X.shape)
+    print(y.shape)
+    results = []
+    d = discriminator()
+    g = generator(200)
+#    for i in range(len(gen_weights)):
+    for i in range(2):                                                                                            
+       results.append(analyse(d, g, X, y, gen_weights[i], disc_weights[i]))
+
+#    for i in range(len(gen_weights)):
+    for i in range(2):                                                                                            
+       print ('The results for......',gen_weights[i])
+       print (" The result for {} = {:.2f} , {:.2f}, {:.2f}".format(i, results[i][0], results[i][1], results[i][2]\
+))
+    total=[]
+    pos_e=[]
+    energy_e=[]
+    for item in results:
+        total.append(item[0])
+        pos_e.append(item[1])
+        energy_e.append(item[2])
+    plt.figure()
+    plt.plot(total, label = 'Total')
+    plt.plot(pos_e, label = 'Max pos error')
+    plt.plot(energy_e , label = 'Energy profile error')
+    plt.legend()
+    plt.xticks(np.arange(0, 30, 1.0))
+    plt.savefig(resultfile)
+
 if __name__ == "__main__":
-    main()
+    #hpscan()
+    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
+    weightpath = "/afs/cern.ch/work/g/gkhattak/weights/arch16weights"
+    resultfile = 'result_train.pdf'          
+    #X_train, X_test, y_train, y_test, ecal_train, ecal_test= get_data(datafile)
+    #analysisTest(X_train, y_train, weightpath, resultfile)
+    hpscan()
