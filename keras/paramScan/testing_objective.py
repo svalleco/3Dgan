@@ -228,7 +228,7 @@ def main():
          (1, 10), #gen_weight
          (0.01, 0.1), #aux_weight
          (0.01, 0.1), #ecal_weight
-         (-8, -1), #lr
+         (-9, -1), #lr
          (2, 9), #rho
          [0, 0.001], #decay 
          [True,False], # dflag
@@ -242,9 +242,9 @@ def main():
          (2, 16), #gy
          (2, 16), #gz
         ]
-    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-    genpath = "/afs/cern.ch/work/g/gkhattak/caltech8p2p1weights/params_generator*.hdf5"
-    discpath = "/afs/cern.ch/work/g/gkhattak/caltech8p2p1weights/params_discriminator*.hdf5"
+    datafile = "/nfshome/gkhattak/Ele_v1_1_2.h5"
+    genpath = "newweights/params_generator*.hdf5"
+    discpath = "newweights/params_discriminator*.hdf5"
     gen_weights=[]
     disc_weights=[]
     for f in sorted(glob.glob(genpath)):
@@ -274,16 +274,30 @@ def main():
     total=[]
     pos_e=[]
     energy_e=[]
+    mine = 100
+    minp = 100
+    mint = 100 
+    num = 0
     for item in results:
         total.append(item[0])
+        if item[0]< mint:
+           mint = item[0]
+           mint_n = num
         pos_e.append(item[1])
+        if item[1]< minp:
+           minp = item[1]
+           minp_n = num
         energy_e.append(item[2])
+        if item[2]< mine:
+           mine = item[2]
+           mine_n = num
+        num = num + 1
     plt.figure()
     plt.plot(total, label = 'Total')
     plt.plot(pos_e, label = 'Max pos error')
     plt.plot(energy_e , label = 'Energy profile error')
-    plt.legend()
-    plt.xticks(np.arange(0, 30, 1.0))
+    plt.legend(title='Min total error{:.2f}({})\n, Position error {:.2f}({}), Energy error {:.2}({})'.format(mint, mint_n, minp, minp_n, mine, mine_n))
+    plt.xticks(np.arange(0, len(gen_weights), 2))
     plt.savefig('result.pdf')
 if __name__ == "__main__":
     main()
