@@ -19,7 +19,7 @@ latent_space =200
 num_events=3000         #events in each bin
 save=0                #whether save generated output in a file
 get_gen=0             # whether load from file. In that case discrimination will not be performed but the file must be generated using same energies as the data file.
-m=2                   #moments
+m=3                   #moments
 
 #Get weights
 #gen_weights='/afs/cern.ch/work/g/gkhattak/caltech8p2p1weights/params_generator_epoch_017.hdf5'
@@ -33,8 +33,6 @@ plots_dir = 'readbyfile_8p2p1_epo46/'
 d=h5py.File(datafile,'r')
 X=np.array(d.get('ECAL'))[:n_jets]
 Y=np.array(d.get('target'))[:n_jets,1]
-#X=np.array(X[:n_jets])
-#Y=np.array(Y[:n_jets,1])
 Y=np.expand_dims(Y, axis=-1)
 tolerance = 5
 print " Data is loaded"
@@ -143,33 +141,24 @@ def plot_energy_wt_hist(array, index, out_file, num_fig, plot_label, pos=0):
    plt.figure(num_fig)
    plt.subplot(221)
    plt.title('X-axis')
-   ecal = np.zeros((index, 25))
-   print('..........index', index)
-   print('....ecal shape', ecal.shape)
-   print('....array shape', array.shape)   
    sumx_array = array[:index, 0]
-   print('sumx shape', sumx.shape)
-   sumx_array = sumx_array.sum(axis = 0)
-   print('sumx shape', sumx.shape)
+   sumx_array = sumx_array.mean(axis = 0)
    label= plot_label + '\n{:.2f}'.format(np.mean(sumx_array))+ '({:.2f})'.format(np.std(sumx_array))
    plt.hist(bins, weights = sumx_array, label=plot_label, bins = bins, histtype='step', normed=1)
-   #plt.plot(data, label=plot_label)
-   #plt.ylabel('ECAL Energy')
    plt.legend(loc=2, fontsize='xx-small')
 
    plt.subplot(222)
    plt.title('Y-axis')
-   sumy_array =array[0:index, 0].sum(axis = 0)
+   sumy_array = array[:index, 1]
+   sumy_array = sumy_array.mean(axis = 0)
    label= plot_label + '\n{:.2f}'.format(np.mean(sumy_array))+ '({:.2f})'.format(np.std(sumy_array))
-   #plt.plot(sumy_array/index, label=plot_label)
    plt.hist(bins, weights = sumy_array, label=plot_label, bins = bins, histtype='step', normed=1)
    plt.legend(loc=2, fontsize='small')
    plt.xlabel('Position')
 
    plt.subplot(223)
-   sumz_array =array[0:index, 2].sum(axis = 0)
+   sumz_array =array[0:index, 2].mean(axis = 0)
    label= plot_label + '\n{:.2f}'.format(np.mean(sumz_array))+ '({:.2f})'.format(np.std(sumz_array))
-   #plt.plot( sumz_array/index, label=plot_label)
    plt.hist(bins, weights = sumz_array, label=plot_label, bins = bins, histtype='step', normed=1)
    plt.legend(loc=8, fontsize='small')
    plt.xlabel('Z axis Position')
@@ -187,15 +176,12 @@ def plot_energy_skwt_hist(array, index, out_file, num_fig, plot_label, pos=0):
    sumx_array = array[0:index, 0]
    label= plot_label + '\n{:.2f}'.format(np.mean(sumx_array))+ '({:.2f})'.format(np.std(sumx_array))
    _=skh_plt.hist(ecal, weights = sumx_array, label=plot_label, bins = bins, histtype='step', errorbars=True)
-   #plt.plot(data, label=plot_label)
-   #plt.ylabel('ECAL Energy')
    plt.legend(loc=2, fontsize='xx-small')
 
    plt.subplot(222)
    plt.title('Y-axis')
    sumy_array =array[0:index, 1]
    label= plot_label + '\n{:.2f}'.format(np.mean(sumy_array))+ '({:.2f})'.format(np.std(sumy_array))
-   #plt.plot(sumy_array/index, label=plot_label)
    _=skh_plt.hist(ecal, weights = sumy_array, label=plot_label, bins = bins, histtype='step', errorbars=True)
    plt.legend(loc=2, fontsize='small')
    plt.xlabel('Position')
@@ -203,7 +189,6 @@ def plot_energy_skwt_hist(array, index, out_file, num_fig, plot_label, pos=0):
    plt.subplot(223)
    sumz_array =array[0:index, 2]
    label= plot_label + '\n{:.2f}'.format(np.mean(sumz_array))+ '({:.2f})'.format(np.std(sumz_array))
-   #plt.plot( sumz_array/index, label=plot_label)
    _=skh_plt.hist(ecal, weights = sumz_array, label=plot_label, bins = bins, histtype='step', errorbars=True)
    plt.legend(loc=8, fontsize='small')
    plt.xlabel('Z axis Position')
@@ -345,12 +330,6 @@ def plot_1to2(array, index, out_file, num_fig, plot_label):
    array = array[:index]
    ecal_array1= np.sum(array[:,:,:,0:12], axis=(1, 2, 3))
    ecal_array2= np.sum(array[:,:,:,13:24], axis=(1, 2, 3))
-   #ecal_array1=np.sum(array[:index-1, :, :, 0], axis=(1, 2))
-   #ecal_array2=np.sum(array[:index-1, :, :, 1], axis=(1, 2))
-   #print (ecal_array1.shape)
-   #print (ecal_array2.shape)
-   #print ( "ecal_array shapes")
-   #ratio = np.zeros((index, 1))
    ratio = ecal_array1/ ecal_array2
    label= plot_label + '\n{:.2f}'.format(np.mean(ratio))+ '({:.2f})'.format(np.std(ratio))
    plt.title('ECAL RATIO LAYER 1 to 2')
@@ -362,7 +341,7 @@ def plot_1to2(array, index, out_file, num_fig, plot_label):
    plt.savefig(out_file)
 
 def plot_1tototal(array, index, out_file, num_fig, plot_label):
-   # plot ecal sum                                                                                                                                         
+                                                                                                                      
    #bins = np.linspace(0, 0.01, 50)
    plt.figure(num_fig)
    ecal_array1=np.sum(array[:index, :, :, 0:12], axis=(1, 2, 3))
@@ -498,16 +477,12 @@ else:
    g = build_generator(latent_space, return_intermediate=False)
    g.load_weights(gen_weights)
    noise = np.random.normal(0, 1, (n_jets, latent_space))
-   #sampled_labels = np.ones((n_jets, 1), dtype=np.float)                                
-   #sampled_labels = np.random.uniform(0, 5, (n_jets, 1))                     
    sampled_labels = Y/100  #take sampled labels from actual data                              
-   #print sampled_labels[:10]
    generator_in = np.multiply(sampled_labels, noise)
    start = time.time()
    generated_images = g.predict(generator_in, verbose=False, batch_size=100)
    end = time.time()
    gen_time = end - start
-   #print generated_images.shape
    d = build_discriminator()
    d.load_weights(disc_weights)
    start =time.time()
@@ -515,10 +490,6 @@ else:
    end = time.time()
    disc_time = end - start
    generated_images = np.squeeze(generated_images)
-   #print generated_images.shape
-   ## Use Discriminator for actual images                                                         
-   #d = build_discriminator()
-   #d.load_weights(disc_weights)
    image = np.expand_dims(X, axis=-1)
    start =time.time()
    isreal2, aux_out2, ecal_out2 = np.array(d.predict(image, verbose=False, batch_size=100))
@@ -551,15 +522,11 @@ for energy in energies:
       var["sumact" + str(energy)][j, 0] = np.sum(var["events_act" + str(energy)][j], axis=(1,2))
       var["sumact" + str(energy)][j, 1] = np.sum(var["events_act" + str(energy)][j], axis=(0,2))
       var["sumact" + str(energy)][j, 2] = np.sum(var["events_act" + str(energy)][j], axis=(0,1))
-      #var["E_act" + str(energy)] = (var["energy_sampled" + str(energy)]-var["energy_act" + str(energy)])/var["energy_sampled" + str(energy)]
       var["max_pos_gan_" + str(energy)][j] = np.unravel_index(var["events_gan" + str(energy)][j].argmax(), (25, 25, 25))
       var["sumgan" + str(energy)][j, 0] = np.sum(var["events_gan" + str(energy)][j], axis=(1,2))
       var["sumgan" + str(energy)][j, 1] = np.sum(var["events_gan" + str(energy)][j], axis=(0,2))
       var["sumgan" + str(energy)][j, 2] = np.sum(var["events_gan" + str(energy)][j], axis=(0,1))
-      #var["E_gan" + str(energy)] = (var["energy_sampled" + str(energy)]-var["energy_gan" + str(energy)])/var["energy_gan" + str(energy)]
    totalE_act = np.sum(var["events_act" + str(energy)][:var["index" + str(energy)]], axis=(1, 2, 3))
-   print totalE_act.shape
-
    totalE_gan = np.sum(var["events_gan" + str(energy)][:var["index" + str(energy)]], axis=(1, 2, 3))
    var["E_act" + str(energy)] = (var["energy_sampled" + str(energy)][:var["index" + str(energy)]]-var["energy_act" + str(energy)][:var["index" + str(energy)]])/var["energy_sampled" + str(energy)][:var["index" + str(energy)]]
    var["E_gan" + str(energy)] = (var["energy_sampled" + str(energy)][:var["index" + str(energy)]]-var["energy_gan" + str(energy)][:var["index" + str(energy)]])/var["energy_sampled" + str(energy)][:var["index" + str(energy)]]
@@ -803,6 +770,7 @@ for energy in energies:
          fig+=1
 
 plt.close("all")
+
 # Plot for all
 plot_ecal(X, n_jets, os.path.join(comdir, 'ECAL_sum.pdf'), fig, 'Data')
 plot_ecal(generated_images, n_jets, os.path.join(comdir, 'ECAL_sum.pdf'), fig, 'GAN')
