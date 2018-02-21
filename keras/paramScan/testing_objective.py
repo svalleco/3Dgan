@@ -40,6 +40,65 @@ K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
 
+def main():
+    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
+    genpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_generator*.hdf5"
+    discpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_discriminator*.hdf5"
+    resultplot = 'Newresult.pdf'
+    resultfile = 'Newresult.txt'
+    gen_weights=[]
+    disc_weights=[]
+    for f in sorted(glob.glob(genpath)):
+      gen_weights.append(f)
+    for f in sorted(glob.glob(discpath)):
+      disc_weights.append(f)
+
+    results = []
+    file = open(resultfile,'w')
+
+#    for i in range(len(gen_weights)-2,len(gen_weights)):                                                          
+    for i in range(len(gen_weights)):
+#    for i in range(2):                                                                                            
+       results.append(analyse(gen_weights[i], disc_weights[i], datafile))
+       file.write("{}\t{}\t{}\n".format(results[i][0], results[i][1], results[i][2]))
+#    for i in range(2):                                                                                            
+    for i in range(len(gen_weights)):
+#    for i in range(2):                                                                                            
+       print ('The results for......',gen_weights[i])
+       print (" The result for {} = {:.4f} , {:.4f}, {:.4f}".format(i, results[i][0], results[i][1], results[i][2]))
+    file.close()
+    total=[]
+    pos_e=[]
+    energy_e=[]
+    mine = 100
+    minp = 100
+    mint = 100
+    num = 0
+    for item in results:
+        total.append(item[0])
+        if item[0]< mint:
+           mint = item[0]
+           mint_n = num
+        pos_e.append(item[1])
+        if item[1]< minp:
+           minp = item[1]
+           minp_n = num
+        energy_e.append(item[2])
+        if item[2]< mine:
+           mine = item[2]
+           mine_n = num
+        num = num + 1
+
+    plt.figure()
+    plt.plot(total, label = 'Total')
+    plt.plot(pos_e, label = 'Pos error (Moments)')
+    plt.plot(energy_e , label = 'Energy profile error')
+    plt.legend(title='Min total error{:.4f}({})\nPosition error {:.4f}({})\nEnergy error {:.4}({})'.format(mint, mint_n, minp, minp_n, mine, mine_n))
+    plt.xticks(np.arange(0, len(gen_weights), 2))
+    plt.ylim(0, 1.0)
+    plt.savefig(resultplot)
+
+
 # Fuction used to flip random bits for training
 def bit_flip(x, prob=0.05):
     """ flips a int array's values with some probability """
@@ -54,8 +113,7 @@ def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5
    num_events=3000
    data=h5py.File(datafile,'r')
    X=np.array(data.get('ECAL'))
-   y=np.array(data.get('target'))
-   Y=np.expand_dims(y[:,1], axis=-1)
+   Y=np.expand_dims(np.array(data.get('target')[:,1]), axis=-1)
    X[X < 1e-6] = 0
    print("Data is loaded")
    energies=[50, 100, 150, 200, 300, 400, 500] 
@@ -66,6 +124,9 @@ def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5
    d = discriminator()
    d.load_weights(disc_weights)
    m = 2
+   print('Generator...........', gen_weights)
+   print('Discriminator...........', disc_weights)
+
    # Initialization of parameters  
    var = {}
    for energy in energies:
@@ -85,8 +146,6 @@ def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5
      
    ## Sorting data in bins                                                         
    size_data = int(X.shape[0])
-#   print ("Sorting data")
-#   print(Y[:10])
    for i in range(size_data):
      for energy in energies:
         if Y[i][0] > energy-tolerance and Y[i][0] < energy+tolerance and var["index" + str(energy)] < num_events:
@@ -124,12 +183,8 @@ def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5
       ECAL_midZ = np.zeros(var["index" + str(energy)])
       for i in range(m):
          relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-         #print('retive index', relativeIndices.transpose().shape)
          moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
          sumx = var["sumact" + str(energy)][0:(var["index" + str(energy)]), 0]
-         #print (moments.shape)                                                                    
-         #print (sumx.shape)                                                                       
-         #print (totalE.shape)                                                                     
          ECAL_momentX = umath.inner1d(sumx, moments)/var["totalE_act" + str(energy)]
          if i==0: ECAL_midX = ECAL_momentX.transpose()
          var["x_act"+ str(energy)][:var["index" + str(energy)],i]= ECAL_momentX
@@ -171,133 +226,43 @@ def analyse(gen_weights, disc_weights, datafile, latent=200, gflag=0, gf=8, gx=5
    metricp = 0
    metrice = 0
    for energy in energies:
-       #var["pos_error"+ str(energy)] = var["max_pos_act_" + str(energy)] - var["max_pos_gan_" + str(energy)]
-       #pos_error = var["max_pos_act_" + str(energy)] - var["max_pos_gan_" + str(energy)]
-       #var["pos_error"+ str(energy)]= np.divide(pos_error, var["max_pos_act_" + str(energy)], out=np.zeros_like(pos_error), where=var["max_pos_act_" + str(energy)]!=0)
-       #var["pos_total"+ str(energy)] = np.sum(var["pos_error"+ str(energy)]**2)/num_events
-       #print('moment =', var["x_act"+ str(energy)].shape)
-       var["posx_error"+ str(energy)]= (np.mean(var["x_act"+ str(energy)][:var["index" + str(energy)]], axis=0)- np.mean(var["x_gan"+ str(energy)][:var["index" + str(energy)]], axis=0))/np.mean(var["x_act"+ str(energy)][:var["index" + str(energy)]], axis=0)
-       var["posy_error"+ str(energy)]= (np.mean(var["y_act"+ str(energy)][:var["index" + str(energy)]], axis=0)- np.mean(var["y_gan"+ str(energy)][:var["index" + str(energy)]], axis=0))/np.mean(var["y_act"+ str(energy)][:var["index" + str(energy)]], axis=0)
-       var["posz_error"+ str(energy)]= (np.mean(var["z_act"+ str(energy)][:var["index" + str(energy)]], axis=0)- np.mean(var["z_gan"+ str(energy)][:var["index" + str(energy)]], axis=0))/np.mean(var["x_act"+ str(energy)][:var["index" + str(energy)]], axis=0)
-       print (var["posx_error"+ str(energy)].shape)
-       #var["posx_error"+ str(energy)]= np.divide((var["x_act"+ str(energy)]-var["x_gan"+ str(energy)]), var["x_act"+ str(energy)])
-       #var["posy_error"+ str(energy)]= np.divide((var["y_act"+ str(energy)]-var["y_gan"+ str(energy)]), var["y_act"+ str(energy)])
-       #var["posz_error"+ str(energy)]= np.divide((var["z_act"+ str(energy)]-var["z_gan"+ str(energy)]), var["x_act"+ str(energy)])
-       var["pos_error"+ str(energy)]= ((var["posx_error"+ str(energy)])**2 + (var["posy_error"+ str(energy)])**2 + (var["posz_error"+ str(energy)])**2)/3
-       var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])
+       #Relative error on mean moment value for each moment and each axis
+       x_act= np.sum(var["x_act"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       x_gan= np.sum(var["x_gan"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       y_act= np.sum(var["y_act"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       y_gan= np.sum(var["y_gan"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       z_act= np.sum(var["z_act"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       z_gan= np.sum(var["z_gan"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       var["posx_error"+ str(energy)]= (x_act - x_gan)/x_act
+       var["posy_error"+ str(energy)]= (y_act - y_gan)/y_act
+       var["posz_error"+ str(energy)]= (z_act - z_gan)/z_act
+       #Taking absolute of errors and adding for each axis then scaling by 3
+       var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
+       #Summing over moments and dividing for number of moments
+       var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
        metricp += var["pos_total"+ str(energy)]
-       Ecal = np.tile(var["totalE_act" + str(energy)], (25,3, 1))
-       Ecal = Ecal.transpose()
-       #print('Ecal', Ecal[1])
-       #print(var["totalE_act" + str(energy)][:3])
-       var["eprofile_error"+ str(energy)]= np.divide((var["sumact" + str(energy)] - var["sumgan" + str(energy)]), Ecal)
-       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_error"+ str(energy)]**2)
-       var["eprofile_total"+ str(energy)]= var["eprofile_total"+ str(energy)]/var["index" + str(energy)]
+
+       #Take profile along each axis and find mean along events
+       sumact = np.mean(var["sumact" + str(energy)][:var["index" + str(energy)]], axis=0)
+       sumgan = np.mean(var["sumgan" + str(energy)][:var["index" + str(energy)]], axis=0)
+       maxact = np.amax(sumact, axis=1)
+       maxact = np.reshape(maxact, (-1, 1))
+       maxact = np.repeat(maxact, 25, axis=1)
+       var["eprofile_error"+ str(energy)] = np.divide((sumact - sumgan), sumact)
+
+       #Take absolute of error and mean for all events
+       var["eprofile_total"+ str(energy)]= np.sum(np.absolute(var["eprofile_error"+ str(energy)]), axis=1)/ecal_size
+       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_total"+ str(energy)])/3
        metrice += var["eprofile_total"+ str(energy)]
    metricp = metricp/len(energies)
    metrice = metrice/len(energies)    
    tot = metricp + metrice
    
    for energy in energies:
-       print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]), str(np.unravel_index(var["events_gan" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_gan" + str(energy)]), np.amin(var["events_gan" + str(energy)]), var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
-   print(" Position Error = %.4f\t Energy Profile Error =   %.4f" %(metricp, metrice))
+       print ("%d \t\t%d \t\t%f \t\t%f" %(energy, var["index" +str(energy)], var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
+   print(" Total Position Error = %.4f\t Total Energy Profile Error =   %.4f" %(metricp, metrice))
    print(" Total Error =  %.4f" %(tot))
    return(tot, metricp, metrice)
 
-#Function to return a single value for a network performnace metric. The metric needs to be minimized.
-def objective(params):
-   gen_weights = "gen_weights.hdf5"
-   disc_weights = "disc_weights.hdf5"
-   datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-   
-   # Just done to print the parameter setting to screen
-   epochs, batch_size, latent, gen_weight, aux_weight, ecal_weight, lr, rho, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz= params
-   params1= [1*epochs, pow(2,batch_size), latent, gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz]
-   print(len(params1))
-   print("epochs= {}   batchsize={}   Latent space={}\nGeneration loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}\nLearning rate={}   rho={}   decay={}\nDiscriminator: extra layer={}  filters={}  x={}  y={}  z{\
-}\nGenerator: extra layer={}  filters={}  x={}  y={}  z{}\n".format(*params1))
-
-   vegantrain(1*epochs, pow(2,batch_size), latent, gen_weight, aux_weight, ecal_weight, pow(10,lr), rho * 0.1, decay, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
-   score = analyse(gen_weights, disc_weights, datafile, latent, dflag, df, dx, dy, dz, gflag, gf, gx, gy, gz)
-   return score
-
-def main():
-    space = [(3, 5), #epochs x 10 
-         (5, 8), #batch_size power of 2
-         [256, 512], #latent size
-         (1, 10), #gen_weight
-         (0.01, 0.1), #aux_weight
-         (0.01, 0.1), #ecal_weight
-         (-9, -1), #lr
-         (2, 9), #rho
-         [0, 0.001], #decay 
-         [True,False], # dflag
-         (4, 64), #df
-         (2, 16), #dx
-         (2, 16), #dy
-         (2, 16), #dz
-         [True,False],#gflag
-         (4, 64), #gf
-         (2, 16), #gx
-         (2, 16), #gy
-         (2, 16), #gz
-        ]
-    datafile = "/nfshome/gkhattak/Ele_v1_1_2.h5"
-    genpath = "newweights/params_generator*.hdf5"
-    discpath = "newweights/params_discriminator*.hdf5"
-    gen_weights=[]
-    disc_weights=[]
-    for f in sorted(glob.glob(genpath)):
-      gen_weights.append(f)
-    for f in sorted(glob.glob(discpath)):
-      disc_weights.append(f)
-
-    """disc_weights.append("veganweights/params_discriminator_epoch_019.hdf5")
-    gen_weights.append("veganweights/params_generator_epoch_029.hdf5")
-    disc_weights.append("veganweights/params_discriminator_epoch_029.hdf5")
-    gen_weights.append("veganweights/params_generator_epoch_039.hdf5")
-    disc_weights.append("veganweights/params_discriminator_epoch_039.hdf5")"""
-    print(len(gen_weights))
-    print(len(disc_weights))
-    #params1 =[1, 7, 256, 10, 0.1, 0.2, -3, 9 , 0, False, 12, 5, 5, 5, False, 12, 5, 5, 5]
-    #tot1 = objective(params1)
-    #print (" The negative performance metric for first = %.4f"%(tot1))
-    results = []
-    for i in range(len(gen_weights)):
-#    for i in range(2):
-       results.append(analyse(gen_weights[i], disc_weights[i], datafile))
-    
-    for i in range(len(gen_weights)):
-#    for i in range(2):
-       print ('The results for......',gen_weights[i])
-       print (" The result for {} = {:.2f} , {:.2f}, {:.2f}".format(i, results[i][0], results[i][1], results[i][2]))
-    total=[]
-    pos_e=[]
-    energy_e=[]
-    mine = 100
-    minp = 100
-    mint = 100 
-    num = 0
-    for item in results:
-        total.append(item[0])
-        if item[0]< mint:
-           mint = item[0]
-           mint_n = num
-        pos_e.append(item[1])
-        if item[1]< minp:
-           minp = item[1]
-           minp_n = num
-        energy_e.append(item[2])
-        if item[2]< mine:
-           mine = item[2]
-           mine_n = num
-        num = num + 1
-    plt.figure()
-    plt.plot(total, label = 'Total')
-    plt.plot(pos_e, label = 'Max pos error')
-    plt.plot(energy_e , label = 'Energy profile error')
-    plt.legend(title='Min total error{:.2f}({})\n, Position error {:.2f}({}), Energy error {:.2}({})'.format(mint, mint_n, minp, minp_n, mine, mine_n))
-    plt.xticks(np.arange(0, len(gen_weights), 2))
-    plt.savefig('result.pdf')
 if __name__ == "__main__":
     main()
