@@ -25,9 +25,9 @@ def bit_flip(x, prob=0.05):
 
 if __name__ == '__main__':
 
-    import keras.backend as K
+    #import keras.backend as K
 
-    K.set_image_dim_ordering('tf')
+    #K.set_image_dim_ordering('channels_first')
 
     from keras.layers import Input
     from keras.models import Model
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
 
-    nb_epochs = 30 
+    nb_epochs = 2
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -60,7 +60,7 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[6, 0.1, 0.1]
+        loss_weights=[6, 0.2, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
 
@@ -89,11 +89,11 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[6, 0.1, 0.1]
+        loss_weights=[6, 0.2, 0.1]
     )
 
 
-    d=h5py.File("/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5",'r')
+    d=h5py.File("/data/svalleco/Ele_v1_1_2.h5",'r')
     e=d.get('target')
     X=np.array(d.get('ECAL'))
     y=(np.array(e[:,1]))
@@ -110,13 +110,17 @@ if __name__ == '__main__':
    # remove unphysical values
     X[X < 1e-6] = 0
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.05, test_size=0.05)
 
     # tensorflow ordering
-    X_train =np.array(np.expand_dims(X_train, axis=-1))
-    X_test = np.array(np.expand_dims(X_test, axis=-1))
-    y_train= np.array(y_train)/100
-    y_test=np.array(y_test)/100
+    X_train =np.expand_dims(X_train, axis=-1)
+    X_test = np.expand_dims(X_test, axis=-1)
+    print(X_train.shape)
+    X_train =np.moveaxis(X_train, -1, 1)
+    X_test = np.moveaxis(X_test, -1,1)
+
+    y_train= y_train/100
+    y_test=y_test/100
     print(X_train.shape)
     print(X_test.shape)
     print(y_train.shape)
@@ -130,8 +134,8 @@ if __name__ == '__main__':
     X_test = X_test.astype(np.float32)
     y_train = y_train.astype(np.float32)
     y_test = y_test.astype(np.float32)
-    ecal_train = np.sum(X_train, axis=(1, 2, 3))
-    ecal_test = np.sum(X_test, axis=(1, 2, 3))
+    ecal_train = np.sum(X_train, axis=(2, 3, 4))
+    ecal_test = np.sum(X_test, axis=(2, 3, 4))
 
     print(X_train.shape)
     print(X_test.shape)
