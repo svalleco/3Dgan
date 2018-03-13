@@ -48,7 +48,7 @@ if __name__ == '__main__':
     batch_size = 128
     latent_size = 200
     verbose = 'false'
-    poly = [-0.03140347, 1.952197, 0.0827042 ]
+    poly = [0.00618083, -0.07960782, 2.0544174, 0.03408574 ]
     
     generator=generator(latent_size)
     discriminator=discriminator()
@@ -62,7 +62,7 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[10, 0.2, 0.1]
+        loss_weights=[8, 0.2, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[10, 0.2, 0.1]
+        loss_weights=[8, 0.2, 0.1]
     )
 
 
