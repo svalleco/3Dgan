@@ -153,7 +153,7 @@ def get_data(datafile):
     return X_train, X_test, y_train, y_test, ecal_train, ecal_test
   
 ## Training Function
-def vegantrain(d, g, X_train, y_train, ecal_train, epochs=5, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0):
+def vegantrain(d, g, X_train, y_train, ecal_train, epochs=10, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0):
 #dflag=0, df= 16, dx=8, dy=8, dz= 8, dp=0.2, gflag=0, gf= 16, gx=8, gy=8, gz= 8):
     init_start = time.time()
     g_weights = 'params_generator_epoch_'
@@ -202,8 +202,8 @@ def vegantrain(d, g, X_train, y_train, ecal_train, epochs=5, batch_size=128, lat
         epoch_disc_loss = []
 
         for index in range(nb_batches):
-            if index % 100 == 0:
-                    print('processed {}/{} batches'.format(index + 1, nb_batches))
+            #if index % 100 == 0:
+             #       print('processed {}/{} batches'.format(index + 1, nb_batches))
 
             noise = np.random.normal(0, 1, (batch_size, latent_size))
 
@@ -237,7 +237,7 @@ def vegantrain(d, g, X_train, y_train, ecal_train, epochs=5, batch_size=128, lat
             ])
 
         epoch_time = time.time() - epoch_start
-        print('Training for one epoch took {} seconds'.format(epoch_time))
+        #print('Training for one epoch took {} seconds'.format(epoch_time))
 
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
         
@@ -246,17 +246,14 @@ def vegantrain(d, g, X_train, y_train, ecal_train, epochs=5, batch_size=128, lat
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
 
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
-            'component', *d.metrics_names))
-        print('-' * 65)
+        #print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
+         #   'component', *d.metrics_names))
+       # print('-' * 65)
 
-        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
-        print(ROW_FMT.format('generator (train)', *train_history['generator'][-1]))
-       # print(ROW_FMT.format('generator (test)', *test_history['generator'][-1]))
-        print(ROW_FMT.format('discriminator (train)', *train_history['discriminator'][-1]))
-       # print(ROW_FMT.format('discriminator (test)',  *test_history['discriminator'][-1]))
-        
-        pickle.dump({'train': train_history},open('dcgan-history.pkl', 'wb'))
+        # print(ROW_FMT.format('generator (train)', *train_history['generator'][-1]))
+        # print(ROW_FMT.format('discriminator (train)', *train_history['discriminator'][-1]))
+           
+    pickle.dump({'train': train_history},open('dcgan-history.pkl', 'wb'))
 
     #save weights at last epoch                                                                                          
     g.save_weights('gen_weights.hdf5'.format(g_weights, epoch), overwrite=True)
@@ -294,10 +291,10 @@ def analyse(d, g, X, Y, gen_weights, disc_weights, latent=200):
           
    ## Sorting data in bins                                                         
    size_data = int(X.shape[0])
-   print ("Sorting data")
-   print (X.shape)
-   print (Y.shape)
-   print (Y[:10])
+   #print ("Sorting data")
+   #print (X.shape)
+   #print (Y.shape)
+   #print (Y[:10])
    for i in range(size_data):
      for energy in energies:
         if Y[i][0] > energy-tolerance and Y[i][0] < energy+tolerance and var["index" + str(energy)] < num_events:
@@ -309,7 +306,7 @@ def analyse(d, g, X, Y, gen_weights, disc_weights, latent=200):
    # Generate images
    for energy in energies:        
         noise = np.random.normal(0, 1, (var["index" + str(energy)], latent))
-        print(energy, var["index" + str(energy)], noise.shape)
+        #print(energy, var["index" + str(energy)], noise.shape)
         sampled_labels = var["energy_sampled" + str(energy)]
         generator_in = np.multiply(sampled_labels, noise)
         generated_images = g.predict(generator_in, verbose=False, batch_size=100)
@@ -380,52 +377,66 @@ def analyse(d, g, X, Y, gen_weights, disc_weights, latent=200):
    metricp = 0
    metrice = 0
    for energy in energies:
-       var["posx_error"+ str(energy)]= (var["x_act"+ str(energy)]-var["x_gan"+ str(energy)])/25
-       var["posy_error"+ str(energy)]= (var["y_act"+ str(energy)]-var["y_gan"+ str(energy)])/25
-       var["posz_error"+ str(energy)]= (var["z_act"+ str(energy)]-var["z_gan"+ str(energy)])/25
-       var["pos_error"+ str(energy)]= ((var["posx_error"+ str(energy)])**2 + (var["posy_error"+ str(energy)])**2 + (var["posz_error"+ str(energy)])**2)
-       var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/var["index" + str(energy)]
+       #Relative error on mean moment value for each moment and each axis                                          
+       x_act= np.sum(var["x_act"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       x_gan= np.sum(var["x_gan"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       y_act= np.sum(var["y_act"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       y_gan= np.sum(var["y_gan"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       z_act= np.sum(var["z_act"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       z_gan= np.sum(var["z_gan"+ str(energy)], axis=0)/ var["index" + str(energy)]
+       var["posx_error"+ str(energy)]= (x_act - x_gan)/x_act
+       var["posy_error"+ str(energy)]= (y_act - y_gan)/y_act
+       var["posz_error"+ str(energy)]= (z_act - z_gan)/z_act
+       var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
+       #Summing over moments and dividing for number of moments                                                    
+       var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
+
        metricp += var["pos_total"+ str(energy)]
-       Ecal = np.tile(var["totalE_act" + str(energy)], (25,3, 1))
-       Ecal = Ecal.transpose()
-       var["eprofile_error"+ str(energy)]= np.divide((var["sumact" + str(energy)] - var["sumgan" + str(energy)]), Ecal)
-       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_error"+ str(energy)]**2)
-       var["eprofile_total"+ str(energy)]= var["eprofile_total"+ str(energy)]/var["index" + str(energy)]
+
+       #Take profile along each axis and find mean along events                                                    
+       sumact = np.mean(var["sumact" + str(energy)][:var["index" + str(energy)]], axis=0)
+       sumgan = np.mean(var["sumgan" + str(energy)][:var["index" + str(energy)]], axis=0)
+       var["eprofile_error"+ str(energy)] = np.divide((sumact - sumgan), sumact)
+       var["eprofile_total"+ str(energy)]= np.sum(np.absolute(var["eprofile_error"+ str(energy)]), axis=1)/ecal_size
+       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_total"+ str(energy)])/3
        metrice += var["eprofile_total"+ str(energy)]
+   metricp = metricp/len(energies)
+   metrice = metrice/len(energies)
+  
    tot = metricp + metrice
 
-   for energy in energies:
-       print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]), str(np.unravel_index(var["events_gan" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_gan" + str(energy)]), np.amin(var["events_gan" + str(energy)]), var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
-   print(" Position Error = %.4f\t Energy Profile Error =   %.4f" %(metricp, metrice))
-   print(" Total Error =  %.4f" %(tot))
-   return(tot, metricp, metrice)
+   #for energy in energies:
+      # print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]), str(np.unravel_index(var["events_gan" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_gan" + str(energy)]), np.amin(var["events_gan" + str(energy)]), var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
+   #print(" Position Error = %.4f\t Energy Profile Error =   %.4f" %(metricp, metrice))
+   #print(" Total Error =  %.4f" %(tot))
+   return(tot)
 
 #Function to return a single value for a network performnace metric. The metric needs to be minimized.
 def objective(params):
    gen_weights = "gen_weights.hdf5"
    disc_weights = "disc_weights.hdf5"
-   datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-   
+   datafile = "/nfshome/gkhattak/Ele_v1_1_2.h5"
+   latent =200
    X_train, X_test, y_train, y_test, ecal_train, ecal_test= get_data(datafile)
    
    # Just done to print the parameter setting to screen
    gen_weight, aux_weight, ecal_weight= params
    #params1= [gen_weight, aux_weight, ecal_weight]
-   print("Generation loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}".format(*params))
+   #print("Generation loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}".format(*params))
    d = discriminator()
    g = generator()
    loss = vegantrain(d, g, X_train, y_train, ecal_train, gen_weight = gen_weight, aux_weight = aux_weight, ecal_weight = aux_weight)
-   #score = analyse(X_train, y_train, gen_weights, disc_weights, datafile, pow(2,latent), discriminator, generator)
-   return loss
+   score = analyse(d, g, X_train, y_train, gen_weights, disc_weights)
+   return score
 
 def hpscan():
     space = [
          #Integer(25, 25), #name ='epochs'),  
          #Integer(5, 8), #name ='batch_size'),
          #Integer(8, 10), #name='latent size'),
-         Real(1, 10), #name='gen_weight'),
-         Real(0.01, 0.1), #name='aux_weight'),
-         Real(0.01, 0.1), #name='ecal_weight'),
+         Categorical([1, 2, 5, 6, 8]), #name='gen_weight'),
+         Categorical([0.1, 0.2, 1, 2]), #name='aux_weight'),
+         Categorical([0.1, 1.0, 10.0]), #name='ecal_weight'),
          #Real(10**-5, 10**0, "log-uniform"), #name ='lr'),
          #Real(8, 9), #name='rho'),
          #Real(0, 0.0001), #name='decay'), 
@@ -441,7 +452,7 @@ def hpscan():
          #Integer(2, 16), #name='gy'),
          #Integer(2, 16)] #name='gz')
            ]
-    res_gp = gp_minimize(objective, space, n_calls=10, random_state=0)
+    res_gp = gp_minimize(objective, space, n_calls=15, n_random_starts=5, n_jobs=3, verbose=True, random_state=0)
     "Best score=%.4f" % res_gp.fun
     print("""Best parameters:
     Loss Weights:
