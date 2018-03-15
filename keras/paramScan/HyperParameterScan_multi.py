@@ -177,7 +177,7 @@ def evaluate_threaded(params):
       for value in score:
          sfile.write(str(value) + '\t')
       sfile.write('\n')
-   #open('%s.json'%id_res,'w').write(json.dumps({'result': score[0]}))
+   open('%s.json'%id_res,'w').write(json.dumps({'result': score[0]}))
    return score[0]
 
 
