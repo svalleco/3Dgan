@@ -8,6 +8,15 @@ try:
 except ImportError:
     import pickle
 
+def main():
+   lossfile = 'dcgan-history.pkl'
+   weights = [8, 0.2, 0.1]
+   #defining limits for different plots. Varies with result
+   ymax = [10, 2, 2, 15, 0.8, 1.0]
+   outdir = 'loss_plots'
+   safe_mkdir(outdir)
+   plot_loss(lossfile, weights, ymax, outdir)
+
 def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #Getting losses in arrays
    with open(lossfile, 'rb') as f:
@@ -86,6 +95,19 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.ylim(0, ymax[1])  
    plt.savefig(os.path.join(lossdir, 'BCE_train_losses.pdf'))
 
+   #training losses for Real/fake Magnified
+   fig = fig + 1
+   start_epoch = 10
+   plt.figure(fig)
+   plt.title('Binary Training losses for Generator')
+   #plt.plot(disc_train[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
+   plt.plot(gen_train[start_epoch:,1], label='Gen gen (Binary Cross Entropy)', color='blue')
+   plt.legend()
+   plt.xlabel('Epochs starting from epoch' + str(start_epoch))  
+   plt.ylabel('Loss')                            
+   plt.ylim(ymax[4], ymax[5])  
+   plt.savefig(os.path.join(lossdir, 'BCE_train_gen_losses.pdf'))
+
    #testing losses for Real/fake
    fig = fig + 1
    plt.figure(fig)
@@ -126,13 +148,6 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.ylim(0, ymax[3])  
    plt.savefig(os.path.join(lossdir, 'aux_testing_losses.pdf'))
 
-def main():
-   lossfile = 'dcgan-history.pkl'
-   weights = [8, 0.2, 0.1]
-   ymax = [50, 4, 4, 25]
-   outdir = 'loss_plots'
-   safe_mkdir(outdir)
-   plot_loss(lossfile, weights, ymax, outdir)
 
 if __name__ == "__main__":
    main()
