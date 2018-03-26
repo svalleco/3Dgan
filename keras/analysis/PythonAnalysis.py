@@ -12,22 +12,22 @@ import numpy.core.umath_tests as umath
 import matplotlib.lines as mlines
 
 #Architectures 
-from ecalvegan import generator, discriminator
+from EcalEnergyGan import generator, discriminator
 plt.switch_backend('Agg')
 
-#disc_weights="params_discriminator_epoch_067.hdf5"
-#gen_weights= "params_generator_epoch_067.hdf5"
-disc_weights = "rootfit_disc.hdf5"
-gen_weights = "rootfit_gen.hdf5"
+#disc_weights="params_discriminator_epoch_049.hdf5"
+#gen_weights= "params_generator_epoch_049.hdf5"
+disc_weights = "disc_onepas_50.hdf5"
+gen_weights = "gen_onepas_50.hdf5"
 
-plots_dir = "root_plots/"
+plots_dir = "my_plots/"
 latent = 200
 num_data = 100000
 num_events = 2000
 m = 3
 scale = 1
 
-#datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path                                         
+#datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Caltech Training data path                                         
 datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
 sortedpath = 'sorted_*.hdf5'
 Test = False
@@ -73,18 +73,21 @@ def plot_flat_energy(arrayx, arrayy, arrayz, out_file, num_fig, plot_label):
    plt.title('X-axis')
    plt.hist(arrayx.flatten(), bins='auto', histtype='step', label=plot_label)
    plt.legend()
+   plt.yscale('log', nonposy='clip')
    plt.ylabel('Events')
 
    plt.subplot(222)
    plt.title('Y-axis')
    plt.hist(arrayy.flatten(), bins='auto', histtype='step', label=plot_label)
    plt.legend()
+   plt.yscale('log', nonposy='clip')
    plt.xlabel('Energy')
 
    plt.subplot(223)
    plt.hist(arrayz.flatten(), bins='auto', histtype='step', label=plot_label)
    plt.legend()
    plt.ylabel('Events')
+   plt.yscale('log', nonposy='clip')
    plt.savefig(out_file)
 
 def plot_energy(array, out_file, num_fig, plot_label, color='blue', pos=0):
@@ -131,7 +134,7 @@ def plot_energy_axis_log(arrayx, arrayy, arrayz, out_file, num_fig, plot_label, 
    plt.xlim(xmax=25)
    plt.savefig(out_file)
 
-def plot_energy_wt_hist(arrayx, arrayy, arrayz, out_file, num_fig, plot_label, pos=0):
+def plot_energy_wt_hist(arrayx, arrayy, arrayz, out_file, num_fig, plot_label, pos=0, log=0):
    ### Plot total energy deposition cell by cell along x, y, z axis as histogram                                         
    bins = np.arange(0, 25, 1)
    plt.figure(num_fig)
@@ -139,25 +142,30 @@ def plot_energy_wt_hist(arrayx, arrayy, arrayz, out_file, num_fig, plot_label, p
    plt.title('X-axis')
    sumx_array = arrayx.sum(axis=0)
    label= plot_label + '\n{:.2f}'.format(np.mean(sumx_array))+ '({:.2f})'.format(np.std(sumx_array))
-   plt.hist(bins, weights = sumx_array, label=plot_label, bins = bins, histtype='step', normed=1)
+   plt.hist(bins, weights = sumx_array, label=plot_label, bins = bins, histtype='step')
    plt.legend(loc=2, fontsize='xx-small')
+   if log:
+      plt.yscale('log', nonposy='clip')
 
    plt.subplot(222)
    plt.title('Y-axis')
    sumy_array = arrayy.sum(axis=0)
    label= plot_label + '\n{:.2f}'.format(np.mean(sumy_array))+ '({:.2f})'.format(np.std(sumy_array))
-   plt.hist(bins, weights = sumy_array, label=plot_label, bins = bins, histtype='step', normed=1)
+   plt.hist(bins, weights = sumy_array, label=plot_label, bins = bins, histtype='step')
    plt.legend(loc=2, fontsize='small')
    plt.xlabel('Position')
+   if log:
+      plt.yscale('log', nonposy='clip')
 
    plt.subplot(223)
    sumz_array =arrayz.sum(axis=0)
    label= plot_label + '\n{:.2f}'.format(np.mean(sumz_array))+ '({:.2f})'.format(np.std(sumz_array))
-   plt.hist(bins, weights = sumz_array, label=plot_label, bins = bins, histtype='step', normed=1)
+   plt.hist(bins, weights = sumz_array, label=plot_label, bins = bins, histtype='step')
    plt.legend(loc=8, fontsize='small')
    plt.xlabel('Z axis Position')
    plt.ylabel('ECAL Energy')
-
+   if log:
+      plt.yscale('log', nonposy='clip')
    plt.savefig(out_file)
 
 def plot_energy_axis(arrayx, arrayy, arrayz, out_file, num_fig, plot_label, pos=0):
@@ -196,20 +204,20 @@ def plot_energy_mean(arrayx, arrayy, arrayz, out_file, num_fig, plot_label):
    plt.subplot(221)
    plt.title('X-axis')
    plt.plot(arrayx.mean(axis = 0), label=plot_label)
-   plt.legend()
+   plt.legend(fontsize='xx-small')
    plt.ylabel('Mean Energy')
 
    plt.subplot(222)
    plt.title('Y-axis')
    plt.plot(arrayy.mean(axis = 0), label=plot_label)
-   plt.legend()
+   plt.legend(fontsize='xx-small')
    plt.xlabel('Position')
 
    plt.subplot(223)
    plt.title('Z-axis')
    plt.plot(arrayz.mean(axis = 0), label=plot_label)
    plt.xlabel('Position')
-   plt.legend()
+   plt.legend(fontsize='xx-small')
    plt.ylabel('Mean Energy')
    plt.savefig(out_file)
 
@@ -413,17 +421,22 @@ def get_data(datafile):
     ecal = np.sum(x, axis=(1, 2, 3))
     return x, y, ecal
 
-def sort(data, energies):
+def sort(data, energies, flag=False):
     X = data[0]
     Y = data[1]
     tolerance = 5
     srt = {}
     for energy in energies:
-       indexes = np.where((Y > energy - tolerance ) & ( Y < energy + tolerance))
-       if len(indexes) > num_events:
-          indexes = indexes[:num_events]
-       srt["events_act" + str(energy)] = X[indexes]
-       srt["energy" + str(energy)] = Y[indexes]
+       if energy == 0 and flag:
+          srt["events_act" + str(energy)] = X[:2000]
+          srt["energy" + str(energy)] = Y[:2000]
+          print srt["events_act" + str(energy)].shape
+       else:
+          indexes = np.where((Y > energy - tolerance ) & ( Y < energy + tolerance))
+          if len(indexes) > num_events:
+             indexes = indexes[:num_events]
+          srt["events_act" + str(energy)] = X[indexes]
+          srt["energy" + str(energy)] = Y[indexes]
     return srt
 
 def save_sorted(srt, energies):
@@ -565,7 +578,7 @@ if __name__ == '__main__':
     else:
        # Getting Data
        events_per_file = 10000
-       energies = [50, 100, 200, 250, 300, 400, 500]
+       energies = [0, 50, 100, 200, 250, 300, 400, 500]
        Trainfiles, Testfiles = DivideFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Ele"]) 
        if Test:
           data_files = Testfiles
@@ -574,13 +587,13 @@ if __name__ == '__main__':
        start = time.time()
        for index, dfile in enumerate(data_files):
           data = get_data(dfile)
-          sorted_data = sort(data, energies)
-          data = None
           if index==0:
-             var.update(sorted_data)
+             var.update(sort(data, energies, True))
           else:
+             sorted_data = sort(data, energies, False)
              for key in var:
                var[key]= np.append(var[key], sorted_data[key], axis=0)
+       data = None
        data_time = time.time() - start
        print "{} events were loaded in {} seconds".format(num_data, data_time)
        if save_data:
@@ -599,7 +612,8 @@ if __name__ == '__main__':
       g.load_weights(gen_weights)
       start = time.time()
       for energy in energies:
-        var["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100)/scale
+        var["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100)
+        var["events_gan" + str(energy)] = var["events_gan" + str(energy)]
         if save_gen:
           save_generated(var["events_gan" + str(energy)], var["energy" + str(energy)], energy)
       gen_time = time.time() - start
@@ -612,19 +626,19 @@ if __name__ == '__main__':
       d.load_weights(disc_weights)
       start = time.time()
       for energy in energies:
-        var["isreal_act" + str(energy)], var["aux_act" + str(energy)], var["ecal_act"+ str(energy)]= discriminate(d, var["events_act" + str(energy)])
-        var["isreal_gan" + str(energy)], var["aux_gan" + str(energy)], var["ecal_gan"+ str(energy)]= discriminate(d, var["events_gan" + str(energy)])
+        var["isreal_act" + str(energy)], var["aux_act" + str(energy)], var["ecal_act"+ str(energy)]= discriminate(d, var["events_act" + str(energy)] * scale)
+        var["isreal_gan" + str(energy)], var["aux_gan" + str(energy)], var["ecal_gan"+ str(energy)]= discriminate(d, var["events_gan" + str(energy)] )
       disc_time = time.time() - start
       print "Discriminator took {} seconds for {} data and generated events".format(disc_time, total)
       
       if save_disc:
         save_discriminated(var, energies)
+    
     for energy in energies:
       print 'Calculations for ....', energy
-      var["isreal_act" + str(energy)], var["aux_act" + str(energy)], var["ecal_act"+ str(energy)]= np.squeeze(var["isreal_act" + str(energy)]), np.squeeze(var["aux_act" + str(energy)]), np.squeeze(var["ecal_a\
-ct"+ str(energy)])
-      var["isreal_gan" + str(energy)], var["aux_gan" + str(energy)], var["ecal_gan"+ str(energy)]= np.squeeze(var["isreal_gan" + str(energy)]), np.squeeze(var["aux_gan" + str(energy)]), np.squeeze(var["ecal_g\
-an"+ str(energy)])
+      var["events_gan" + str(energy)] = var["events_gan" + str(energy)]/scale
+      var["isreal_act" + str(energy)], var["aux_act" + str(energy)], var["ecal_act"+ str(energy)]= np.squeeze(var["isreal_act" + str(energy)]), np.squeeze(var["aux_act" + str(energy)]), np.squeeze(var["ecal_act"+ str(energy)]/scale)
+      var["isreal_gan" + str(energy)], var["aux_gan" + str(energy)], var["ecal_gan"+ str(energy)]= np.squeeze(var["isreal_gan" + str(energy)]), np.squeeze(var["aux_gan" + str(energy)]), np.squeeze(var["ecal_gan"+ str(energy)]/scale)
       var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)])
       var["max_pos_gan" + str(energy)] = get_max(var["events_gan" + str(energy)])
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
@@ -687,8 +701,8 @@ for energy in energies:
    fig+=1
    plot_max(var["max_pos_gan" + str(energy)],  os.path.join(gendir, maxfile), fig, glabel)
    fig+=1
-   plot_energy_axis(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, histfile), fig, glabel)
-   fig+=1
+   #plot_energy_axis(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, histfile), fig, glabel)
+   #fig+=1
    plot_ecal(var["ecal_gan" + str(energy)], os.path.join(gendir, ecalfile), fig, glabel)
    fig+=1
    plot_ecal_error(var["Eerror_act" + str(energy)], os.path.join(actdir, ecalerrorfile), fig, dlabel)
@@ -721,22 +735,24 @@ for energy in energies:
    glabel = "GAN " + str(energy)
    plot_flat_energy(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(actdir, flatfile), fig, dlabel)
    plot_energy_wt_hist(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(actdir, "w_" + histallfile), fig+1, dlabel)
-   plot_energy_axis(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(actdir, histallfile), fig+2, dlabel)
+   #plot_energy_axis(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(actdir, histallfile), fig+2, dlabel)
    plot_energy_mean(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(actdir, meanallfile), fig+3, dlabel)
    plot_flat_energy(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, flatfile), fig + 4, glabel)
-   plot_energy_wt_hist(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, histallfile), fig+5, glabel)
-   plot_energy_axis(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, "w_" + histallfile), fig+6, glabel)
-   plot_energy_mean(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, meanallfile), fig+7, glabel)
-   plot_perror_relative(var["Pnerror_act" + str(energy)], os.path.join(actdir, Efile), fig + 8, energy, 'tab:blue', 1)
-   plot_perror_relative(var["Pnerror_gan" + str(energy)], os.path.join(gendir, Efile), fig + 9, energy, 'tab:orange', 1)
-   plot_perror_relative(var["Pnerror_act" + str(energy)], os.path.join(comdir, Efile), fig + 10, energy, 'tab:blue')
-   plot_perror_relative(var["Pnerror_gan" + str(energy)], os.path.join(comdir, Efile), fig + 10, energy, 'tab:orange')
-   plot_ecal_relative(var["Enerror_act" + str(energy)], os.path.join(actdir, Ecalfile), fig+11, energy, 'tab:blue', 1)
-   plot_ecal_relative(var["Enerror_gan" + str(energy)], os.path.join(gendir, Ecalfile), fig+12, energy, 'tab:orange', 1)
-   plot_ecal_relative(var["Enerror_act" + str(energy)], os.path.join(comdir, Ecalfile), fig+13, energy, 'tab:blue')
-   plot_ecal_relative(var["Enerror_gan" + str(energy)], os.path.join(comdir, Ecalfile), fig+13, energy, 'tab:orange')
-   plot_ecal_ratio(var["Eratio_act" + str(energy)], os.path.join(actdir, Ecalratiofile), fig+14, energy, 'tab:blue')
-   plot_ecal_ratio(var["Eratio_gan" + str(energy)], os.path.join(gendir, Ecalratiofile), fig+15, energy, 'tab:orange')
+   plot_energy_wt_hist(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, "w_" + histallfile), fig+ 5, glabel)
+   #plot_energy_axis(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, histallfile), fig+6, glabel)
+   plot_energy_mean(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, meanallfile), fig+6, glabel)
+   plot_energy_wt_hist(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(gendir, "wl_" + histallfile), fig+ 7, glabel, log=1)
+   if energy != 0:
+      plot_perror_relative(var["Pnerror_act" + str(energy)], os.path.join(actdir, Efile), fig + 8, energy, 'tab:blue', 1)
+      plot_perror_relative(var["Pnerror_gan" + str(energy)], os.path.join(gendir, Efile), fig + 9, energy, 'tab:orange', 1)
+      plot_perror_relative(var["Pnerror_act" + str(energy)], os.path.join(comdir, Efile), fig + 10, energy, 'tab:blue')
+      plot_perror_relative(var["Pnerror_gan" + str(energy)], os.path.join(comdir, Efile), fig + 10, energy, 'tab:orange')
+      plot_ecal_relative(var["Enerror_act" + str(energy)], os.path.join(actdir, Ecalfile), fig+11, energy, 'tab:blue', 1)
+      plot_ecal_relative(var["Enerror_gan" + str(energy)], os.path.join(gendir, Ecalfile), fig+12, energy, 'tab:orange', 1)
+      plot_ecal_relative(var["Enerror_act" + str(energy)], os.path.join(comdir, Ecalfile), fig+13, energy, 'tab:blue')
+      plot_ecal_relative(var["Enerror_gan" + str(energy)], os.path.join(comdir, Ecalfile), fig+13, energy, 'tab:orange')
+      plot_ecal_ratio(var["Eratio_act" + str(energy)], os.path.join(actdir, Ecalratiofile), fig+14, energy, 'tab:blue')
+      plot_ecal_ratio(var["Eratio_gan" + str(energy)], os.path.join(gendir, Ecalratiofile), fig+15, energy, 'tab:orange')
 
 plt.close("all")
 fig+=16
@@ -751,6 +767,8 @@ for energy in energies:
    realfile = "realfake_" + str(energy) + ".pdf"
    dlabel = "Data " + str(energy)
    glabel = "GAN " + str(energy)
+   drlabel = "Disc. Actual " + str(energy)
+   dglabel = "Disc. GAN " + str(energy)
    xfile = "xmoment" + str(energy) + "_"
    yfile = "ymoment" + str(energy) + "_"
    zfile = "zmoment" + str(energy) + "_"
@@ -763,17 +781,21 @@ for energy in energies:
    plot_energy_axis_log(var["sumsx_act" + str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(comdir, "log_" + histfile), fig, dlabel)
    plot_energy_axis_log(var["sumsx_gan" + str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(comdir, "log_" + histfile), fig, glabel)
    fig+=1
-   plot_energy_axis(var["sumsx_act" + str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(comdir, histfile), fig, dlabel)
-   plot_energy_axis(var["sumsx_gan" + str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(comdir, histfile), fig, glabel)
-   fig+=1
+   #plot_energy_axis(var["sumsx_act" + str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(comdir, histfile), fig, dlabel)
+   #plot_energy_axis(var["sumsx_gan" + str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(comdir, histfile), fig, glabel)
+   #fig+=1
    plot_energy_wt_hist(var["sumsx_act" + str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(comdir, "wt_" + histfile), fig, dlabel)
    plot_energy_wt_hist(var["sumsx_gan" + str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(comdir, "wt_" + histfile), fig, glabel)
+   fig+=1
+   plot_energy_wt_hist(var["sumsx_act" + str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], os.path.join(comdir, "wtlog_" + histfile), fig, dlabel, log=1)
+   plot_energy_wt_hist(var["sumsx_gan" + str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], os.path.join(comdir, "wtlog_" + histfile), fig, glabel, log=1)
    fig+=1
    plot_ecal(var["ecal_act" + str(energy)], os.path.join(comdir, ecalfile), fig, dlabel)
    plot_ecal(var["ecal_gan" + str(energy)], os.path.join(comdir, ecalfile), fig, glabel)
    fig+=1
-   plot_energy(np.multiply(100, var["aux_act" + str(energy)]), os.path.join(comdir, energyfile), fig, dlabel, 'blue')
-   plot_energy(np.multiply(100, var["aux_gan" + str(energy)]), os.path.join(comdir, energyfile), fig, glabel, 'green')
+   plot_energy(np.multiply(100, var["aux_act" + str(energy)]), os.path.join(comdir, energyfile), fig, drlabel, 'blue')
+   plot_energy(np.multiply(100, var["aux_gan" + str(energy)]), os.path.join(comdir, energyfile), fig, dglabel, 'green')
+   plot_energy(var["energy" + str(energy)], os.path.join(comdir, energyfile), fig, dlabel, 'red')
    fig+=1
    plot_real(var["isreal_act" + str(energy)], os.path.join(discdir, realfile), fig, dlabel)
    plot_real(var["isreal_gan" + str(energy)], os.path.join(discdir, realfile), fig, glabel)
