@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
     import keras.backend as K
 
-    K.set_image_dim_ordering('tf')
+    K.set_image_dim_ordering('th')
 
     from keras.layers import Input
     from keras.models import Model
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
 
-    nb_epochs = 30 
+    nb_epochs = 2
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -93,6 +93,7 @@ if __name__ == '__main__':
     )
 
 
+    #d=h5py.File("/data/svalleco/Ele_v1_1_2.h5",'r')
     d=h5py.File("/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5",'r')
     e=d.get('target')
     X=np.array(d.get('ECAL'))
@@ -110,13 +111,22 @@ if __name__ == '__main__':
    # remove unphysical values
     X[X < 1e-6] = 0
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9, test_size=0.1)
 
+    X_train = X_train[:,12,:,:]
+    X_test = X_test[:,12,:,:]
+    #y_train = y_train[:,12,:,:]
+    #y_test = y_test[:,12,:,:]
     # tensorflow ordering
-    X_train =np.array(np.expand_dims(X_train, axis=-1))
-    X_test = np.array(np.expand_dims(X_test, axis=-1))
-    y_train= np.array(y_train)/100
-    y_test=np.array(y_test)/100
+    X_train =np.expand_dims(X_train, axis=-1)
+    X_test = np.expand_dims(X_test, axis=-1)
+    y_train= y_train/100
+    y_test=y_test/100
+    print(X_train.shape)
+    X_train =np.moveaxis(X_train, -1, 1)
+    X_test = np.moveaxis(X_test, -1,1)
+
+
     print(X_train.shape)
     print(X_test.shape)
     print(y_train.shape)
@@ -130,8 +140,8 @@ if __name__ == '__main__':
     X_test = X_test.astype(np.float32)
     y_train = y_train.astype(np.float32)
     y_test = y_test.astype(np.float32)
-    ecal_train = np.sum(X_train, axis=(1, 2, 3))
-    ecal_test = np.sum(X_test, axis=(1, 2, 3))
+    ecal_train = np.sum(X_train, axis=(2, 3))
+    ecal_test = np.sum(X_test, axis=(2, 3))
 
     print(X_train.shape)
     print(X_test.shape)
@@ -201,59 +211,59 @@ if __name__ == '__main__':
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
 
-        print('\nTesting for epoch {}:'.format(epoch + 1))
+        #print('\nTesting for epoch {}:'.format(epoch + 1))
 
-        noise = np.random.normal(0, 1, (nb_test, latent_size))
+        #noise = np.random.normal(0, 1, (nb_test, latent_size))
 
-        sampled_energies = np.random.uniform(1, 5, (nb_test, 1))
-        generator_ip = np.multiply(sampled_energies, noise)
-        generated_images = generator.predict(generator_ip, verbose=False)
-        ecal_ip = np.multiply(2, sampled_energies)
-        sampled_energies = np.squeeze(sampled_energies, axis=(1,))
-        X = np.concatenate((X_test, generated_images))
-        y = np.array([1] * nb_test + [0] * nb_test)
-        ecal = np.concatenate((ecal_test, ecal_ip))
-        print(ecal.shape)
-        print(y_test.shape)
-        print(sampled_energies.shape)
-        aux_y = np.concatenate((y_test, sampled_energies), axis=0)
-        print(aux_y.shape)
-        discriminator_test_loss = discriminator.evaluate(
-            X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
+        #sampled_energies = np.random.uniform(1, 5, (nb_test, 1))
+        #generator_ip = np.multiply(sampled_energies, noise)
+        #generated_images = generator.predict(generator_ip, verbose=False)
+        #ecal_ip = np.multiply(2, sampled_energies)
+        #sampled_energies = np.squeeze(sampled_energies, axis=(1,))
+        #X = np.concatenate((X_test, generated_images))
+        #y = np.array([1] * nb_test + [0] * nb_test)
+        #ecal = np.concatenate((ecal_test, ecal_ip))
+        #print(ecal.shape)
+        #print(y_test.shape)
+        #print(sampled_energies.shape)
+        #aux_y = np.concatenate((y_test, sampled_energies), axis=0)
+        #print(aux_y.shape)
+        #discriminator_test_loss = discriminator.evaluate(
+        #    X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
 
-        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
+        #discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
-        noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
-        sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
-        generator_ip = np.multiply(sampled_energies, noise)
-        ecal_ip = np.multiply(2, sampled_energies)
+        #noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
+        #sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
+        #generator_ip = np.multiply(sampled_energies, noise)
+        #ecal_ip = np.multiply(2, sampled_energies)
 
-        trick = np.ones(2 * nb_test)
+        #trick = np.ones(2 * nb_test)
 
-        generator_test_loss = combined.evaluate(generator_ip,
-                                                [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
+        #generator_test_loss = combined.evaluate(generator_ip,
+        #                                        [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
 
-        generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
+        #generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
 
-        train_history['generator'].append(generator_train_loss)
-        train_history['discriminator'].append(discriminator_train_loss)
+        #train_history['generator'].append(generator_train_loss)
+        #train_history['discriminator'].append(discriminator_train_loss)
 
-        test_history['generator'].append(generator_test_loss)
-        test_history['discriminator'].append(discriminator_test_loss)
+        #test_history['generator'].append(generator_test_loss)
+        #test_history['discriminator'].append(discriminator_test_loss)
 
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
-            'component', *discriminator.metrics_names))
-        print('-' * 65)
+        #print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
+        #    'component', *discriminator.metrics_names))
+        #print('-' * 65)
 
-        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
-        print(ROW_FMT.format('generator (train)',
-                             *train_history['generator'][-1]))
-        print(ROW_FMT.format('generator (test)',
-                             *test_history['generator'][-1]))
-        print(ROW_FMT.format('discriminator (train)',
-                             *train_history['discriminator'][-1]))
-        print(ROW_FMT.format('discriminator (test)',
-                             *test_history['discriminator'][-1]))
+        #ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
+        #print(ROW_FMT.format('generator (train)',
+        #                     *train_history['generator'][-1]))
+        #print(ROW_FMT.format('generator (test)',
+        #                     *test_history['generator'][-1]))
+        #print(ROW_FMT.format('discriminator (train)',
+        #                     *train_history['discriminator'][-1]))
+        #print(ROW_FMT.format('discriminator (test)',
+        #                     *test_history['discriminator'][-1]))
 
         # save weights every epoch
         generator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(g_weights, epoch),
@@ -261,5 +271,5 @@ if __name__ == '__main__':
         discriminator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
 
-        pickle.dump({'train': train_history, 'test': test_history},
-open('dcgan-history.pkl', 'wb'))
+        #pickle.dump({'train': train_history, 'test': test_history},
+#open('dcgan-history.pkl', 'wb'))
