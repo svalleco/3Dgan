@@ -20,17 +20,16 @@ def main():
    gen_weights5 = 'generator_16gpu_002.hdf5'# 16 gpu          
 
    disc_weights1 = 'discriminator_1gpu_042.hdf5'# 1 gpu      
-   disc_weights2 = 'discriminator_2gpu_023.hdf5'# 2 gpu                                                                                                        
-   disc_weights3 = '4gpu_disc.hdf5'             # 4 gpu                                                                                                               
-   disc_weights4 = 'discriminator_8gpu_005.hdf5'# 8 gpu                                                                                                                
+   disc_weights2 = 'discriminator_2gpu_023.hdf5'# 2 gpu                                                           
+   disc_weights3 = '4gpu_disc.hdf5'             # 4 gpu                                                           
+   disc_weights4 = 'discriminator_8gpu_005.hdf5'# 8 gpu                                                   
    disc_weights5 = 'discriminator_16gpu_002.hdf5'# 16 gpu   
 
-   plots_dir = "distributed/"
+   plots_dir = "distributed_Test/"
    latent = 200
    num_data = 100000
    num_events = 2000
    m = 3
-   scale = 1
    energies=[0, 50, 100, 200, 250, 300, 400, 500]
 
    #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path                                         
@@ -38,21 +37,22 @@ def main():
    sortdir = 'SortedData'
    gendir = 'Gen'  
    discdir = 'Disc' 
-   Test = False
-   save_data = True # True if the sorted data is to be saved. It only saves when read_data is false
-   read_data = True # True if loading previously sorted data  
-   save_gen = True # True if saving generated data. 
-   read_gen = True # True if generated data is already saved and can be loaded
-   save_disc = True # True if discriminiator data is to be saved
-   read_disc =  True # True if discriminated data is to be loaded from previously saved file
+   Test = True
+   save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
+   read_data = False # True if loading previously sorted data  
+   save_gen = False # True if saving generated data. 
+   read_gen = False # True if generated data is already saved and can be loaded
+   save_disc = False # True if discriminiator data is to be saved
+   read_disc =  False # True if discriminated data is to be loaded from previously saved file
  
    flags =[Test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
-   dweights = [disc_weights1]
-   gweights = [gen_weights1]
+   dweights = [disc_weights1, disc_weights2, disc_weights3, disc_weights4, disc_weights5]
+   gweights = [gen_weights1, gen_weights2, gen_weights3, gen_weights4, gen_weights5]
+   scales = [1, 1, 1, 1, 1]
    d = discriminator()
    g = generator(latent)
-   var= perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data, num_events, m, scale, flags, latent)
-   get_plots(var, plots_dir, energies, m)
+   var= perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data, num_events, m, scales, flags, latent)
+   get_plots(var, plots_dir, energies, m, len(gweights))
 
 def BinLogX(h):
    axis = h.GetXaxis()
@@ -273,9 +273,8 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy):
    c1.Update()
    c1.Print(out_file)
 
-
 def plot_primary_hist(aux1, aux2, out_file, energy):
-   c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                                                                                                                                                                                                                                                                                                                                 
+   c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                
    hd = ROOT.TH1F("DATA", "", 100, 0, 600)
    hg = ROOT.TH1F("GAN", "GAN", 100, 0, 600)
    c1.SetGrid()
@@ -287,8 +286,38 @@ def plot_primary_hist(aux1, aux2, out_file, energy):
    else:
       hd.SetTitle("Auxilliary Energy  Histogram for {} GeV".format(energy) )
    hd.GetXaxis().SetTitle("Primary GeV")
-   #Eprof.GetYaxis().SetTitle("Ecal/Ep")                                                                                                                                                                          
-   #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                                                                                                                                                                                                                                                                                                                                             
+   #Eprof.GetYaxis().SetTitle("Ecal/Ep")                                                                             
+   #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                           
+   hd.Draw()
+   hd.SetLineColor(4)
+   hd.SetLineColor(2)
+   hg.Draw('sames')
+   c1.Update()
+   stat_pos(hg)
+   c1.Update()
+   legend = TLegend(.7, .8, .9, .9)
+   legend.AddEntry(hd,"Data","l")
+   legend.AddEntry(hg, "GAN", "l")
+   legend.Draw()
+   c1.Modified()
+   c1.Update()
+   c1.Print(out_file)
+
+def plot_primary_error_hist(aux1, aux2, y, out_file, energy):
+   c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                
+   hd = ROOT.TH1F("DATA", "", 100, -0.2, 0.2)
+   hg = ROOT.TH1F("GAN", "GAN", 100, -0.2, 0.2)
+   c1.SetGrid()
+
+   fill_hist(hd, (y - aux1*100)/y)
+   fill_hist(hg, (y- aux2*100)/y)
+   if energy == 0:
+      hd.SetTitle("Auxilliary Energy Error Histogram for Uniform Spectrum")
+   else:
+      hd.SetTitle("Auxilliary Energy  Error Histogram for {} GeV".format(energy) )
+   hd.GetXaxis().SetTitle("Primary GeV")
+   #Eprof.GetYaxis().SetTitle("Ecal/Ep")                                                                             
+   #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                           
    hd.Draw()
    hd.SetLineColor(4)
    hd.SetLineColor(2)
@@ -561,7 +590,7 @@ def plot_energy_hist_root2(array1x, array1y, array1z, array2x, array2y, array2z,
    canvas.Update()
    canvas.Print(out_file3)
 
-def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, out_file1, out_file2, out_file3, energy, log=0):
+def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, out_file1, out_file2, out_file3, histfile, i,energy, log=0):
    canvas = TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
    bins = np.arange(0, 25, 1)
    canvas.Divide(2,2)
@@ -626,16 +655,50 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1z.Draw('sames')
    canvas.Update()
    canvas.cd(4)
-   leg = ROOT.TLegend(0.1,0.7,0.48,0.9)
+   leg = ROOT.TLegend(0.1,0.8,0.4, 1.0)
    leg.AddEntry(h1x,"Data","l")
-   leg.AddEntry(h2x,"GAN","l")
+   leg.AddEntry(h2x,"GAN" ,"l")
    leg.Draw()
    canvas.Update()
    canvas.Print(out_file3)
+   if i == 0:
+     h1x.SetStats(kFALSE)
+     h1y.SetStats(kFALSE)
+     h1z.SetStats(kFALSE)
+     h2x.SetStats(kFALSE)
+     h2y.SetStats(kFALSE)
+     h2z.SetStats(kFALSE)
+     canvas.Print(histfile + '.root')
+   else:
+     f = ROOT.TFile(histfile + '.root', 'read')
+     c = f.Get("canvas")
+     c.Draw()
+     color= h2x.GetLineColor()
+     color = color + i * 5
+     gPad.SetLineColor(color)
+     h2x.SetLineColor(color)
+     h2y.SetLineColor(color)
+     h2z.SetLineColor(color)
+     h2x.SetStats(kFALSE)
+     h2y.SetStats(kFALSE)
+     h2z.SetStats(kFALSE)
+
+     c.cd(1)
+     h2x.Draw('sames')
+     c.cd(2)
+     h2y.Draw('sames')
+     c.cd(3)
+     h2z.Draw('sames')
+     c.cd(4)  
+     leg = ROOT.TLegend(0.1,0.8 - i * 0.1,0.4, 0.9 - i * 0.1)
+     leg.AddEntry(h2x,"GAN"+ str(i) ,"l")
+     leg.Draw()
+     c.Update()
+     c.Print(histfile + '.root')
+     c.Print(histfile + '.pdf')
 
 def plot_moment(array1, array2, out_file, dim, energy, moment):
-   c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                                                                                                                
-  
+   c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                
    if moment==0:
      bins = 25
      maxbin = 25
@@ -656,7 +719,7 @@ def plot_moment(array1, array2, out_file, dim, energy, moment):
    else:
       hd.SetTitle("Histogram for {} {} Moment for {} GeV".format(dim, moment + 1, energy))
    hd.GetXaxis().SetTitle("Position along {} axis".format(dim))
-   #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                                                                                                                                                                                                                                                                                                                                             
+   #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                           
    hd.Draw()
    hd.SetLineColor(4)
    hd.SetLineColor(2)
@@ -672,7 +735,7 @@ def plot_moment(array1, array2, out_file, dim, energy, moment):
    c1.Update()
    c1.Print(out_file)
 
-def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=400000, EventsperFile = 10000, Fractions=[.5,.5],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))  
     print ("Found {} files. ".format(len(Files)))
@@ -715,8 +778,7 @@ def get_data(datafile):
     x = np.expand_dims(x, axis=-1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
-    ecal = np.sum(x, axis=(1, 2, 3))
-    return x, y, ecal
+    return x, y
 
 def sort(data, energies, flag=False, num_events=2000):
     X = data[0]
@@ -855,10 +917,7 @@ def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
     return momentX, momentY, momentZ
 
 def safe_mkdir(path):
-    '''                                                                                                            
-    Safe mkdir (i.e., don't create if already exists,                                                              
-    and no violation of race conditions)                                                                           
-    '''
+   #Safe mkdir (i.e., don't create if already exists,and no violation of race conditions)
     from os import makedirs
     from errno import EEXIST
     try:
@@ -867,50 +926,71 @@ def safe_mkdir(path):
         if exception.errno != EEXIST:
             raise exception
 
-def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data, num_events, m, scale, flags, latent, events_per_file=10000):
+def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, flags, latent, events_per_file=10000):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     Test = flags[0]
     save_data = flags[1]  
-    read_data = flags[2]                                                                                                                                                      
-    save_gen = flags[3]                                                                                                                                                               
-    read_gen = flags[4]                                                                                                                                    
-    save_disc = flags[5]                                                                                                                                                
+    read_data = flags[2]                                                                                              
+    save_gen = flags[3]                                                                                               
+    read_gen = flags[4]                                                                                               
+    save_disc = flags[5]                                                                                              
     read_disc =  flags[6]
     var={}     
-    for gen_weights, disc_weights, i in zip(gweights, dweights, np.arange(len(gweights))):
-       if read_data: # Read from sorted dir
-          start = time.time()
-          energies, var['n_'+ str(i)] = load_sorted(sortedpath)
-          sort_time = time.time()- start
-          print "Events were loaded in {} seconds".format(sort_time)
+#    for gen_weights, disc_weights, i in zip(gweights, dweights, np.arange(len(gweights))):
+    if read_data: # Read from sorted dir
+       start = time.time()
+       energies, var = load_sorted(sortedpath)
+       sort_time = time.time()- start
+       print "Events were loaded in {} seconds".format(sort_time)
+    else:
+       # Getting Data
+       events_per_file = 10000
+       Filesused = int(math.ceil(num_data/events_per_file))
+       Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =["Ele"])
+       Trainfiles = Trainfiles[: Filesused]
+       Testfiles = Testfiles[: Filesused]
+       print Trainfiles
+       print Testfiles
+       if Test:
+          data_files = Testfiles
        else:
-          # Getting Data
-          events_per_file = 10000
-          Trainfiles, Testfiles = DivideFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Ele"]) 
-          if Test:
-             data_files = Testfiles
+          data_files = Trainfiles 
+       start = time.time()
+       for index, dfile in enumerate(data_files):
+          data = get_data(dfile)
+          if index==0:
+             var = sort(data, energies, True, num_events)
           else:
-             data_files = Trainfiles + Testfiles
-          start = time.time()
-          for index, dfile in enumerate(data_files):
-             data = get_data(dfile)
-             if index==0:
-                var['n_'+ str(i)] = sort(data, energies, True, num_events)
-             else:
-                sorted_data = sort(data, energies, False, num_events)
-                for key in var['n_'+ str(i)]:
-                   var['n_'+ str(i)][key]= np.append(var['n_'+ str(i)][key], sorted_data[key], axis=0)
-          data = None
-          data_time = time.time() - start
-          print "{} events were loaded in {} seconds".format(num_data, data_time)
-          if save_data:
-             save_sorted(var['n_'+ str(i)], energies, sortdir)        
-       total = 0
-       for energy in energies:
-         var['n_'+ str(i)]["index" + str(energy)]= var['n_'+ str(i)]["energy" + str(energy)].shape[0]
-         total += var['n_'+ str(i)]["index" + str(energy)]
-         data_time = time.time() - start
-       print "{} events were put in {} bins".format(total, len(energies))
+             sorted_data = sort(data, energies, False, num_events)
+             for key in var:
+                var[key]= np.append(var[key], sorted_data[key], axis=0)
+       data = None
+       data_time = time.time() - start
+       print "{} events were loaded in {} seconds".format(num_data, data_time)
+       if save_data:
+          save_sorted(var, energies, sortdir)        
+    total = 0
+    for energy in energies:
+    #calculations for data events
+      var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
+      total += var["index" + str(energy)]
+      var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)])
+      var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
+      var["ecal_act"+ str(energy)]= np.sum(var["events_act" + str(energy)], axis=(1, 2, 3))
+      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["events_act" + str(energy)], var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
+      
+    data_time = time.time() - start
+    print "{} events were put in {} bins".format(total, len(energies))
+    #### Generate Data table to screen                                                                                                                                                                          
+    print "Actual Data"
+    print "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2"
+    for energy in energies:
+       print "{}\t{}\t{:.4f}\t\t{}\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), np.mean(var["max_pos_act" + str(energy)], axis=0), np.mean(var["events_act" + str(energy)]), np.mean(var["momentX_act"+ str(energy)][:, 1]), np.mean(var["momentY_act"+ str(energy)][:, 1]), np.mean(var["momentZ_act"+ str(energy)][:, 1]))
+
+    for gen_weights, disc_weights, scale, i in zip(gweights, dweights, scales, np.arange(len(gweights))):    
+       var['n_'+ str(i)]={}
+       gendir = gendirs + '/n_' + str(i)
+       discdir = discdirs + '/n_' + str(i)
        if read_gen:
          for energy in energies:
            var['n_'+ str(i)]["events_gan" + str(energy)]= get_gen(energy, gendir)
@@ -918,10 +998,9 @@ def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, 
          g.load_weights(gen_weights)
          start = time.time()
          for energy in energies:
-            var['n_'+ str(i)]["events_gan" + str(energy)] = generate(g, var['n_'+ str(i)]["index" + str(energy)], var['n_'+ str(i)]["energy" + str(energy)]/100, latent)
-            var['n_'+ str(i)]["events_gan" + str(energy)] = var['n_'+ str(i)]["events_gan" + str(energy)]
+            var['n_'+ str(i)]["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, latent)
             if save_gen:
-              save_generated(var['n_'+ str(i)]["events_gan" + str(energy)], var['n_'+ str(i)]["energy" + str(energy)], energy, gendir)
+              save_generated(var['n_'+ str(i)]["events_gan" + str(energy)], var["energy" + str(energy)], energy, gendir)
          gen_time = time.time() - start
          print "Generator took {} seconds to generate {} events".format(gen_time, total)
        if read_disc:
@@ -931,7 +1010,7 @@ def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, 
          d.load_weights(disc_weights)
          start = time.time()
          for energy in energies:
-           var['n_'+ str(i)]["isreal_act" + str(energy)], var['n_'+ str(i)]["aux_act" + str(energy)], var['n_'+ str(i)]["ecal_act"+ str(energy)]= discriminate(d, var['n_'+ str(i)]["events_act" + str(energy)] * scale)
+           var['n_'+ str(i)]["isreal_act" + str(energy)], var['n_'+ str(i)]["aux_act" + str(energy)], var['n_'+ str(i)]["ecal_act"+ str(energy)]= discriminate(d, var["events_act" + str(energy)] * scale)
            var['n_'+ str(i)]["isreal_gan" + str(energy)], var['n_'+ str(i)]["aux_gan" + str(energy)], var['n_'+ str(i)]["ecal_gan"+ str(energy)]= discriminate(d, var['n_'+ str(i)]["events_gan" + str(energy)] )
          disc_time = time.time() - start
          print "Discriminator took {} seconds for {} data and generated events".format(disc_time, total)
@@ -944,50 +1023,35 @@ def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, 
          var['n_'+ str(i)]["events_gan" + str(energy)] = var['n_'+ str(i)]["events_gan" + str(energy)]/scale
          var['n_'+ str(i)]["isreal_act" + str(energy)], var['n_'+ str(i)]["aux_act" + str(energy)], var['n_'+ str(i)]["ecal_act"+ str(energy)]= np.squeeze(var['n_'+ str(i)]["isreal_act" + str(energy)]), np.squeeze(var['n_'+ str(i)]["aux_act" + str(energy)]), np.squeeze(var['n_'+ str(i)]["ecal_act"+ str(energy)]/scale)
          var['n_'+ str(i)]["isreal_gan" + str(energy)], var['n_'+ str(i)]["aux_gan" + str(energy)], var['n_'+ str(i)]["ecal_gan"+ str(energy)]= np.squeeze(var['n_'+ str(i)]["isreal_gan" + str(energy)]), np.squeeze(var['n_'+ str(i)]["aux_gan" + str(energy)]), np.squeeze(var['n_'+ str(i)]["ecal_gan"+ str(energy)]/scale)
-         var['n_'+ str(i)]["max_pos_act" + str(energy)] = get_max(var['n_'+ str(i)]["events_act" + str(energy)])
          var['n_'+ str(i)]["max_pos_gan" + str(energy)] = get_max(var['n_'+ str(i)]["events_gan" + str(energy)])
-         var['n_'+ str(i)]["sumsx_act"+ str(energy)], var['n_'+ str(i)]["sumsy_act"+ str(energy)], var['n_'+ str(i)]["sumsz_act"+ str(energy)] = get_sums(var['n_'+ str(i)]["events_act" + str(energy)])
          var['n_'+ str(i)]["sumsx_gan"+ str(energy)], var['n_'+ str(i)]["sumsy_gan"+ str(energy)], var['n_'+ str(i)]["sumsz_gan"+ str(energy)] = get_sums(var['n_'+ str(i)]["events_gan" + str(energy)])
-         var['n_'+ str(i)]["momentX_act" + str(energy)], var['n_'+ str(i)]["momentY_act" + str(energy)], var['n_'+ str(i)]["momentZ_act" + str(energy)]= get_moments(var['n_'+ str(i)]["events_act" + str(energy)], var['n_'+ str(i)]["sumsx_act"+ str(energy)], var['n_'+ str(i)]["sumsy_act"+ str(energy)], var['n_'+ str(i)]["sumsz_act"+ str(energy)], var['n_'+ str(i)]["ecal_act"+ str(energy)], m)
          var['n_'+ str(i)]["momentX_gan" + str(energy)], var['n_'+ str(i)]["momentY_gan" + str(energy)], var['n_'+ str(i)]["momentZ_gan" + str(energy)] = get_moments(var['n_'+ str(i)]["events_gan" + str(energy)], var['n_'+ str(i)]["sumsx_gan"+ str(energy)], var['n_'+ str(i)]["sumsy_gan"+ str(energy)], var['n_'+ str(i)]["sumsz_gan"+ str(energy)], var['n_'+ str(i)]["ecal_gan"+ str(energy)], m)
-         var['n_'+ str(i)]["Perror_act" + str(energy)] = (var['n_'+ str(i)]["energy"+ str(energy)] - 100 * var['n_'+ str(i)]["aux_act" + str(energy)])
-         var['n_'+ str(i)]["Perror_gan" + str(energy)] = (var['n_'+ str(i)]["energy"+ str(energy)] - 100 * var['n_'+ str(i)]["aux_gan" + str(energy)])
-         var['n_'+ str(i)]["Pnerror_act" + str(energy)] = var['n_'+ str(i)]["Perror_act" + str(energy)]/var['n_'+ str(i)]["energy"+ str(energy)]
-         var['n_'+ str(i)]["Pnerror_gan" + str(energy)] = var['n_'+ str(i)]["Perror_gan" + str(energy)]/var['n_'+ str(i)]["energy"+ str(energy)]
-         var['n_'+ str(i)]["Eerror_act" + str(energy)] = (var['n_'+ str(i)]["energy"+ str(energy)] - 50 * var['n_'+ str(i)]["ecal_act" + str(energy)])
-         var['n_'+ str(i)]["Eerror_gan" + str(energy)] = (var['n_'+ str(i)]["energy"+ str(energy)] - 50 * var['n_'+ str(i)]["ecal_gan" + str(energy)])
-         var['n_'+ str(i)]["Enerror_act" + str(energy)] = var['n_'+ str(i)]["Eerror_act" + str(energy)]/var['n_'+ str(i)]["energy"+ str(energy)]
-         var['n_'+ str(i)]["Enerror_gan" + str(energy)] = var['n_'+ str(i)]["Eerror_gan" + str(energy)]/var['n_'+ str(i)]["energy"+ str(energy)]
-         var['n_'+ str(i)]["Eratio_act" + str(energy)] = var['n_'+ str(i)]["energy"+ str(energy)]/var['n_'+ str(i)]["ecal_act" + str(energy)]
-         var['n_'+ str(i)]["Eratio_gan" + str(energy)] = var['n_'+ str(i)]["energy"+ str(energy)]/ var['n_'+ str(i)]["ecal_gan" + str(energy)]
-      
+   
        print('For {} iteration:\nWith Generator weights.....{}\nWith Discriminator weights.....{}'.format(i, gen_weights, disc_weights))
-       #### Generate Data table to screen                                                                                 
-       print "Actual Data"
-       print "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2"
-       for energy in energies:
-         print "{}\t{}\t{:.4f}\t\t{}\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var['n_'+ str(i)]["index" +str(energy)], np.amax(var['n_'+ str(i)]["events_act" + str(energy)]), np.mean(var['n_'+ str(i)]["max_pos_act" + str(energy)], axis=0), np.mean(var['n_'+ str(i)]["events_act" + str(energy)]), np.mean(var['n_'+ str(i)]["momentX_act"+ str(energy)][:, 1]), np.mean(var['n_'+ str(i)]["momentY_act"+ str(energy)][:, 1]), np.mean(var['n_'+ str(i)]["momentZ_act"+ str(energy)][:, 1]))
-
+   
        #### Generate GAN table to screen                                                                                  
        print "Generated Data"
        print "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2"
        for energy in energies:
-         print "{}\t{}\t{:.4f}\t\t{}\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var['n_'+ str(i)]["index" +str(energy)], np.amax(var['n_'+ str(i)]["events_gan" + str(energy)]), np.mean(var['n_'+ str(i)]["max_pos_gan" + str(energy)], axis=0), np.mean(var['n_'+ str(i)]["events_gan" + str(energy)]), np.mean(var['n_'+ str(i)]["momentX_gan"+ str(energy)][:, 1]), np.mean(var['n_'+ str(i)]["momentY_gan"+ str(energy)][:, 1]), np.mean(var['n_'+ str(i)]["momentZ_gan"+ str(energy)][:, 1]))
+         print "{}\t{}\t{:.4f}\t\t{}\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var['n_'+ str(i)]["events_gan" + str(energy)]), np.mean(var['n_'+ str(i)]["max_pos_gan" + str(energy)], axis=0), np.mean(var['n_'+ str(i)]["events_gan" + str(energy)]), np.mean(var['n_'+ str(i)]["momentX_gan"+ str(energy)][:, 1]), np.mean(var['n_'+ str(i)]["momentY_gan"+ str(energy)][:, 1]), np.mean(var['n_'+ str(i)]["momentZ_gan"+ str(energy)][:, 1]))
     return var
 
-def get_plots(var, plots_dir, energies, m):
-    for i, key in enumerate(var):
-      plots_dir= plots_dir + 'plots_' + str(i) + '/'
+def get_plots(var, plots_dir, energies, m, n):
+    
+    actdir = plots_dir + 'Actual'
+    safe_mkdir(actdir)
+    alldir = plots_dir + 'All'
+    safe_mkdir(alldir)
+
+    for i in np.arange(n):
       ## Make folders for plots                                                                                          
-      discdir = plots_dir + 'disc_outputs'
+      discdir = plots_dir + 'disc_outputs'+ 'plots_' + str(i) + '/'
       safe_mkdir(discdir)
-      actdir = plots_dir + 'Actual'
-      safe_mkdir(actdir)
-      gendir = plots_dir + 'Generated'
+      gendir = plots_dir + 'Generated' + 'plots_' + str(i) + '/'
       safe_mkdir(gendir)
-      comdir = plots_dir + 'Combined'
+      comdir = plots_dir + 'Combined' + 'plots_' + str(i) + '/'
       safe_mkdir(comdir)
-      mdir = plots_dir + 'Moments'
+      mdir = plots_dir + 'Moments' + 'plots_' + str(i) + '/'
       safe_mkdir(mdir)
       start = time.time()
    
@@ -998,8 +1062,6 @@ def get_plots(var, plots_dir, energies, m):
          ecalfile = "ecal_" + str(energy) + ".pdf"
          energyfile = "energy_" + str(energy) + ".pdf"
          realfile = "realfake_" + str(energy) + ".pdf"
-         derrorfile = "error_act" + str(energy) + ".pdf"
-         gerrorfile = "error_gan" + str(energy) + ".pdf"
          momentfile = "moment" + str(energy) + ".pdf"
          ecalerrorfile = "ecal_error" + str(energy) + ".pdf"
          allfile = 'All_energies.pdf'
@@ -1008,23 +1070,23 @@ def get_plots(var, plots_dir, energies, m):
          allerrorfile = 'All_relative_auxerror.pdf'
          start = time.time()
        
-         plot_max(var[key]["max_pos_act" + str(energy)], var[key]["max_pos_gan" + str(energy)], os.path.join(actdir, maxfile), os.path.join(gendir, maxfile), os.path.join(comdir, maxfile), energy)
-         plot_energy_hist_root(var[key]["sumsx_act"+ str(energy)], var[key]["sumsy_act"+ str(energy)], var[key]["sumsz_act"+ str(energy)], var[key]["sumsx_gan"+ str(energy)], var[key]["sumsy_gan"+ str(energy)], var[key]["sumsz_gan"+ str(energy)], os.path.join(actdir, histfile), os.path.join(gendir, histfile), os.path.join(comdir, histfile), energy)
-         plot_energy_hist_root(var[key]["sumsx_act"+ str(energy)], var[key]["sumsy_act"+ str(energy)], var[key]["sumsz_act"+ str(energy)], var[key]["sumsx_gan"+ str(energy)], var[key]["sumsy_gan"+ str(energy)], var[key]["sumsz_gan"+ str(energy)], os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, log=1)
-     
-         plot_ecal_hist(var[key]["ecal_act" + str(energy)], var[key]["ecal_gan" + str(energy)], os.path.join(comdir, ecalfile), energy)
-         #plot_ecal_flatten_hist(var[key]["events_act" + str(energy)], var[key]["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy)
-         plot_ecal_hits_hist(var[key]["events_act" + str(energy)], var[key]["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy)
-         plot_primary_hist(var[key]["aux_act" + str(energy)] * 100, var[key]["aux_gan" + str(energy)] * 100, os.path.join(comdir, energyfile), energy)
-         plot_realfake_hist(var[key]["isreal_act" + str(energy)], var[key]["isreal_gan" + str(energy)], os.path.join(discdir, realfile), energy)
+         plot_max(var["max_pos_act" + str(energy)], var['n_' + str(i)]["max_pos_gan" + str(energy)], os.path.join(actdir, maxfile), os.path.join(gendir, maxfile), os.path.join(comdir, maxfile), energy)
+         plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var['n_' + str(i)]["sumsx_gan"+ str(energy)], var['n_' + str(i)]["sumsy_gan"+ str(energy)], var['n_' + str(i)]["sumsz_gan"+ str(energy)], os.path.join(actdir, histfile), os.path.join(gendir, histfile), os.path.join(comdir, histfile),os.path.join(alldir, "hist_" + str(energy)), i, energy)
+         plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var['n_' + str(i)]["sumsx_gan"+ str(energy)], var['n_' + str(i)]["sumsy_gan"+ str(energy)], var['n_' + str(i)]["sumsz_gan"+ str(energy)], os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), os.path.join(alldir, "histl_" + str(energy) ), i, energy, log=1)
+         plot_ecal_hist(var["ecal_act" + str(energy)], var['n_' + str(i)]["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy)
+         #plot_ecal_flatten_hist(var["events_act" + str(energy)], var['n_' + str(i)]["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy)
+         plot_ecal_hits_hist(var["events_act" + str(energy)], var['n_' + str(i)]["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy)
+         plot_primary_hist(var['n_' + str(i)]["aux_act" + str(energy)] * 100, var['n_' + str(i)]["aux_gan" + str(energy)] * 100, os.path.join(discdir, energyfile), energy)
+         plot_realfake_hist(var['n_' + str(i)]["isreal_act" + str(energy)], var['n_' + str(i)]["isreal_gan" + str(energy)], os.path.join(discdir, realfile), energy)
+         plot_primary_error_hist(var['n_' + str(i)]["aux_act" + str(energy)], var['n_' + str(i)]["aux_gan" + str(energy)], var["energy" + str(energy)], os.path.join(discdir, 'error_' + energyfile), energy)
          for mmt in range(m):                                                                                            
-            plot_moment(var[key]["momentX_act" + str(energy)][:, mmt], var[key]["momentX_gan" + str(energy)][:, mmt], os.path.join(mdir, 'x' + str(mmt + 1) + momentfile), 'x', energy, mmt)           
-            plot_moment(var[key]["momentY_act" + str(energy)][:, mmt], var[key]["momentY_gan" + str(energy)][:, mmt], os.path.join(mdir, 'y' + str(mmt + 1) + momentfile), 'y', energy, mmt)           
-            plot_moment(var[key]["momentZ_act" + str(energy)][:, mmt], var[key]["momentZ_gan" + str(energy)][:, mmt], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt)           
-      plot_energy_hist_root_all(var[key]["sumsz_act50"], var[key]["sumsz_act100"], var[key]["sumsz_act400"], var[key]["sumsz_act500"], var[key]["sumsz_gan50"], var[key]["sumsz_gan100"], var[key]["sumsz_gan400"], var[key]["sumsz_gan500"], 50, 100, 400, 500, os.path.join(comdir, allfile))
-      plot_ecal_ratio_profile(var[key]["ecal_act0"], var[key]["ecal_gan0"], var[key]["energy0"], os.path.join(comdir, allecalfile))
-      plot_ecal_relative_profile(var[key]["ecal_act0"], var[key]["ecal_gan0"], var[key]["energy0"], os.path.join(comdir, allecalrelativefile))
-      plot_aux_relative_profile(var[key]["aux_act0"], var[key]["aux_gan0"], var[key]["energy0"], os.path.join(comdir, allerrorfile))
+            plot_moment(var["momentX_act" + str(energy)][:, mmt], var['n_' + str(i)]["momentX_gan" + str(energy)][:, mmt], os.path.join(mdir, 'x' + str(mmt + 1) + momentfile), 'x', energy, mmt)           
+            plot_moment(var["momentY_act" + str(energy)][:, mmt], var['n_' + str(i)]["momentY_gan" + str(energy)][:, mmt], os.path.join(mdir, 'y' + str(mmt + 1) + momentfile), 'y', energy, mmt)           
+            plot_moment(var["momentZ_act" + str(energy)][:, mmt], var['n_' + str(i)]["momentZ_gan" + str(energy)][:, mmt], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt)           
+      plot_energy_hist_root_all(var["sumsz_act50"], var["sumsz_act100"], var["sumsz_act400"], var["sumsz_act500"], var['n_' + str(i)]["sumsz_gan50"], var['n_' + str(i)]["sumsz_gan100"], var['n_' + str(i)]["sumsz_gan400"], var['n_' + str(i)]["sumsz_gan500"], 50, 100, 400, 500, os.path.join(comdir, allfile))
+      plot_ecal_ratio_profile(var['n_' + str(i)]["ecal_act0"], var['n_' + str(i)]["ecal_gan0"], var["energy0"], os.path.join(comdir, allecalfile))
+      plot_ecal_relative_profile(var['n_' + str(i)]["ecal_act0"], var['n_' + str(i)]["ecal_gan0"], var["energy0"], os.path.join(comdir, allecalrelativefile))
+      plot_aux_relative_profile(var['n_' + str(i)]["aux_act0"], var['n_' + str(i)]["aux_gan0"], var["energy0"], os.path.join(comdir, allerrorfile))
       print 'Plots are saved in ', plots_dir
       plot_time= time.time()- start
       print 'Plots are generated in {} seconds'.format(plot_time)
