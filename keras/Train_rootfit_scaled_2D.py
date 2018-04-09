@@ -324,7 +324,7 @@ if __name__ == '__main__':
     datapath = params.datapath#Data path on EOS CERN
     EventsperFile = params.nbperfile#Events in a file
     nEvents = params.nbEvents#Total events for training
-    fitmod = params.mod
+    fitmod = 1 #params.mod
     weightdir = params.weightsdir
     xscale = params.xscale
     print(params)
