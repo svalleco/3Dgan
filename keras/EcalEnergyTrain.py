@@ -20,6 +20,16 @@ import time
 import math
 import argparse
 #import setGPU #if Caltech
+def safe_mkdir(path):
+   #Safe mkdir (i.e., don't create if already exists,and no violation of race conditions)
+    from os import makedirs
+    from errno import EEXIST
+    try:
+        makedirs(path)
+    except OSError as exception:
+        if exception.errno != EEXIST:
+            raise exception
+
 
 def BitFlip(x, prob=0.05):
     """ flips a int array's values with some probability """
@@ -268,7 +278,7 @@ def GanTrain2D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
                              *train_history['discriminator'][-1]))
         #print(ROW_FMT.format('discriminator (test)',
         #                     *test_history['discriminator'][-1]))
-
+        safe_mkdir(WeightsDir)
         # save weights every epoch
         generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
@@ -290,7 +300,7 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='veganweights2D', help='Directory to store weights.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights2D', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
