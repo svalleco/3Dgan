@@ -353,8 +353,8 @@ if __name__ == '__main__':
      #Values to be set by user
     parser = get_parser()
     params = parser.parse_args()
-    #nb_epochs = params.nbepochs #Total Epochs
-    nb_epochs = 1
+    nb_epochs = params.nbepochs #Total Epochs
+    #nb_epochs = 1
     batch_size = params.batchsize #batch size
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
@@ -362,7 +362,7 @@ if __name__ == '__main__':
     datapath = params.datapath#Data path 
     EventsperFile = params.nbperfile#Events in a file
     #nEvents = params.nbEvents#Total events for training
-    nEvents = 100000
+    nEvents = 200000
     #fitmod = params.mod
     fitmod = 3
     weightdir = params.weightsdir
