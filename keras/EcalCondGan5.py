@@ -24,7 +24,7 @@ def discriminator():
 
     image = Input(shape=(51, 51, 25, 1))
 
-    x = Conv3D(32, 5, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
@@ -41,7 +41,6 @@ def discriminator():
     x = Dropout(0.2)(x)
 
     #x = AveragePooling3D((2, 2, 2))(x)
-
     #x = ZeroPadding3D((1, 1, 1))(x)
     x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
