@@ -9,11 +9,11 @@ except ImportError:
     import pickle
 
 def main():
-   lossfile = 'dcgan-history.pkl'
-   weights = [8, 0.2, 0.1]
+   lossfile = 'dcgan-pion-history2.pkl'
+   weights = [2, 0.1, 0.2]
    #defining limits for different plots. Varies with result
-   ymax = [10, 2, 2, 15, 0.8, 1.0]
-   outdir = 'loss_plots'
+   ymax = [10, 2, 2, 15, 0.75, 1.25]
+   outdir = 'loss_plots_pions'
    safe_mkdir(outdir)
    plot_loss(lossfile, weights, ymax, outdir)
 
@@ -134,20 +134,16 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.ylim(0, ymax[3])  
    plt.savefig(os.path.join(lossdir, 'aux_training_losses.pdf'))
 
-   #Training losses for auxlilliary losses
+   #Diff. for training losses Real/fake
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Testing losses for Auxilliary outputs')
-   plt.plot(disc_train[:,2], label='Disc aux (Mean Absolute Percentage Error)', color='blue')
-   plt.plot(disc_train[:,3], label='Disc ecal(Mean Absolute Percentage Error)', color='magenta')
-   plt.plot(gen_train[:,2], label='Gen aux (Mean Absolute Percentage Error)', color='blue', linestyle='--')
-   plt.plot(gen_train[:,3], label='Gen ecal(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
+   plt.title('Binary Training losses for GAN')
+   plt.plot(gen_train[:,1] - disc_train[:,1], label='Gen loss - Disc loss (Binary Cross Entropy)')
    plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
-   plt.ylim(0, ymax[3])  
-   plt.savefig(os.path.join(lossdir, 'aux_testing_losses.pdf'))
-
+   plt.ylim(0, ymax[1])  
+   plt.savefig(os.path.join(lossdir, 'BCE_train_losses_diff.pdf'))
 
 if __name__ == "__main__":
    main()
