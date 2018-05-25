@@ -1,13 +1,13 @@
 import sys
 import os
-
+import ROOT
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
 plt.switch_backend('Agg')
 import math
 from keras import backend as K
-
+import ROOTutils  
 # Computing log only when not zero
 def logftn(x, base, f1, f2):
     select= np.where(x>0)
@@ -38,7 +38,7 @@ def GetProcData(datafile, num_events):
     y = y.astype(np.float32)
     return x, y
 
-def PlotEcalFlat(x, outfile, label, fig=1):
+def PlotEcalFlatlog(x, outfile, label, fig=1):
     x = x.flatten()
     bins = np.logspace(np.log10(1e-7),np.log10(1),50)
     plt.figure(fig)
@@ -49,10 +49,11 @@ def PlotEcalFlat(x, outfile, label, fig=1):
     print('Saving plot for Flat Ecal in {}.'.format(outfile))
     plt.savefig(outfile)
 
-def PlotEcalFlatlog(x, outfile, label, fig=1):
+def PlotEcalFlat(x, outfile, label, fig=1):
     x = x.flatten()
+    bins = np.arange(0.01, 1, 0.01)
     plt.figure(fig)
-    plt.hist(x, bins='auto', histtype='step', label=label)
+    plt.hist(x, bins=bins, histtype='step', label=label)
     #plt.xscale('log', nonposy='clip')
     plt.legend()
     plt.xlabel('Log of G4')
@@ -64,11 +65,11 @@ def main():
     num_events=100
     outfile = 'flat_ecal_python'
     X, Y = GetProcData(datafile, num_events)
-    PlotEcalFlat(X, outfile + '1.pdf', label='G4')
+    PlotEcalFlatlog(X, outfile + '1.pdf', label='G4')
     xlog = logftn(X, 10, 1.0/6.0, 1.0)
-    PlotEcalFlatlog(xlog, outfile + '_log.pdf', fig=2, label='log Ecal')
+    PlotEcalFlat(xlog, outfile + '_log.pdf', fig=2, label='log Ecal')
     x = get_log(xlog)
-    PlotEcalFlat(x, outfile + '2.pdf', label= 'out of lambda')
+    PlotEcalFlatlog(x, outfile + '2.pdf', label= 'out of lambda')
                    
 if __name__ == '__main__':
     main()
