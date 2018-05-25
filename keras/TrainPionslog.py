@@ -23,9 +23,9 @@ import setGPU #if Caltech
 from numpy import ma
 
 # Computing log only when not zero
-def safelog(x):
+def logftn(x, f1, f2):
     select= np.where(x>0)
-    x[select] = np.log(x[select]) 
+    x[select] = f1 * np.log10(x[select]) + f2 
     return x
 
 def BitFlip(x, prob=0.05):
@@ -87,7 +87,7 @@ def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     X = xscale * X
     Y = Y/yscale
     ecal = np.sum(X, axis=(1, 2, 3))
-    X = (-1.0/6.0)* safelog(X)
+    X = logftn(X, 1.0/6.0, 1.0)
     return X, Y, ecal
 
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
@@ -216,26 +216,33 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             file_index +=1
+            print('The image data for {} batch is from {} to {}'.format(index, np.amin(image_batch), np.amax(image_batch)))
+            print('Energy batch = {}'.format(energy_batch[:5]))
+            print('Ecal batch = {}'.format(ecal_batch[:5]))
             noise = np.random.normal(0, 1, (batch_size, latent_size))
             sampled_energies = np.random.uniform(0.1, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
-               
+            print('The sampled energies are {}'.format(sampled_energies[:5]))
             #ecal sum from fit
             ecal_ip = GetEcalFit(sampled_energies, 'Pi0',mod, xscale)
-          
+            print('Ecal from fit = {}'.format(ecal_ip[:5]))
             generated_images = generator.predict(generator_ip, verbose=0) 
             #print('ecal batch', ecal_batch.shape)
             #disc_out = discriminator.predict(image_batch)
             #print('disc out', len(disc_out), len(disc_out[0]))
            # ecal_sum = np.sum(np.exp(-6 *image_batch), axis= (1, 2, 3))
            # print('ecal sum', ecal_sum[:5])       
+            print('The generated data for {} batch is from {} to {}'.format(index, np.amin(generated_images), np.amax(generated_images)))
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
-            #print('Real batch loss = {}'.format(real_batch_loss))
+            print('Real batch loss = {}'.format(real_batch_loss))
             #print('ecal ip',ecal_ip[:5])
-            #disc_out = discriminator.predict(generated_images)
-            #print('disc out',disc_out[2][:5])
+            disc_out = discriminator.predict(image_batch)
+            print('disc out for data', disc_out[2][:5])
+
+            disc_out = discriminator.predict(generated_images)
+            print('disc out for generated', disc_out[2][:5])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
-            #print('Fake batch loss = {}'.format(fake_batch_loss))
+            print('Fake batch loss = {}'.format(fake_batch_loss))
             epoch_disc_loss.append([
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
@@ -251,9 +258,9 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
                     [generator_ip],
                     [trick, sampled_energies.reshape((-1, 1)), ecal_ip]))
                 com_out = combined.predict(generator_ip)
-               # print("#################Generator########################")
-               # print('ecal ip',ecal_ip[:5])
-               # print('com out', com_out[2][:5])
+                print("#################Generator########################")
+                print('ecal ip',ecal_ip[:5])
+                print('com out', com_out[2][:5])
 
             epoch_gen_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)

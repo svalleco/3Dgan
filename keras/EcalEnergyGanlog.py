@@ -15,13 +15,12 @@ from keras.models import Model, Sequential
 import tensorflow as tf
 K.set_image_dim_ordering('tf')
 
-# Output shape
-def output_of_lambda(input_shape):
-    return (input_shape[0], 1)
-
 # Exponent
 def expon(a):
-   return K.exp(-6.0 * a)
+    a = a - K.ones_like(a)
+    a = K.log(10.0) * a
+    a = K.exp(6.0 * a)
+    return a
 
 # Ecal sum Calculation
 def ecal_sum_log(image):
@@ -29,6 +28,7 @@ def ecal_sum_log(image):
     result = K.tf.where(K.equal(image, 0.0),  K.zeros_like(image), expon(image))
     sum = K.sum(result, axis=(1, 2, 3))
     sum = K.expand_dims(sum)
+    print K.int_shape(sum)
     return sum
    
 def discriminator():
