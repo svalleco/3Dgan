@@ -40,22 +40,27 @@ from sklearn.cross_validation import train_test_split
 K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
-from ecalvegan import generator
-
+from EcalEnergyGan_5layer import generator
+import setGPU
+from GANutils import get_sorted
 
 def main():
 #    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
 #    genpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_generator*.hdf5"
 #    discpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_discriminator*.hdf5"
     datapath = "/bigdata/shared/LCD/NewV1/*scan/*.h5"
-    genpath = "/nfshome/gkhattak/keras/veganweights/params_generator*.hdf5"
-    sorted_path = 'sorted_*.hdf5'
-    filename = 'rootfit2p1p1'
+    genpath = "/nfshome/gkhattak/keras/veganweights2/params_generator*.hdf5"
+    sorted_path = 'Elesorted_*.hdf5'
+    filename = 'Ele_5layer'
+    particle = "Ele"
+    scale = 100
     g= generator()
     gen_weights=[]
     disc_weights=[]
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
+    #gen_weights=gen_weights[:30]
+    print(gen_weights)
     metrics = []
     metric = 3
     """
@@ -69,10 +74,10 @@ def main():
     """
     metric+=1
     metrics.append(metric)
-    fig+=1
+    fig=1
     resultfile = filename + '_' + str(metric) + 'result.txt'
     resultplot = filename + '_' + str(metric) + 'result.pdf'
-    results2 = GetResults(metric, resultfile, gen_weights, g, datapath)
+    results2 = GetResults(metric, resultfile, gen_weights, g, datapath, sorted_path, particle, scale)
     PlotResults(results2, metric, resultplot, fig)
     """
     fig+=1
@@ -115,7 +120,7 @@ def PlotResultsAll(results, metrics, resultplotall, fig):
     plt.savefig(resultplotall)
     print ('The plot is saved to {}.'.format(resultplotall))
 
-def GetResults(num, resultfile, gen_weights, g, datapath):
+def GetResults(num, resultfile, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100):
     results= []
     file = open(resultfile,'w')
     if num==3:
@@ -124,9 +129,9 @@ def GetResults(num, resultfile, gen_weights, g, datapath):
         metric = metric4                                                      
     for i in range(len(gen_weights)):
        if i==0:
-         results.append(analyse(g, True, False, gen_weights[i], datapath, metric)) # For the first time when sorted data is not saved we can make use opposite flags
+         results.append(analyse(g, False, True, gen_weights[i], datapath, sorted_path, metric, scale, particle)) # For the first time when sorted data is not saved we can make use opposite flags
        else:
-         results.append(analyse(g, True, False, gen_weights[i], datapath, metric))
+         results.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, particle))
        file.write("{}\t{}\t{}\n".format(results[i][0], results[i][1], results[i][2]))
     #print all results together at end                                                                               
     for i in range(len(gen_weights)):                                                                                            
@@ -165,7 +170,7 @@ def PlotResults(results, metric, resultplot, fig):
     plt.plot(energy_e , label = 'Energy profile error')
     plt.legend(title='Min total error{:.4f}({})\nPosition error {:.4f}({})\nEnergy error {:.4}({})'.format(mint, mint_n, minp, minp_n, mine, mine_n))
     plt.xticks(np.arange(0, len(total), 5))
-    plt.ylim(0, 1.0)
+    #plt.ylim(0, 1.0)
     plt.savefig(resultplot)
     print ('The plots are saved to {}.'.format(resultplot))
 
@@ -228,9 +233,10 @@ def sort(data, energies, num_events):
        srt["energy" + str(energy)] = Y[indexes]
     return srt
 
-def save_sorted(srt, energies):
+def save_sorted(srt, energies, sorted_path):
+    sorted_path = sorted_path.split("_")
     for energy in energies:
-       filename = "sorted_{:03d}.hdf5".format(energy)
+       filename = sorted_path[0] + "_{:03d}.hdf5".format(energy)
        with h5py.File(filename ,'w') as outfile:
           outfile.create_dataset('ECAL',data=srt["events_act" + str(energy)])
           outfile.create_dataset('Target',data=srt["energy" + str(energy)])
@@ -292,7 +298,6 @@ def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
       if i==0: ECAL_midY = ECAL_momentY.transpose()
       momentY[:,i]= ECAL_momentY
     for i in range(m):
-      relativeIndices = np.tile(np.arange(ecal_size), (index,1))
       moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
       ECAL_momentZ = umath.inner1d(sumsz, moments)/totalE
       if i==0: ECAL_midZ = ECAL_momentZ.transpose()
@@ -300,11 +305,11 @@ def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
     return momentX, momentY, momentZ
  
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, datapath, optimizer):
+def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, particle="Ele"):
    print ("Started")
    num_events=2000
    num_data = 100000
-   sortedpath = 'sorted_*.hdf5'
+   #sortedpath = 'sorted_*.hdf5'
    Test = False
    latent= 200
    m = 2
@@ -312,32 +317,33 @@ def analyse(g, read_data, save_data, gen_weights, datapath, optimizer):
    g =generator(latent)
    if read_data:
      start = time.time()
-     energies, var = load_sorted(sortedpath)
+     energies, var = load_sorted(sorted_path)
      sort_time = time.time()- start
      print ("Events were loaded in {} seconds".format(sort_time))
    else:
      # Getting Data
      events_per_file = 10000
      energies = [50, 100, 200, 250, 300, 400, 500]
-     Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Ele"]) 
+     Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Pi0"]) 
      if Test:
         data_files = Testfiles
      else:
         data_files = Trainfiles + Testfiles
      start = time.time()
-     for index, dfile in enumerate(data_files):
-        data = get_data(dfile)
-        sorted_data = sort(data, energies, num_events)
-        data = None
-        if index==0:
-          var.update(sorted_data)
-        else:
-          for key in var:
-            var[key]= np.append(var[key], sorted_data[key], axis=0)
+     #for index, dfile in enumerate(data_files):
+     #   data = get_data(dfile)
+     #   sorted_data = sort(data, energies, num_events)
+     #   data = None
+     #   if index==0:
+     #     var.update(sorted_data)
+     #   else:
+     #     for key in var:
+     #       var[key]= np.append(var[key], sorted_data[key], axis=0)
+     var = get_sorted(data_files, energies)
      data_time = time.time() - start
      print ("{} events were loaded in {} seconds".format(num_data, data_time))
      if save_data:
-        save_sorted(var, energies)        
+        save_sorted(var, energies, sorted_path)        
    total = 0
    for energy in energies:
      var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
@@ -348,7 +354,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, optimizer):
               
    start = time.time()
    for energy in energies:
-     var["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], latent, var["energy" + str(energy)]/100)
+     var["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], latent, var["energy" + str(energy)]/100)/xscale
    gen_time = time.time() - start
    print ("{} events were generated in {} seconds".format(total, gen_time))
 
@@ -369,6 +375,7 @@ def metric4(var, energies, m):
    for energy in energies:
      #Relative error on mean moment value for each moment and each axis
      x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
+     x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
      x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
      y_act= np.mean(var["momentY_act"+ str(energy)], axis=0)
      y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
@@ -450,4 +457,4 @@ def metric3(var, energies, m):
 
 
 if __name__ == "__main__":
-    main()
+   main()
