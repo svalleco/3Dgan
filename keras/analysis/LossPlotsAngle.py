@@ -12,8 +12,8 @@ def main():
    lossfile = 'dcgan-history-angle.pkl'
    weights = [2, 0.1, 0.1, 0.1]
    #defining limits for different plots. Varies with result
-   ymax = [15, 4, 4, 60, 2.75, 3.25]
-   outdir = 'loss_plots_angle'
+   ymax = [30, 5, 4, 200, 1.75, 2.75]
+   outdir = 'loss_plots_angle_eta'
    safe_mkdir(outdir)
    plot_loss(lossfile, weights, ymax, outdir)
 
@@ -33,7 +33,7 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.plot(disc_train[:,0], label='tot')
    plt.plot(weights[0] * disc_train[:,1], label='gen')
    plt.plot(weights[1] * disc_train[:,2], label='aux')
-   plt.plot(weights[2] * disc_train[:,3], label='theta')
+   plt.plot(weights[2] * disc_train[:,3], label='eta')
    plt.plot(weights[3] * disc_train[:,4], label='ecal')
    plt.legend()                                                                   
    plt.ylim(0, ymax[0])                                                                                                                           
@@ -43,7 +43,7 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.plot(gen_train[:,0], label='tot')
    plt.plot(weights[0] * gen_train[:,1], label='gen')
    plt.plot(weights[1] * gen_train[:,2], label='aux')
-   plt.plot(weights[2] * gen_train[:,3], label='theta')
+   plt.plot(weights[2] * gen_train[:,3], label='eta')
    plt.plot(weights[3] * gen_train[:,4], label='ecal')
    plt.legend()                                                                   
    plt.ylim(0, ymax[0])                                                                                              
@@ -53,8 +53,8 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.plot(disc_test[:,0], label='tot')
    plt.plot(weights[0] * disc_test[:,1], label='gen')
    plt.plot(weights[1] * disc_test[:,2], label='aux')
-   plt.plot(weights[2] * disc_test[:,3], label='ecal')
-   plt.plot(weights[2] * disc_test[:,3], label='ecal')
+   plt.plot(weights[2] * disc_test[:,3], label='eta')
+   plt.plot(weights[3] * disc_test[:,4], label='ecal')
 
    plt.legend()
    plt.ylim(0, ymax[0])  
@@ -64,7 +64,8 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.plot(gen_test[:,0], label='tot')
    plt.plot(weights[0] * gen_test[:,1], label='gen')
    plt.plot(weights[1] * gen_test[:,2], label='aux')
-   plt.plot(weights[2] *disc_test[:,3], label='ecal')
+   plt.plot(weights[2] * gen_test[:,3], label='eta')
+   plt.plot(weights[3] * gen_test[:,4], label='ecal')
    plt.legend()
    plt.ylim(0, ymax[0])  
    plt.savefig(os.path.join(lossdir,'losses.pdf')) 
@@ -72,17 +73,17 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #Training losses
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Weighted Training losses for GAN: Loss weights = (%0.2f, %.2f, %.2f)'%(weights[0], weights[1], weights[2]))
+   plt.title('Weighted Training losses for GAN: Loss weights = (%0.2f, %.2f, %.2f,  %.2f)'%(weights[0], weights[1], weights[2],  weights[3]))
    plt.plot(disc_train[:,0], label='Disc tot', color='red')
    plt.plot(weights[0] * disc_train[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
    plt.plot(weights[1] * disc_train[:,2], label='Disc aux (Mean Absolute Percentage Error)', color='blue')
-   plt.plot(weights[2] * disc_train[:,3], label='Disc theta(Mean Absolute Percentage Error)', color='magenta')
-   plt.plot(weights[2] * disc_train[:,4], label='Disc ecal(Mean Absolute Percentage Error)', color='green')
+   plt.plot(weights[2] * disc_train[:,3], label='Disc eta(Mean Absolute Percentage Error)', color='magenta')
+   plt.plot(weights[3] * disc_train[:,4], label='Disc ecal(Mean Absolute Percentage Error)', color='green')
 
    plt.plot(gen_train[:,0], label='Gen tot', color='red', linestyle='--')
    plt.plot(weights[0] * gen_train[:,1], label='Gen gen (Binary Cross Entropy)', color='green', linestyle='--')
    plt.plot(weights[1] * gen_train[:,2], label='Gen aux (Mean Absolute Percentage Error)', color='blue', linestyle='--')
-   plt.plot(weights[2] * gen_train[:,3], label='Gen theta(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
+   plt.plot(weights[2] * gen_train[:,3], label='Gen eta(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
    plt.plot(weights[3] * gen_train[:,4], label='Gen ecal(Mean Absolute Percentage Error)', color='green', linestyle='--')
    plt.legend(fontsize='x-small')
    plt.xlabel('Epochs')  
@@ -132,11 +133,11 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    plt.figure(fig)
    plt.title('Training losses for Auxilliary outputs')
    plt.plot(disc_train[:,2], label='Disc aux (Mean Absolute Percentage Error)', color='blue')
-   plt.plot(disc_train[:,3], label='Disc theta(Mean Absolute Percentage Error)', color='magenta')
+   plt.plot(disc_train[:,3], label='Disc eta(Mean Absolute Percentage Error)', color='magenta')
    plt.plot(disc_train[:,4], label='Disc ecal(Mean Absolute Percentage Error)', color='green')
 
    plt.plot(gen_train[:,2], label='Gen aux (Mean Absolute Percentage Error)', color='blue', linestyle='--')
-   plt.plot(gen_train[:,3], label='Gen theta(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
+   plt.plot(gen_train[:,3], label='Gen eta(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
    plt.plot(gen_train[:,4], label='Gen ecal(Mean Absolute Percentage Error)', color='green', linestyle='--')
    
    plt.legend(fontsize='x-small')
