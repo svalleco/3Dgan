@@ -76,7 +76,7 @@ def GetDataAngleEta(datafile, xscale =1, yscale = 100, etascale=1):
     X = np.expand_dims(X, axis=-1)
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    eta = eta.astype(np.float32) * etascale
+    eta = (eta.astype(np.float32) + 0.6) * etascale
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, eta, ecal
 
@@ -105,7 +105,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     start_init = time.time()
     verbose = False
     pmin, pmax = 2/100, 500/100
-    etamin, etamax= (- 0.6) * etascale, (0.6) * etascale 
+    etamin, etamax= 0, (1.2) * etascale 
     print(etamin, etamax)
     particle='Ele'
     f = [0.9, 0.1]
@@ -114,7 +114,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     #discriminator.summary()
     discriminator.compile(
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, eta_weight, ecal_weight]
     )
 
@@ -139,7 +139,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, eta_weight, ecal_weight]
     )
 
@@ -169,12 +169,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print(Y_test.shape)
     #print(Y_test[:10])
     print('*************************************************************************************')
-
+    print('Eta varies from {} to {}'.format(np.amin(eta_test), np.amax(eta_test)))
     nb_test = X_test.shape[0]
     nb_train = nEvents * f[0] # Total events in training files
     total_batches = int(nb_train / batch_size)
     print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
-
+ 
     train_history = defaultdict(list)
     test_history = defaultdict(list)
     init_time = time.time()- start_init
@@ -316,7 +316,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds".format(epoch, epoch_time))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-angle.pkl', 'wb'))
+    open('dcgan-history-angle4.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -364,10 +364,11 @@ if __name__ == '__main__':
     datapath = params.datapath#Data path 
     EventsperFile = params.nbperfile#Events in a file
     #nEvents = params.nbEvents#Total events for training
-    nEvents = 200000
+    nEvents = 400000
     #fitmod = params.mod
     fitmod = 3
-    weightdir = params.weightsdir
+    #weightdir = params.weightsdir
+    weightdir = 'angleweights4'
     #xscale = params.xscale
     xscale = 2
     print(params)
