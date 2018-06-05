@@ -86,9 +86,9 @@ def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     Y = Y.astype(np.float32)
     X = xscale * X
     Y = Y/yscale
-    ecal = np.sum(X, axis=(1, 2, 3))
+    #ecal = np.sum(X, axis=(1, 2, 3))
     X = logftn(X, 1.0/6.0, 1.0)
-    return X, Y, ecal
+    return X, Y #, ecal
 
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
     if mod==0:
@@ -107,13 +107,14 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
 def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1):
     start_init = time.time()
     verbose = False
+    noise_init = 1
     f=[0.9, 0.1]
     print('[INFO] Building discriminator')
     #discriminator.summary()
     discriminator.compile(
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ecal_weight]
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error'],
+        loss_weights=[gen_weight, aux_weight]
     )
 
     # build the generator
@@ -128,16 +129,16 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     latent = Input(shape=(latent_size, ), name='combined_z')   
     fake_image = generator( latent)
     discriminator.trainable = False
-    fake, aux, ecal = discriminator(fake_image)
+    fake, aux = discriminator(fake_image)
     combined = Model(
         input=[latent],
-        output=[fake, aux, ecal],
+        output=[fake, aux],
         name='combined_model'
     )
     combined.compile(
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ecal_weight]
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error'],
+        loss_weights=[gen_weight, aux_weight]
     )
 
     # Getting Data
@@ -150,14 +151,14 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
-           X_test, Y_test, ecal_test = GetprocData(dtest, xscale=xscale)
+           X_test, Y_test = GetprocData(dtest, xscale=xscale)
        else:
            print(X_test.shape[0])
            if X_test.shape[0] < nb_test:
-              X_temp, Y_temp, ecal_temp = GetprocData(dtest, xscale=xscale)
+              X_temp, Y_temp = GetprocData(dtest, xscale=xscale)
               X_test = np.concatenate((X_test, X_temp))[:nb_test]
               Y_test = np.concatenate((Y_test, Y_temp))[:nb_test]
-              ecal_test = np.concatenate((ecal_test, ecal_temp))[:nb_test]
+              #ecal_test = np.concatenate((ecal_test, ecal_temp))[:nb_test]
 
     print('Test Data loaded of shapes:')
     print(X_test.shape)
@@ -179,7 +180,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         epoch_start = time.time()
         nb_file=0
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-        X_train, Y_train, ecal_train = GetprocData(Trainfiles[nb_file], xscale=xscale)
+        X_train, Y_train = GetprocData(Trainfiles[nb_file], xscale=xscale)
         #print(Y_train[:10])
         nb_file+=1
         nb_batches = int(X_train.shape[0] / batch_size)
@@ -199,50 +200,50 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
             loaded_data = X_train.shape[0]
             used_data = file_index * batch_size
             if (loaded_data - used_data) < (batch_size + 1 ):
-                X_temp, Y_temp, ecal_temp = GetprocData(Trainfiles[nb_file], xscale=xscale)
+                X_temp, Y_temp = GetprocData(Trainfiles[nb_file], xscale=xscale)
                 #print("\n{} Data file loaded..........{}".format(nb_file, Trainfiles[nb_file]))
                 nb_file+=1
                 X_left = X_train[(file_index * batch_size):]
                 Y_left = Y_train[(file_index * batch_size):]
-                ecal_left = ecal_train[(file_index * batch_size):]
+                #ecal_left = ecal_train[(file_index * batch_size):]
                 X_train = np.concatenate((X_left, X_temp))
                 Y_train = np.concatenate((Y_left, Y_temp))
-                ecal_train = np.concatenate((ecal_left, ecal_temp))
+                #ecal_train = np.concatenate((ecal_left, ecal_temp))
                 nb_batches = int(X_train.shape[0] / batch_size)                
                 #print("{} batches loaded..........".format(nb_batches))
                 file_index = 0
 
             image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
+            #ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             file_index +=1
-            print('The image data for {} batch is from {} to {}'.format(index, np.amin(image_batch), np.amax(image_batch)))
-            print('Energy batch = {}'.format(energy_batch[:5]))
-            print('Ecal batch = {}'.format(ecal_batch[:5]))
-            noise = np.random.normal(0, 1, (batch_size, latent_size))
+            #print('The image data for {} batch is from {} to {}'.format(index, np.amin(image_batch), np.amax(image_batch)))
+            #print('Energy batch = {}'.format(energy_batch[:5]))
+            #print('Ecal batch = {}'.format(ecal_batch[:5]))
+            noise = np.random.normal(0, noise_init, (batch_size, latent_size))
             sampled_energies = np.random.uniform(0.1, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
-            print('The sampled energies are {}'.format(sampled_energies[:5]))
+            #print('The sampled energies are {}'.format(sampled_energies[:5]))
             #ecal sum from fit
-            ecal_ip = GetEcalFit(sampled_energies, 'Pi0',mod, xscale)
-            print('Ecal from fit = {}'.format(ecal_ip[:5]))
+            #ecal_ip = GetEcalFit(sampled_energies, 'Pi0',mod, xscale)
+            #print('Ecal from fit = {}'.format(ecal_ip[:5]))
             generated_images = generator.predict(generator_ip, verbose=0) 
             #print('ecal batch', ecal_batch.shape)
             #disc_out = discriminator.predict(image_batch)
             #print('disc out', len(disc_out), len(disc_out[0]))
            # ecal_sum = np.sum(np.exp(-6 *image_batch), axis= (1, 2, 3))
            # print('ecal sum', ecal_sum[:5])       
-            print('The generated data for {} batch is from {} to {}'.format(index, np.amin(generated_images), np.amax(generated_images)))
-            real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
-            print('Real batch loss = {}'.format(real_batch_loss))
+            #print('The generated data for {} batch is from {} to {}'.format(index, np.amin(generated_images), np.amax(generated_images)))
+            real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch])
+            #print('Real batch loss = {}'.format(real_batch_loss))
             #print('ecal ip',ecal_ip[:5])
             disc_out = discriminator.predict(image_batch)
-            print('disc out for data', disc_out[2][:5])
+            #print('disc out for data', disc_out[2][:5])
 
             disc_out = discriminator.predict(generated_images)
-            print('disc out for generated', disc_out[2][:5])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
-            print('Fake batch loss = {}'.format(fake_batch_loss))
+            #print('disc out for generated', disc_out[2][:5])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies])
+            #print('Fake batch loss = {}'.format(fake_batch_loss))
             epoch_disc_loss.append([
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
@@ -250,55 +251,57 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
             trick = np.ones(batch_size)
             gen_losses = []
             for _ in range(2):
-                noise = np.random.normal(0, 1, (batch_size, latent_size))
+                noise = np.random.normal(0, noise_init, (batch_size, latent_size))
                 sampled_energies = np.random.uniform(0.1, 5, ( batch_size,1 ))
                 generator_ip = np.multiply(sampled_energies, noise)
-                ecal_ip = GetEcalFit(sampled_energies, 'Pi0', mod, xscale)
-                gen_losses.append(combined.train_on_batch(
+                #ecal_ip = GetEcalFit(sampled_energies, 'Pi0', mod, xscale)
+                gen_loss= combined.train_on_batch(
                     [generator_ip],
-                    [trick, sampled_energies.reshape((-1, 1)), ecal_ip]))
+                    [trick, sampled_energies.reshape((-1, 1))])
+                gen_losses.append(gen_loss)
+                #print('Generator batch loss = {}'.format(gen_loss))
                 com_out = combined.predict(generator_ip)
-                print("#################Generator########################")
-                print('ecal ip',ecal_ip[:5])
-                print('com out', com_out[2][:5])
+                #print("#################Generator########################")
+                #print('ecal ip',ecal_ip[:5])
+                #print('com out', com_out[2][:5])
 
             epoch_gen_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
 
         print('\nTesting for epoch {}:'.format(epoch + 1))
-        noise = np.random.normal(0.1, 1, (nb_test, latent_size))
+        noise = np.random.normal(0, noise_init, (nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
         generated_images = generator.predict(generator_ip, verbose=False)
-        ecal_ip = GetEcalFit(sampled_energies, 'Pi0', mod, xscale)
+        #ecal_ip = GetEcalFit(sampled_energies, 'Pi0', mod, xscale)
         sampled_energies = np.squeeze(sampled_energies, axis=(1,))
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
-        ecal = np.concatenate((ecal_test, ecal_ip))
+        #ecal = np.concatenate((ecal_test, ecal_ip))
         aux_y = np.concatenate((Y_test, sampled_energies), axis=0)
         discriminator_test_loss = discriminator.evaluate(
-            X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
+            X, [y, aux_y], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
-        noise = np.random.normal(0.1, 1, (2 * nb_test, latent_size))
+        noise = np.random.normal(0, noise_init, (2 * nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (2 * nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
-        ecal_ip = GetEcalFit(sampled_energies, 'Pi0', mod, xscale)
+        #ecal_ip = GetEcalFit(sampled_energies, 'Pi0', mod, xscale)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
-                                                [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
+                                                [trick, sampled_energies.reshape((-1, 1))], verbose=False, batch_size=batch_size)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
 
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
+        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
 
-        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
+        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}'
         print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',
@@ -374,7 +377,7 @@ if __name__ == '__main__':
     pklfile = 'dcgan-pion-history2.pkl'
     print(params)
     
-    from EcalEnergyGanlog import generator, discriminator
+    from EnergyGanlog import generator, discriminator
 
     # Building discriminator and generator
     d=discriminator()
