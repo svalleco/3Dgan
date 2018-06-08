@@ -119,14 +119,14 @@ def GetAngleData(datafile, num_data):
 
 def Meas(events, yp1 = 3, yp2 = 21):
     images = tf.convert_to_tensor(events, dtype=tf.float32)
-    m = math.pi/2 + ecal_angle(images, yp1, yp2)
+    m = math.pi/2 - ecal_angle(images, yp1, yp2)
     m = np.squeeze(m)
     return m
 
 def ecal_angle(image, p1, p2):
     a = K.sum(image, axis=(1, 4))
     b = K.argmax(a, axis=1)
-    c = K.cast(b[:,p1] - b[:,p2], dtype='float32')/(p2 - p1)
+    c = K.cast(b[:,p2] - b[:,p1], dtype='float32')/(p2 - p1)
     d = tf.atan(c)
     d = K.expand_dims(d)
     return K.eval(d)
