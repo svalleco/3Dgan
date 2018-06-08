@@ -18,39 +18,42 @@ def main():
    datapath = "/eos/project/d/dshep/LCD/DDHEP/*scan_RandomAngle_*_MERGED/*Escan_RandomAngle_*.h5"
    numdata = 10000
    numevents=10
-   ypoint1 = 8
-   ypoint2 = 12
+   ypoint1 = 5 
+   ypoint2 = 20
    filename = '/error_angle'
    datafiles = GetDataFiles(datapath, numdata, Particles=['Ele'])
-   plotsdir = 'meas_plots{}_{}'.format(ypoint1, ypoint2)
+   plotsdir = 'meas_plots_reduced{}_{}'.format(ypoint1, ypoint2)
    filename = plotsdir + filename
    gan.safe_mkdir(plotsdir)
-   x, y, theta, alpha= GetAllData(datafiles)
-   m1 = Meas1(x)
-   m2 = Meas2(x, yp1 = ypoint1, yp2 = ypoint2)
+   X, Y, theta, alpha= GetAllData(datafiles)
+   m1 = Meas1(X, yp1 = ypoint1, yp2 = ypoint2)
+   m2 = Meas2(X, yp1 = ypoint1, yp2 = ypoint2)
    fig=1
-   PlotAngleMeasure(m1, alpha, filename + '_1.pdf', fig=fig)
+   angle = theta
+   PlotAngleMeasure(m1, angle, filename + '_1.pdf', fig=fig, yp1 = ypoint1, yp2 = ypoint2)
    fig+=1
-   PlotAngleMeasure(m2, alpha, filename + '_2.pdf', fig=fig, yp1 = ypoint1, yp2 = ypoint2)
+   PlotAngleMeasure(m2, angle, filename + '_2.pdf', fig=fig, yp1 = ypoint1, yp2 = ypoint2)
    fig+=1
-   PlotHistError([m1, m2], alpha, ['Fit', 'Approx'], filename + '_hist.pdf', fig=fig)
+   PlotHistError([m1, m2], angle, ['Fit', 'Approx'], filename + '_hist.pdf', fig=fig)
    fig+=1
-   indexes1 = np.where((alpha - m1)> 0.5)
-   events1 = x[indexes1]
-   alpha1 = alpha[indexes1]
+   indexes1 = np.where((angle - m1)> 0.5)
+   events1 = X[indexes1]
+   angle1 = angle[indexes1]
    meas1_1 = m1[indexes1]
    meas1_2 = m2[indexes1]
-   indexes2 = np.where((alpha - m2)> 0.5)
-   events2 = x[indexes2]
-   alpha2 = alpha[indexes2]
+   indexes2 = np.where((angle - m2)> 0.5)
+   events2 = X[indexes2]
+   angle2 = angle[indexes2]
    meas2_1 = m1[indexes2]
    meas2_2 = m2[indexes2]
-   print events1.shape[0]
+   x = X.shape[1]
+   y = X.shape[2]
+   z = X.shape[3]
    for i in np.arange(min(numevents, events1.shape[0])):
-      PlotEvent(events1[i], 51, 51, 25, alpha1[i], meas1_1[i], meas1_2[i], plotsdir + '/Event1_{}.pdf'.format(i), i, fig= fig, yp1 = ypoint1, yp2 = ypoint2)
+      PlotEvent(events1[i], x, y, z, angle[i], meas1_1[i], meas1_2[i], plotsdir + '/Event1_{}.pdf'.format(i), i, fig= fig, yp1 = ypoint1, yp2 = ypoint2)
       fig+=1
    for i in np.arange(min(numevents, events2.shape[0])):
-      PlotEvent(events2[i], 51, 51, 25, alpha2[i], meas2_1[i], meas2_2[i], plotsdir + '/Event2_{}.pdf'.format(i), i, fig=fig, yp1 = ypoint1, yp2 = ypoint2)
+      PlotEvent(events2[i], x, y, z, angle2[i], meas2_1[i], meas2_2[i], plotsdir + '/Event2_{}.pdf'.format(i), i, fig=fig, yp1 = ypoint1, yp2 = ypoint2)
       fig+=1
    print('Plots are saved in {}.'.format(plotsdir))
   
@@ -93,7 +96,7 @@ def PlotEvent(event, x, y, z, angle, m1, m2, outfile, n, fig, yp1 = 3, yp2 = 21)
    plt.savefig(outfile)
 
 def PlotAngleMeasure(measured, angle, outfile, fig=1, degree=False, yp1 = 3, yp2 = 21):
-   error = angle - measured
+   error = abs(angle - measured)
    if degree:
       angle = np.degrees(angle)
       measured = np.degrees(measured)
@@ -116,23 +119,23 @@ def GetAngleData(datafile):
     print 'Loading Data from .....', datafile
     f=h5py.File(datafile,'r')
     y=np.array(f.get('energy'))
-    x=np.array(f.get('ECAL'))
+    x=np.array(f.get('ECAL'))[:, 13:38, 13:38, :]
     theta = np.array(f.get('theta')) 
-    x[x < 1e-6] = 0
+    x[x < 1e-4] = 0
     alpha = (math.pi/2)*np.ones_like(theta) - theta
     x = np.expand_dims(x, axis=-1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
     return x, y, theta, alpha
 
-def Meas1(events):
+def Meas1(events, yp1 = 3, yp2 = 21):
     a = []
     for i in np.arange(events.shape[0]):
        event = np.sum(np.squeeze(events[i]), axis=(0))
        y = np.arange(25)
        maxy = np.argmax(event, axis=0)
-       p = np.polyfit(y, maxy, 1)
-       angle = math.atan(p[0])
+       p = np.polyfit(y[yp1:yp2], maxy[yp1:yp2], 1)
+       angle = math.pi/2 - math.atan(p[0])
        a.append(angle)
     return np.array(a)
 
@@ -143,7 +146,7 @@ def Meas2(events, yp1 = 3, yp2 = 21):
        y = np.arange(25)
        maxy = np.argmax(event, axis=0)
        tan = (maxy[yp2]-maxy[yp1]) / np.float(yp2 - yp1)
-       angle = math.atan(tan)
+       angle = math.pi/2 - math.atan(tan) 
        a.append(angle)
     return np.array(a)
 
