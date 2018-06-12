@@ -19,7 +19,7 @@ import numpy as np
 import time
 import math
 import argparse
-#import setGPU #if Caltech
+import setGPU #if Caltech
 
 def BitFlip(x, prob=0.05):
     """ flips a int array's values with some probability """
@@ -63,18 +63,17 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 1
             EndI=int(SampleI[i]+ round(NFiles*Frac))
             out[j]+=Sample[SampleI[i]:EndI]
             SampleI[i]=EndI
-
     return out
 
 # This functions loads data from a file and also does any pre processing
-def GetData(datafile, xscale =1, yscale = 100):
+def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     #get data for training                                                                                                                             
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     Y=f.get('target')
     X=np.array(f.get('ECAL'))
     Y=(np.array(Y[:,1]))
-    X[X < 1e-6] = 0
+    X[X < limit] = 0
     X = np.expand_dims(X, axis=-1)
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
@@ -83,17 +82,24 @@ def GetData(datafile, xscale =1, yscale = 100):
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ecal
 
-def GetEcalFit(sampled_energies, mod=0, xscale=1):
+def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
     if mod==0:
-      return np.multiply(2, sampled_energies)
+       return np.multiply(2, sampled_energies)
     elif mod==1:
-      root_fit = [0.0018, -0.023, 0.11, -0.28, 2.21]
-      ratio = np.polyval(root_fit, sampled_energies)
-      return np.multiply(ratio, sampled_energies) * xscale
+       if particle == 'Ele':
+         root_fit = [0.0018, -0.023, 0.11, -0.28, 2.21]
+         ratio = np.polyval(root_fit, sampled_energies)
+         return np.multiply(ratio, sampled_energies) * xscale
+       elif particle == 'Pi0':
+         root_fit = [0.0085, -0.094, 2.051]
+         ratio = np.polyval(root_fit, sampled_energies)
+         return np.multiply(ratio, sampled_energies) * xscale
 
-def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1):
+
+def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1):
     start_init = time.time()
     verbose = False
+    particle = 'Ele'
     print('[INFO] Building discriminator')
     #discriminator.summary()
     discriminator.compile(
@@ -128,7 +134,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
     )
 
     # Getting Data
-    Trainfiles, Testfiles = DivideFiles(datapath, nEvents=nEvents, EventsperFile = EventsperFile, datasetnames=["ECAL"], Particles =["Ele"])
+    Trainfiles, Testfiles = DivideFiles(datapath, nEvents=nEvents, EventsperFile = EventsperFile, datasetnames=["ECAL"], Particles =[particle])
  
     print(Trainfiles)
     print(Testfiles)
@@ -136,9 +142,9 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
-           X_test, Y_test, ecal_test = GetData(dtest)
+           X_test, Y_test, ecal_test = GetprocData(dtest, xscale=xscale)
        else:
-           X_temp, Y_temp, ecal_temp = GetData(dtest)
+           X_temp, Y_temp, ecal_temp = GetprocData(dtest, xscale=xscale)
            X_test = np.concatenate((X_test, X_temp))
            Y_test = np.concatenate((Y_test, Y_temp))
            ecal_test = np.concatenate((ecal_test, ecal_temp))
@@ -161,7 +167,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-        X_train, Y_train, ecal_train = GetData(Trainfiles[0], xscale=xscale)
+        X_train, Y_train, ecal_train = GetprocData(Trainfiles[0], xscale=xscale)
         print(Y_train[:10])
         nb_file=1
         nb_batches = int(X_train.shape[0] / batch_size)
@@ -181,7 +187,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
             loaded_data = X_train.shape[0]
             used_data = file_index * batch_size
             if (loaded_data - used_data) < batch_size + 1 and (nb_file < len(Trainfiles)):
-                X_temp, Y_temp, ecal_temp = GetData(Trainfiles[nb_file], xscale=xscale)
+                X_temp, Y_temp, ecal_temp = GetprocData(Trainfiles[nb_file], xscale=xscale)
                 print("\nData file loaded..........",Trainfiles[nb_file])
                 nb_file+=1
                 X_left = X_train[(file_index * batch_size):]
@@ -203,7 +209,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
             generator_ip = np.multiply(sampled_energies, noise)
       
             #ecal sum from fit
-            ecal_ip = GetEcalFit(sampled_energies, mod, xscale)
+            ecal_ip = GetEcalFit(sampled_energies, particle,mod, xscale)
             generated_images = generator.predict(generator_ip, verbose=0)        
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
@@ -217,7 +223,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
                 noise = np.random.normal(0, 1, (batch_size, latent_size))
                 sampled_energies = np.random.uniform(0.1, 5, ( batch_size,1 ))
                 generator_ip = np.multiply(sampled_energies, noise)
-                ecal_ip = GetEcalFit(sampled_energies, mod, xscale)
+                ecal_ip = GetEcalFit(sampled_energies, particle, mod, xscale)
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, sampled_energies.reshape((-1, 1)), ecal_ip]))
@@ -230,7 +236,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
         sampled_energies = np.random.uniform(0.1, 5, (nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
         generated_images = generator.predict(generator_ip, verbose=False)
-        ecal_ip = GetEcalFit(sampled_energies, mod, xscale)
+        ecal_ip = GetEcalFit(sampled_energies, particle, mod, xscale)
         sampled_energies = np.squeeze(sampled_energies, axis=(1,))
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
@@ -243,7 +249,7 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
         noise = np.random.normal(0.1, 1, (2 * nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (2 * nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
-        ecal_ip = GetEcalFit(sampled_energies, mod, xscale)
+        ecal_ip = GetEcalFit(sampled_energies, particle, mod, xscale)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
                                                 [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
@@ -276,13 +282,13 @@ def GanTrain3D(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
         epoch_time = time.time()-epoch_start
         print("The {} epoch took {} seconds".format(epoch, epoch_time))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history.pkl', 'wb'))
+    open(pklfile, 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--model', '-m', action='store', type=str, default='EcalEnergyGan', help='Model architecture to use.')
     parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
-    parser.add_argument('--batchsize', action='store', type=int, default=126, help='batch size per update')
+    parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/eos/project/d/dshep/LCD/V1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
@@ -290,8 +296,9 @@ def get_parser():
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--weightsdir', action='store', type=str, default='veganweights', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
-    parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
+    parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
+    parser.add_argument('--pklfile', action='store', type=str, default='dcgan-history.pkl', help='File to save losses.')
     return parser
 
 if __name__ == '__main__':
@@ -319,18 +326,18 @@ if __name__ == '__main__':
     batch_size = params.batchsize #batch size
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
-    #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Data path on Caltech
-    datapath = params.datapath#Data path on EOS CERN
+    datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Data path on Caltech
+    #datapath = params.datapath#Data path on EOS CERN default
     EventsperFile = params.nbperfile#Events in a file
     nEvents = params.nbEvents#Total events for training
     fitmod = params.mod
     weightdir = params.weightsdir
     xscale = params.xscale
+    pklfile = params.pklfile
     print(params)
  
     # Building discriminator and generator
-
     d=discriminator()
     g=generator(latent_size)
-    GanTrain3D(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale)
+    Gan3DTrain(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , gen_weight=2, aux_weight=0.1, ecal_weight=0.1, xscale = xscale)
     
