@@ -56,7 +56,7 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 1
     SampleI=len(Samples.keys())*[int(0)]
 
     for i,SampleName in enumerate(Samples):
-        Sample=Samples[SampleName][:Filesused]
+        Sample=Samples[SampleName]
         NFiles=len(Sample)
 
         for j,Frac in enumerate(Fractions):
@@ -100,6 +100,7 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
     start_init = time.time()
     verbose = False
     particle = 'Ele'
+    f = [0.9, 0.1]
     print('[INFO] Building discriminator')
     #discriminator.summary()
     discriminator.compile(
@@ -138,26 +139,26 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
  
     print(Trainfiles)
     print(Testfiles)
-   
+    nb_test = int(nEvents * f[1])
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
            X_test, Y_test, ecal_test = GetprocData(dtest, xscale=xscale)
        else:
-           X_temp, Y_temp, ecal_temp = GetprocData(dtest, xscale=xscale)
-           X_test = np.concatenate((X_test, X_temp))
-           Y_test = np.concatenate((Y_test, Y_temp))
-           ecal_test = np.concatenate((ecal_test, ecal_temp))
-
+           if X_test.shape[0] < nb_test:
+              X_temp, Y_temp, ecal_temp = GetprocData(dtest, xscale=xscale)
+              X_test = np.concatenate((X_test, X_temp))
+              Y_test = np.concatenate((Y_test, Y_temp))
+              ecal_test = np.concatenate((ecal_test, ecal_temp))
+    X_test, Y_test, ecal_test = X_test[:nb_test], Y_test[:nb_test], ecal_test[:nb_test]
     print('Test Data loaded of shapes:')
     print(X_test.shape)
     print(Y_test.shape)
     print(Y_test[:10])
     print('*************************************************************************************')
 
-    nb_test = X_test.shape[0]
-    nb_train = EventsperFile * len(Trainfiles)# Total events in training files
-    total_batches = nb_train / batch_size
+    nb_train = (nEvents * f[0]) #
+    total_batches = int(nb_train / batch_size)
     print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
     train_history = defaultdict(list)
@@ -294,11 +295,11 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='veganweights', help='Directory to store weights.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='veganweights2', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
-    parser.add_argument('--pklfile', action='store', type=str, default='dcgan-history.pkl', help='File to save losses.')
+    parser.add_argument('--pklfile', action='store', type=str, default='dcgan-history2.pkl', help='File to save losses.')
     return parser
 
 if __name__ == '__main__':
