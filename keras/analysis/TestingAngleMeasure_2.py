@@ -18,12 +18,12 @@ def main():
    datapath = "/eos/project/d/dshep/LCD/DDHEP/*scan_RandomAngle_*_MERGED/*Escan_RandomAngle_*.h5"
    numdata = 10000
    datafiles = GetDataFiles(datapath, numdata, Particles=['Ele'])
-   plotsdir = 'meas4_plots'
-   centerfile = 'center_hist.pdf'
-   angfile = 'ang.pdf'
+   plotsdir = 'meas3_5start_plots'
+   centerfile = '_CenterHist.pdf'
+   angfile = 'Ang.pdf'
    gan.safe_mkdir(plotsdir)
    print len(datafiles)
-   numevents = 100
+   numevents = 1000
    X, Y, theta= GetAngleDataReduced(datafiles[0], numdata=numevents) # get data
    zsum = np.sum(X, axis =(1, 2)) # sums per events per z, shape = (numevents, z)
    #sintheta = np.sin(theta) 
@@ -36,15 +36,17 @@ def main():
    fig +=1
    PlotHistcenter(cy[n], os.path.join(plotsdir,'y' + centerfile), fig=fig) # plot y coordinates  of berycenter
    fig +=1
-   PlotHisttan(ct[n], zsum[n], os.path.join(plotsdir, 'hist_' + angfile), theta[n], fig=fig, angleproc= ProcAngle4) # histogram of angle computed
+   PlotHisttan(ct[n], zsum[n], os.path.join(plotsdir, 'hist_' + angfile), theta[n], fig=fig, angleproc= ProcAngle2) # histogram of angle computed
    fig+=1  
-   PlotTan(ct[n], zsum[n], os.path.join(plotsdir, 'scat_' + angfile), theta[n], fig=fig, angleproc= ProcAngle4) # scatter plot of angle computed
+   PlotTan(ct[n], zsum[n], os.path.join(plotsdir, 'scatter_' + angfile), theta[n], fig=fig, angleproc= ProcAngle2) # scatter plot of angle computed
    fig+=1
    
    # All events plots
-   PlotHistError(ct, theta, zsum, 'New', os.path.join(plotsdir, 'errorhist_' + angfile), fig=fig, angleproc= ProcAngles4) # Error histogram 
+   PlotHistErrorROOT(ct, theta, zsum, 'theta', os.path.join(plotsdir, 'ErrorHist_' + angfile), fig=fig, angleproc= ProcAngles2) # Error histogram 
    fig+=1
-   PlotAngleMeasure(ct, theta, zsum, os.path.join(plotsdir, 'errorscat_' + angfile), fig=fig, angleproc= ProcAngles4) # Error scatter plot
+   PlotHistError(ct, theta, zsum, 'theta', os.path.join(plotsdir, 'ErrorHistRoot_' + angfile), fig=fig, angleproc= ProcAngles2) # Error histogram     
+   fig+=1
+   PlotAngleMeasure(ct, theta, zsum, os.path.join(plotsdir, 'ErrorScat_' + angfile), fig=fig, angleproc= ProcAngles2) # Error scatter plot
    fig+=1
    print '{} plots were saved in {}'.format(fig, plotsdir)
 
@@ -61,7 +63,7 @@ def PlotHistcenter(x, outfile, fig=0):
 def PlotHisttan(t, zsum, outfile, theta, fig, angleproc):
    plt.figure(fig)
    m = angleproc(t, zsum)
-   label = 'tan actual ({}) Calculated ({})'.format(theta, m)
+   label = 'theta actual ({}) Calculated ({})'.format(theta, m)
    plt.hist(t, bins='auto', label=label) 
    plt.legend()
    plt.xlabel('angle (radians)'.format(theta, m))
@@ -72,10 +74,10 @@ def PlotTan(t, zsum, outfile, theta, fig, angleproc):
    plt.figure(fig)
    bins = np.arange(t.shape[0])
    m = angleproc(t, zsum)
-   label = 'tan actual ({}) Calculated ({})'.format(theta, m)
+   label = 'theta actual ({}) Calculated ({})'.format(theta, m)
    plt.scatter(bins, t, label=label) 
    plt.legend()
-   plt.xlabel('angle (radians)')
+   plt.xlabel('z axis')
    plt.savefig(outfile)
 
 # Angle using average for z for all events
@@ -83,13 +85,15 @@ def ProcAngles1(meas, zsum):
    a = np.arange(meas.shape[1])
    avg = np.zeros(meas.shape[0])
    for i in np.arange(1, meas.shape[0]):
-      avg[i] = np.sum( meas[i] )/ 24
+      #avg[i] = np.sum( meas[i] )/ 24
+     avg[i] = np.mean( meas[i][20:])
    return avg
 
 # Angle using average for z for single event
 def ProcAngle1(meas, zsum):
    a = np.arange(meas.shape[0])
-   avg = np.sum( meas )/ 24
+   #avg = np.sum( meas )/ 24
+   avg = np.mean(meas[20:])
    return avg
 
 # Angle Measure using weighting by z for all events
@@ -104,6 +108,24 @@ def ProcAngles2(meas, zsum):
 def ProcAngle2(meas, zsum):
    a = np.arange(meas.shape[0])
    avg = np.sum( meas * a)/ (0.5  * (meas.shape[0] * (meas.shape[0] - 1)))
+   return avg
+
+# Angle Measure using weighting by z for all events                                                                                                                                                                
+def ProcAngles4(meas, zsum):
+   l1=5
+   l2 =20
+   a = np.arange(meas.shape[1])
+   avg = np.zeros(meas.shape[0])
+   for i in np.arange(1, meas.shape[0]):
+      avg[i] = np.sum( meas[i][l1:l2] * a[l1:l2])/ (0.5  * (l2-l1) * (l2 -l1 - 1))
+   return avg
+
+# Angle Measure using weighting by z for all events                                                                                                                                                                
+def ProcAngle4(meas, zsum):
+   l1=5
+   l2 =20
+   a = np.arange(meas.shape[0])
+   avg = np.sum( meas[l1:l2] * a[l1:l2])/ (0.5  * (l2-l1) * (l2-l1 - 1))
    return avg
 
 # Angle Measure using weighting by z and energy deposited per layer for all events
@@ -124,7 +146,7 @@ def ProcAngle3(meas, zsum):
    avg = np.sum( meas * a * zsum)/ (ztot * 0.5  * (meas.shape[0] * (meas.shape[0] - 1)))
    return avg
 
-# Angle Measure using weighting by z and energy deposited per layer for all events                                                                                                                                
+# Angle Measure using angle calculated by last layer for all events                                                                                                                                
 def ProcAngles4(meas, zsum):
    a = meas.shape[1]
    avg = np.zeros(meas.shape[0])
@@ -132,7 +154,7 @@ def ProcAngles4(meas, zsum):
       avg[i] = meas[i, a-1]
    return avg
 
-# Angle Measure using weighting by z and energy deposited per layer for single event 
+# Angle Measure using angle calculated by last layer for single event 
 def ProcAngle4(meas, zsum):
    a = meas.shape[0]
    avg = meas[a-1]
@@ -156,6 +178,27 @@ def PlotHistError(meas,  angle, zsum, label, outfile, fig, angleproc, degree=Fal
    plt.xlabel('Error ({})'.format(unit))
    plt.savefig(outfile)
    
+# Error Histogram                                                                                               
+def PlotHistErrorROOT(meas,  angle, zsum, label, outfile, fig, angleproc, degree=False):
+   m = angleproc(meas, zsum)
+   error = angle-m
+   if degree:
+      angle = np.degrees(angle)
+      m = np.degrees(m)
+      error = np.degrees(error)
+      unit = 'degrees'
+   else:
+      unit = 'radians'
+   c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) 
+   c1.SetGrid()
+   Aprof = ROOT.TProfile("Aprof", "", 50, 1, 2.5)
+   Aprof.SetTitle("Error for Theta")
+   r.fill_profile(Aprof, error, angle)
+   Aprof.GetXaxis().SetTitle("Angle in {}".format(unit))
+   Aprof.GetYaxis().SetTitle("Error in {}".format(unit))
+   Aprof.Draw()
+   c1.Print(outfile)
+
 def PlotAngleMeasure(m, angle, zsum, outfile, fig, angleproc, degree=False):
    measured = angleproc(m, zsum)
    error = abs(angle - measured)
@@ -216,6 +259,30 @@ def Meas3(events, mod=0):
             #hp = math.sqrt((x[i, j] - x[i, 0])**2 + (y[i, j] - y[i, 0])**2 )
             #if hp > 0 and hp < j:
             #    ang[i, j] =  np.arcsin(j/hp) 
+    return x, y, ang
+
+def Meas4(events, mod=0):
+    a = []
+    events = np.squeeze(events, axis=4)
+    x = np.zeros((events.shape[0], events.shape[3])) # shape = (num events, z)
+    y = np.zeros((events.shape[0], events.shape[3]))
+    ang = np.zeros((events.shape[0], events.shape[3]))
+    for i in np.arange(events.shape[0]): # Looping over events
+       event = events[i]
+       for j in np.arange(events.shape[3]): # Looping over z
+          sum = np.sum(event[:, :, j])
+          x[i, j] = 0
+          y[i, j] = 0
+          for k in np.arange(events.shape[1]):  # Looping over x
+             for l in np.arange(events.shape[2]): # Looping over y                                                                                                                                                
+               x[i, j] = x[i, j] + event[k, l, j] * k
+               y[i, j] = y[i, j] + event[k, l, j] * l
+          if sum > 0:                         # check for zero sum
+            x[i, j] = x[i, j]/sum
+            y[i, j] = y[i, j]/sum
+          #print i, j, x[i, j], y[i, j]                                                                                                                                                                           
+          if j >0:
+            ang[i, j] = np.arcsin(j/math.sqrt((x[i, j] - x[i, 0])**2 + (y[i, j] - y[i, 0])**2 + j**2))
     return x, y, ang
 
 def GetAllData(datafiles):
