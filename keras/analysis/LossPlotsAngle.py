@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from LCDutils import safe_mkdir
+import matplotlib.colors as colors
+from GANutilsANG import safe_mkdir
 plt.switch_backend('Agg')
 try:
     import cPickle as pickle
@@ -9,15 +10,23 @@ except ImportError:
     import pickle
 
 def main():
-   lossfile = 'dcgan-history-angle.pkl'
-   weights = [2, 0.1, 0.1, 0.1]
+   lossfile = 'dcgan-history-angle-concat.pkl'
+   weights = [1, 2, 0.1, 10, 0.1]
    #defining limits for different plots. Varies with result
-   ymax = [30, 5, 4, 200, 1.75, 2.75]
-   outdir = 'loss_plots_angle_eta'
-   safe_mkdir(outdir)
-   plot_loss(lossfile, weights, ymax, outdir)
+   ymax = [50, 5, 5, 200, 1.8, 2.4, 20] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE] 
+   outdir = 'loss_plots_dense_only'
+   ploss= 'Mean percentage error'
+   aloss= 'Mean absolute error'
+   bloss= 'Binary cross entropy'
+   losstypes = ['Weighted sum', bloss, ploss, aloss, ploss]
+   angtype = 'theta'
+   lossnames = ['tot', 'gen', 'aux', angtype, 'ecal sum']
 
-def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
+   safe_mkdir(outdir)
+   plot_loss(lossfile, weights, ymax, outdir, lossnames, losstypes)
+   print('Loss Plots are saved in {}'.format(outdir))
+   
+def plot_loss(lossfile, weights, ymax, lossdir, lossnames, losstype, fig=1):
    #Getting losses in arrays
    with open(lossfile, 'rb') as f:
     			x = pickle.load(f)
@@ -25,66 +34,48 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    gen_train = np.asarray(x['train']['generator'])
    disc_test = np.asarray(x['test']['discriminator'])
    disc_train = np.asarray(x['train']['discriminator'])
-   
+   color= ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+           '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+                         '#bcbd22', '#17becf']
+   loop = np.arange(len(lossnames))
    #Plots for Testing and Training Losses
    plt.figure(fig)
    plt.subplot(221)
-   plt.title('Disc. Weighted Train loss')
-   plt.plot(disc_train[:,0], label='tot')
-   plt.plot(weights[0] * disc_train[:,1], label='gen')
-   plt.plot(weights[1] * disc_train[:,2], label='aux')
-   plt.plot(weights[2] * disc_train[:,3], label='eta')
-   plt.plot(weights[3] * disc_train[:,4], label='ecal')
-   plt.legend()                                                                   
-   plt.ylim(0, ymax[0])                                                                                                                           
+   plt.title('Discriminator loss')
+   for i in loop:
+      plt.plot(weights[i] * disc_train[:,i], label='{} (train)'.format(lossnames[i]))
+   plt.legend(fontsize='x-small')                                                                   
+   plt.ylim(0, ymax[6])                                                                                                                           
 
    plt.subplot(222)
-   plt.title('Gen. Weighted Train loss')
-   plt.plot(gen_train[:,0], label='tot')
-   plt.plot(weights[0] * gen_train[:,1], label='gen')
-   plt.plot(weights[1] * gen_train[:,2], label='aux')
-   plt.plot(weights[2] * gen_train[:,3], label='eta')
-   plt.plot(weights[3] * gen_train[:,4], label='ecal')
-   plt.legend()                                                                   
+   plt.title('Generator loss')
+   for i in loop:
+      plt.plot(weights[i] * gen_train[:,i], label='{} (train)'.format(lossnames[i]))
+   plt.legend(fontsize='x-small')                                                                   
    plt.ylim(0, ymax[0])                                                                                              
 
    plt.subplot(223)
-   plt.title('Testing loss for Discriminator')
-   plt.plot(disc_test[:,0], label='tot')
-   plt.plot(weights[0] * disc_test[:,1], label='gen')
-   plt.plot(weights[1] * disc_test[:,2], label='aux')
-   plt.plot(weights[2] * disc_test[:,3], label='eta')
-   plt.plot(weights[3] * disc_test[:,4], label='ecal')
-
-   plt.legend()
-   plt.ylim(0, ymax[0])  
+   #plt.title('Testing loss for Discriminator')
+   for i in loop:
+      plt.plot(weights[i] * disc_test[:,i], label='{} (test)'.format(lossnames[i]))
+   plt.legend(fontsize='x-small')
+   plt.ylim(0, ymax[6])  
     
    plt.subplot(224)
-   plt.title('\nTesting loss for Generator')
-   plt.plot(gen_test[:,0], label='tot')
-   plt.plot(weights[0] * gen_test[:,1], label='gen')
-   plt.plot(weights[1] * gen_test[:,2], label='aux')
-   plt.plot(weights[2] * gen_test[:,3], label='eta')
-   plt.plot(weights[3] * gen_test[:,4], label='ecal')
-   plt.legend()
+  # plt.title('\nTesting loss for Generator')
+   for i in loop:
+      plt.plot(weights[i] * gen_test[:,i], label='{} (test)'.format(lossnames[i]))
+   plt.legend(fontsize='x-small')
    plt.ylim(0, ymax[0])  
    plt.savefig(os.path.join(lossdir,'losses.pdf')) 
    
    #Training losses
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Weighted Training losses for GAN: Loss weights = (%0.2f, %.2f, %.2f,  %.2f)'%(weights[0], weights[1], weights[2],  weights[3]))
-   plt.plot(disc_train[:,0], label='Disc tot', color='red')
-   plt.plot(weights[0] * disc_train[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
-   plt.plot(weights[1] * disc_train[:,2], label='Disc aux (Mean Absolute Percentage Error)', color='blue')
-   plt.plot(weights[2] * disc_train[:,3], label='Disc eta(Mean Absolute Percentage Error)', color='magenta')
-   plt.plot(weights[3] * disc_train[:,4], label='Disc ecal(Mean Absolute Percentage Error)', color='green')
-
-   plt.plot(gen_train[:,0], label='Gen tot', color='red', linestyle='--')
-   plt.plot(weights[0] * gen_train[:,1], label='Gen gen (Binary Cross Entropy)', color='green', linestyle='--')
-   plt.plot(weights[1] * gen_train[:,2], label='Gen aux (Mean Absolute Percentage Error)', color='blue', linestyle='--')
-   plt.plot(weights[2] * gen_train[:,3], label='Gen eta(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
-   plt.plot(weights[3] * gen_train[:,4], label='Gen ecal(Mean Absolute Percentage Error)', color='green', linestyle='--')
+   plt.title('Weighted Training losses: Loss weights = (%0.2f, %.2f, %.2f,  %.2f)'%(weights[1], weights[2], weights[3],  weights[4]))
+   for i in loop:
+       plt.plot(weights[i] * disc_train[:,i], label='Disc {} ({})'.format(lossnames[i], losstype[i]), color=color[i])
+       plt.plot(weights[i] * gen_train[:,i], label='Gen {} ({})'.format(lossnames[i], losstype[i]), color=color[i], linestyle='--')
    plt.legend(fontsize='x-small')
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
@@ -94,9 +85,9 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #training losses for Real/fake
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Binary Training losses for GAN')
-   plt.plot(disc_train[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
-   plt.plot(gen_train[:,1], label='Gen gen (Binary Cross Entropy)', color='blue')
+   plt.title('{} losses for GAN'.format(losstype[1]))
+   plt.plot(gen_train[:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
+   plt.plot(disc_train[:,1], label='Disc {} ({})'.format(lossnames[1], losstype[1]))
    plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
@@ -107,9 +98,8 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    fig = fig + 1
    start_epoch = 10
    plt.figure(fig)
-   plt.title('Binary Training losses for Generator')
-   #plt.plot(disc_train[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
-   plt.plot(gen_train[start_epoch:,1], label='Gen gen (Binary Cross Entropy)', color='blue')
+   plt.title('{} losses for Generator'.format(losstype[1]))
+   plt.plot(gen_train[start_epoch:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
    plt.legend()
    plt.xlabel('Epochs starting from epoch' + str(start_epoch))  
    plt.ylabel('Loss')                            
@@ -119,9 +109,9 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #testing losses for Real/fake
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Binary Testing losses for GAN')
-   plt.plot(disc_test[:,1], label='Disc gen (Binary Cross Entropy)', color='green')
-   plt.plot(gen_test[:,1], label='Gen gen (Binary Cross Entropy)', color='blue')
+   plt.title('{} Testing losses for GAN'.format(losstype[1]))
+   plt.plot(gen_test[:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
+   plt.plot(disc_test[:,1], label='Disc {} ({})'.format(lossnames[1], losstype[1]))
    plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
@@ -131,15 +121,10 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #Training losses for auxlilliary losses
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Training losses for Auxilliary outputs')
-   plt.plot(disc_train[:,2], label='Disc aux (Mean Absolute Percentage Error)', color='blue')
-   plt.plot(disc_train[:,3], label='Disc eta(Mean Absolute Percentage Error)', color='magenta')
-   plt.plot(disc_train[:,4], label='Disc ecal(Mean Absolute Percentage Error)', color='green')
-
-   plt.plot(gen_train[:,2], label='Gen aux (Mean Absolute Percentage Error)', color='blue', linestyle='--')
-   plt.plot(gen_train[:,3], label='Gen eta(Mean Absolute Percentage Error)', color='magenta', linestyle='--')
-   plt.plot(gen_train[:,4], label='Gen ecal(Mean Absolute Percentage Error)', color='green', linestyle='--')
-   
+   plt.title('Training losses for Auxilliary outputs (unweighted)')
+   for i in np.arange(2, len(lossnames)):
+      plt.plot(disc_train[:,i], label='Disc {} ({})'.format(lossnames[i], losstype[i]), color=color[i])
+      plt.plot(gen_train[:,i], label='Gen {} ({})'.format(lossnames[i], losstype[i]), color=color[i], linestyle='--')
    plt.legend(fontsize='x-small')
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
@@ -149,8 +134,8 @@ def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #Diff. for training losses Real/fake
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Binary Training losses for GAN')
-   plt.plot(gen_train[:,1] - disc_train[:,1], label='Gen loss - Disc loss (Binary Cross Entropy)')
+   plt.title('Diff between Genenerator loss and Discriminator loss for GAN')
+   plt.plot(gen_train[:,1] - disc_train[:,1], label='Gen loss - Disc loss ({})'.format(losstype[1]))
    plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
