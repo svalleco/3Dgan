@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from LCDutils import safe_mkdir
+from GANutils import safe_mkdir
 plt.switch_backend('Agg')
 try:
     import cPickle as pickle
@@ -9,13 +9,14 @@ except ImportError:
     import pickle
 
 def main():
-   lossfile = 'dcgan-pion-history2.pkl'
-   weights = [2, 0.1, 0.2]
+   lossfile = 'dcgan-ch-pion-history.pkl'
+   weights = [2, 0.1, 0.1]
    #defining limits for different plots. Varies with result
-   ymax = [10, 2, 2, 15, 0.75, 1.25]
-   outdir = 'loss_plots_pions'
+   ymax = [30, 4, 3, 100, 1.25, 2.] #[weighted loss for all, BCE_test loss, BCE_train_loss, Aux unweighted, BCE-train for generator only]
+   outdir = 'loss_plots_ch_pions_1000'
    safe_mkdir(outdir)
    plot_loss(lossfile, weights, ymax, outdir)
+   print('The plots are saved in {}'.format(outdir))
 
 def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #Getting losses in arrays
