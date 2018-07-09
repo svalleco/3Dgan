@@ -234,8 +234,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             #print(len(disc_out[0]))
             #print(disc_out[:5][3][:5])
             #print(disc_out[0])
-            #real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
-            #fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
+            real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
             #print ('real_batch_loss', real_batch_loss)
             #print ('fake_batch_loss', fake_batch_loss)
             epoch_disc_loss.append([
