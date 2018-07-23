@@ -62,7 +62,7 @@ def discriminator():
     Model(input=image, output=[fake, aux, ecal]).summary()
     return Model(input=image, output=[fake, aux, ecal])
 
-def generator(latent_size=1024, return_intermediate=False):
+def generator(latent_size=200, return_intermediate=False):
 
     loc = Sequential([
         Dense(64 * 7* 7, input_dim=latent_size),

@@ -43,7 +43,7 @@ if __name__ == '__main__':
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
 
-    nb_epochs = 2
+    nb_epochs = 1
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -55,7 +55,6 @@ if __name__ == '__main__':
 
     print('[INFO] Building discriminator')
     discriminator.summary()
-    #discriminator.load_weights('veganweights/params_discriminator_epoch_019.hdf5')
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
@@ -67,7 +66,6 @@ if __name__ == '__main__':
     # build the generator
     print('[INFO] Building generator')
     generator.summary()
-    #generator.load_weights('veganweights/params_generator_epoch_019.hdf5')
     generator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
@@ -93,7 +91,7 @@ if __name__ == '__main__':
     )
 
 
-    d=h5py.File("/data/svalleco/Ele_v1_1_2.h5",'r')
+    d=h5py.File("/bigdata/shared/LCD/Electrons_fullSpectrum/Ele_v1_1_2.h5",'r')
     e=d.get('target')
     X=np.array(d.get('ECAL'))
     y=(np.array(e[:,1]))
@@ -260,10 +258,10 @@ if __name__ == '__main__':
                              *test_history['discriminator'][-1]))
 
         # save weights every epoch
-        generator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(g_weights, epoch),
+        generator.save_weights('{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
-        discriminator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(d_weights, epoch),
+        discriminator.save_weights('{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
 
         pickle.dump({'train': train_history, 'test': test_history},
-open('dcgan-history.pkl', 'wb'))
+open('3dgan-history.pkl', 'wb'))
