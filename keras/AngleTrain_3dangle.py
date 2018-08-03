@@ -20,6 +20,18 @@ import time
 import math
 import argparse
 import setGPU #if Caltech
+def safe_mkdir(path):
+    '''
+    Safe mkdir (i.e., don't create if already exists, 
+    and no violation of race conditions)
+    '''
+    from os import makedirs
+    from errno import EEXIST
+    try:
+        makedirs(path)
+    except OSError as exception:
+        if exception.errno != EEXIST:
+            raise exception
 
 def BitFlip(x, prob=0.05):
     """ flips a int array's values with some probability """
@@ -362,6 +374,8 @@ if __name__ == '__main__':
     xscale = 2
     print(params)
  
+    safe_mkdir(weightdir)
+
     # Building discriminator and generator
 
     d=discriminator()
