@@ -214,7 +214,6 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
        if index == 0:
            X_train, Y_train, ang1_train, ang2_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, angscale=angscale, thresh=1e-4)
        else:
-           X_temp, Y_temp, ang1_temp,ang2_temp, ecal_temp = GetDataAngle(dtrain)
            X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, angscale=angscale, thresh=1e-4)
            X_train = np.concatenate((X_train, X_temp))
            Y_train = np.concatenate((Y_train, Y_temp))
@@ -332,7 +331,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         generated_images = generator.predict(generator_ip, verbose=False)
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
-        ang1 = np.concatenate((ang1_test, ang1_test))
+        ang1 = np.concatenate((ang1_test, ang1_test))  # SOFIA : WHAT IS THIS_? WHY DO YOU DOUBLE TEST FILES?
         ang2 = np.concatenate((ang2_test, ang2_test))
         ecal = np.concatenate((ecal_test, ecal_test))
         aux_y = np.concatenate((Y_test, Y_test), axis=0)
