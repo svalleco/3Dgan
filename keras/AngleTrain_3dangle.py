@@ -44,7 +44,7 @@ def BitFlip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
-def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 10000, Fractions=[.1,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     
     Files =sorted( glob.glob(FileSearch))
     Filesused = int(math.ceil(nEvents/EventsperFile))
@@ -217,16 +217,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
            X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, angscale=angscale, thresh=1e-4)
            X_train = np.concatenate((X_train, X_temp))
            Y_train = np.concatenate((Y_train, Y_temp))
-           ang1_test = np.concatenate((ang1_test, ang1_temp))
-           ang2_test = np.concatenate((ang2_test, ang2_temp))
+           ang1_train = np.concatenate((ang1_train, ang1_temp))
+           ang2_train = np.concatenate((ang2_train, ang2_temp))
            ecal_train = np.concatenate((ecal_train, ecal_temp))
 
 
     print("On hostname {0} - After init using {1} memory".format(socket.gethostname(), psutil.Process(os.getpid()).memory_info()[0]))
-    assert X_train.shape[0] == EventsperFile * len(Trainfiles), "# Total events in training files"
     nb_train = X_train.shape[0]# Total events in training files
-    total_batches = nb_train / global_batch_size
-    print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
     train_history = defaultdict(list)
     test_history = defaultdict(list)
@@ -240,7 +237,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_gen_loss = []
         epoch_disc_loss = []
  #       index = 0
- #       total_batches = 0
+        total_batches = int(X_train.shape[0] / batch_size)  
  #       file_index=0
      
  #       while nb_file < len(Trainfiles):
@@ -274,6 +271,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
 
         image_batches = genbatches(X_train, batch_size)
         energy_batches = genbatches(Y_train, batch_size)
+        ang1_batches = genbatches(ang1_train, batch_size)
+        ang2_batches = genbatches(ang2_train, batch_size)
         ecal_batches = genbatches(ecal_train, batch_size) 
  
 
