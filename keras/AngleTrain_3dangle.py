@@ -19,6 +19,10 @@ import numpy as np
 import time
 import math
 import argparse
+import psutil
+import socket
+import time
+import random
 import setGPU #if Caltech
 def safe_mkdir(path):
     '''
@@ -65,14 +69,13 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 1
         out.append([])
 
     SampleI=len(Samples.keys())*[int(0)]
-
     for i,SampleName in enumerate(Samples):
-        Sample=Samples[SampleName]
+        Sample=Samples[SampleName][:Filesused]
         NFiles=len(Sample)
         for j,Frac in enumerate(Fractions):
             EndI=int(SampleI[i]+ round(NFiles*Frac))
-            out[j]+=Sample[SampleI[i]:EndI]
-            SampleI[i]=EndI
+            out[j] =Sample[SampleI[i]:EndI]
+            SampleI[i]=EndI 
 
     return out
 
@@ -91,8 +94,30 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     ang1 = ang1.astype(np.float32)
     ang2 = ang2.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
-    ecal = np.sum(X, axis=(1, 2, 3))
+    X = np.moveaxis(X, -1, 1)
+    ecal = np.sum(X, axis=(2, 3, 4))
     return X, Y, ang1, ang2, ecal
+
+
+def genbatches(a,n):
+    for i in range(0, len(a), n):
+        # Create an index range for l of n items:
+        yield a[i:i+n]
+
+
+def randomize(a, b, c, d, e):
+    assert a.shape[0] == b.shape[0]
+    # Generate the permutation index array.
+    permutation = np.random.permutation(a.shape[0])
+    # Shuffle the arrays by giving the permutation in the square brackets.
+    shuffled_a = a[permutation]
+    shuffled_b = b[permutation]
+    shuffled_c = c[permutation]
+    shuffled_d = d[permutation]
+    shuffled_e = e[permutation]
+    return shuffled_a, shuffled_b, shuffled_c, shuffled_d,shuffled_e
+
+
 
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
     if particle == 'Ele':
@@ -161,24 +186,19 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
  
     print(Trainfiles)
-    print(Testfiles)
-    numTest = int(nEvents * f[1])
+    print("testfiles ",Testfiles)
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
            X_test, Y_test, ang1_test, ang2_test, ecal_test = GetDataAngle(dtest, xscale=xscale, angscale=angscale, thresh=1e-4)
        else:
-           if X_test.shape[0] < numTest:
-              X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(dtest, xscale=xscale, angscale=angscale, thresh=1e-4)
-              X_test = np.concatenate((X_test, X_temp))
-              Y_test = np.concatenate((Y_test, Y_temp))
-              ang1_test = np.concatenate((ang1_test, ang1_temp))
-              ang2_test = np.concatenate((ang2_test, ang2_temp))
-              ecal_test = np.concatenate((ecal_test, ecal_temp))
-    if X_test.shape[0] > numTest:
-        X_test, Y_test, ang1_test, ang2_test, ecal_test = X_test[:numTest], Y_test[:numTest], ang1_test[:numTest], ang2_test[:numTest], ecal_test[:numTest]
-    else:
-        numTest = X_test.shape[0]
+           X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(dtest, xscale=xscale, angscale=angscale, thresh=1e-4)
+           X_test = np.concatenate((X_test, X_temp))
+           Y_test = np.concatenate((Y_test, Y_temp))
+           ang1_test = np.concatenate((ang1_test, ang1_temp))
+           ang2_test = np.concatenate((ang2_test, ang2_temp))
+           ecal_test = np.concatenate((ecal_test, ecal_temp))
+
     print('Test Data loaded of shapes:')
     print(X_test.shape)
     print(Y_test.shape)
@@ -186,8 +206,29 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print('*************************************************************************************')
     print('Ang1 varies from {} to {} with mean {}'.format(np.amin(ang1_test), np.amax(ang1_test), np.mean(ang1_test)))
     print('Ang2 varies from {} to {} with mean {}'.format(np.amin(ang2_test), np.amax(ang2_test), np.mean(ang2_test)))
-    nb_test = numTest
-   
+    nb_test = X_test.shape[0]
+
+
+
+    for index, dtrain in enumerate(Trainfiles):
+       if index == 0:
+           X_train, Y_train, ang1_train, ang2_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, angscale=angscale, thresh=1e-4)
+       else:
+           X_temp, Y_temp, ang1_temp,ang2_temp, ecal_temp = GetDataAngle(dtrain)
+           X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, angscale=angscale, thresh=1e-4)
+           X_train = np.concatenate((X_train, X_temp))
+           Y_train = np.concatenate((Y_train, Y_temp))
+           ang1_test = np.concatenate((ang1_test, ang1_temp))
+           ang2_test = np.concatenate((ang2_test, ang2_temp))
+           ecal_train = np.concatenate((ecal_train, ecal_temp))
+
+
+    print("On hostname {0} - After init using {1} memory".format(socket.gethostname(), psutil.Process(os.getpid()).memory_info()[0]))
+    assert X_train.shape[0] == EventsperFile * len(Trainfiles), "# Total events in training files"
+    nb_train = X_train.shape[0]# Total events in training files
+    total_batches = nb_train / global_batch_size
+    print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
+
     train_history = defaultdict(list)
     test_history = defaultdict(list)
     init_time = time.time()- start_init
@@ -195,47 +236,62 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-        X_train, Y_train, ang1_train, ang2_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, angscale=angscale, thresh=1e-4)
-        nb_file=1
-  
+#        X_train, Y_train, ang1_train, ang2_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, angscale=angscale, thresh=1e-4)
+#        nb_file=1
         epoch_gen_loss = []
         epoch_disc_loss = []
-        index = 0
-        total_batches = 0
-        file_index=0
+ #       index = 0
+ #       total_batches = 0
+ #       file_index=0
      
-        while nb_file < len(Trainfiles):
-            if verbose:
-                progress_bar.update(index)
-            else:
-                if index % 100 == 0:
-                    print('processed {}/{} batches'.format(index + 1, total_batches))
-            loaded_data = X_train.shape[0]
-            used_data = file_index * batch_size
-            if (loaded_data - used_data) < (batch_size + 1 ):
-                X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(Trainfiles[nb_file], xscale=xscale, angscale=angscale, thresh=1e-4)
+ #       while nb_file < len(Trainfiles):
+ #           if verbose:
+ #               progress_bar.update(index)
+ #           else:
+ #               if index % 100 == 0:
+ #                   print('processed {}/{} batches'.format(index + 1, total_batches))
+  #          loaded_data = X_train.shape[0]
+  #          used_data = file_index * batch_size
+  #          if (loaded_data - used_data) < (batch_size + 1 ):
+ #               X_temp, Y_temp, ang1_temp, ang2_temp, ecal_temp = GetDataAngle(Trainfiles[nb_file], xscale=xscale, angscale=angscale, thresh=1e-4)
                 #print("\nData file loaded..........",Trainfiles[nb_file])
-                nb_file+=1
-                X_left = X_train[(file_index * batch_size):]
-                Y_left = Y_train[(file_index * batch_size):]
-                ang1_left = ang1_train[(file_index * batch_size):]
-                ang2_left = ang2_train[(file_index * batch_size):]
-                ecal_left = ecal_train[(file_index * batch_size):]
-                X_train = np.concatenate((X_left, X_temp))
-                Y_train = np.concatenate((Y_left, Y_temp))
-                ang1_train = np.concatenate((ang1_left, ang1_temp))
-                ang2_train = np.concatenate((ang2_left, ang2_temp))
-                ecal_train = np.concatenate((ecal_left, ecal_temp))
-                nb_batches = int(X_train.shape[0] / batch_size)                
-                print("{} batches loaded..........".format(nb_batches))
-                file_index = 0
+ #               nb_file+=1
+ #               X_left = X_train[(file_index * batch_size):]
+ #               Y_left = Y_train[(file_index * batch_size):]
+ #               ang1_left = ang1_train[(file_index * batch_size):]
+ #               ang2_left = ang2_train[(file_index * batch_size):]
+ #               ecal_left = ecal_train[(file_index * batch_size):]
+ #               X_train = np.concatenate((X_left, X_temp))
+ #               Y_train = np.concatenate((Y_left, Y_temp))
+ #               ang1_train = np.concatenate((ang1_left, ang1_temp))
+ #               ang2_train = np.concatenate((ang2_left, ang2_temp))
+ #               ecal_train = np.concatenate((ecal_left, ecal_temp))
+ #               nb_batches = int(X_train.shape[0] / batch_size)                
+ #               print("{} batches loaded..........".format(nb_batches))
+ #               file_index = 0
 
-            image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
-            energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
-            ang1_batch = ang1_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            ang2_batch = ang2_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            file_index +=1
+        randomize(X_train, Y_train, ang1_train, ang2_train, ecal_train)
+
+
+        image_batches = genbatches(X_train, batch_size)
+        energy_batches = genbatches(Y_train, batch_size)
+        ecal_batches = genbatches(ecal_train, batch_size) 
+ 
+
+        for index in range(total_batches):
+            start = time.time()         
+            image_batch = image_batches.next()
+            energy_batch = energy_batches.next()
+            ecal_batch = ecal_batches.next()
+            ang1_batch = ang1_batches.next()
+            ang2_batch = ang2_batches.next()
+
+            #image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
+            #energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
+            #ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
+            #ang1_batch = ang1_train[(file_index * batch_size):(file_index + 1) * batch_size]
+            #ang2_batch = ang2_train[(file_index * batch_size):(file_index + 1) * batch_size]
+            #file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
             generator_ip = np.concatenate((ang1_batch.reshape(-1, 1), noise), axis=1)
@@ -339,7 +395,7 @@ if __name__ == '__main__':
 
     import keras.backend as K
 
-    K.set_image_dim_ordering('tf')
+    K.set_image_dim_ordering('th')
 
     from keras.layers import Input
     from keras.models import Model
