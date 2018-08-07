@@ -24,6 +24,47 @@ def ecal_sum(image):
    
 def ecal_angle(image):
     image = K.squeeze(image, axis=4)
+    # size of ecal
+    x_shape= K.int_shape(image)[1]
+    y_shape= K.int_shape(image)[2]
+    z_shape= K.int_shape(image)[3]
+    sumtot = K.sum(image, axis=(1, 2, 3))# sum of events
+
+    # ref denotes barycenter as that is our reference point
+    x_ref = K.sum(K.sum(image, axis=(2, 3)) * K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32'), axis=1)# sum for x position * x index
+    y_ref = K.sum(K.sum(image, axis=(1, 3)) * K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32'), axis=1)
+    z_ref = K.sum(K.sum(image, axis=(1, 2)) * K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32'), axis=1)
+    x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) * K.cast(x_shape - 1, dtype='float32'), x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
+    y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref)* K.cast(y_shape - 1, dtype='float32'), y_ref/sumtot)
+    z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref)* K.cast(z_shape - 1, dtype='float32'), z_ref/sumtot)
+    #reshape    
+    x_ref = K.expand_dims(x_ref, 1)
+    y_ref = K.expand_dims(y_ref, 1)
+    z_ref = K.expand_dims(z_ref, 1)
+
+    sumz = K.sum(image, axis =(1, 2)) # sum for x,y planes going along z
+    x = K.expand_dims(K.arange(x_shape), 0) # x indexes
+    x = K.cast(K.expand_dims(x, 2), dtype='float32')
+    y = K.expand_dims(K.arange(y_shape), 0)# y indexes
+    y = K.cast(K.expand_dims(y, 2), dtype='float32')
+    #xsum = K.sum(image, axis=2)
+    #barycenter for each z position
+    x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
+    y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
+    x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
+    y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
+    z = K.cast(K.arange(z_shape), dtype='float32') * K.ones_like(z_ref) # Make an array of z indexes for all events
+    zproj = K.sqrt((x_mid-x_ref)**2.0 + (z - z_ref)**2.0)# projection from z axis
+    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
+    m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
+    ang = (math.pi/2.0) - tf.atan(m)# angle correction
+    ang = K.mean(ang, axis=1) # meanof angles computed
+    ang = K.expand_dims(ang, 1)
+    print(K.int_shape(ang))
+    return ang
+
+def ecal_angle2(image):
+    image = K.squeeze(image, axis=4)
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
     z_shape= K.int_shape(image)[3]
@@ -31,14 +72,12 @@ def ecal_angle(image):
     x_ref = K.sum(K.sum(image, axis=(2, 3)) * K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32'), axis=1)
     y_ref = K.sum(K.sum(image, axis=(1, 3)) * K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32'), axis=1)
     z_ref = K.sum(K.sum(image, axis=(1, 2)) * K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32'), axis=1)
-    x_ref = K.tf.where(K.equal(sumtot, 0.0), K.zeros_like(x_ref), x_ref/sumtot)
-    y_ref = K.tf.where(K.equal(sumtot, 0.0), K.zeros_like(y_ref), y_ref/sumtot)
-    z_ref = K.tf.where(K.equal(sumtot, 0.0), K.zeros_like(z_ref), z_ref/sumtot)
-        
+    x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) * K.cast(x_shape - 1, dtype='float32'), x_ref/sumtot)
+    y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref)* K.cast(y_shape - 1, dtype='float32'), y_ref/sumtot)
+    z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref)* K.cast(z_shape - 1, dtype='float32'), z_ref/sumtot)
     x_ref = K.expand_dims(x_ref, 1)
     y_ref = K.expand_dims(y_ref, 1)
     z_ref = K.expand_dims(z_ref, 1)
-
     sumz = K.sum(image, axis =(1, 2)) # sum for x,y planes going along z
     x = K.expand_dims(K.arange(x_shape), 0)
     x = K.cast(K.expand_dims(x, 2), dtype='float32')
@@ -51,15 +90,14 @@ def ecal_angle(image):
     y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
     z = K.cast(K.arange(z_shape), dtype='float32') * K.ones_like(z_ref)
     zproj = K.sqrt((x_mid-x_ref)**2.0 + (z - z_ref)**2.0)
-    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)
+    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/(z - z_ref))
     m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)
-    #tan = K.tf.where(K.tf.greater(K.abs(m), 10.0),  (math.pi/2.0) * K.ones_like(m), tf.atan(m))
     ang = (math.pi/2.0) - tf.atan(m)
     ang = K.mean(ang, axis=1)
     ang = K.expand_dims(ang, 1)
     print(K.int_shape(ang))
     return ang
-                                                                                                                           
+                                                                            
 # Angle Measure using weighting by z for all events
 def ProcAngles2(meas):
    a = np.arange(meas.shape[1])
