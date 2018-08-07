@@ -16,15 +16,19 @@ import math
 from tensorflow import py_func, float32, Tensor
 import tensorflow as tf
 
-K.set_image_dim_ordering('tf')
+K.set_image_dim_ordering('th')
 
 def ecal_sum(image):
-    sum = K.sum(image, axis=(1, 2, 3))
+    sum = K.sum(image, axis=(2, 3, 4))
     return sum
    
 def ecal_angle(image):
+
     image = K.squeeze(image, axis=4)
     # size of ecal
+
+    image = K.squeeze(image, axis=1)
+
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
     z_shape= K.int_shape(image)[3]
@@ -83,9 +87,9 @@ def ecal_angle2(image):
     x = K.cast(K.expand_dims(x, 2), dtype='float32')
     y = K.expand_dims(K.arange(y_shape), 0)
     y = K.cast(K.expand_dims(y, 2), dtype='float32')
-    xsum = K.sum(image, axis=2)
-    x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
-    y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
+    xsum = K.sum(image, axis=1)
+    x_mid = K.sum(K.sum(image, axis=1) * x, axis=1)   ## SOFIA: this axis  (supposedly X) was set at 2 instead of 1 for NHWC (=TF) ordering : why????
+    y_mid = K.sum(K.sum(image, axis=2) * y, axis=1)
     x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
     y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
     z = K.cast(K.arange(z_shape), dtype='float32') * K.ones_like(z_ref)
@@ -121,7 +125,7 @@ def output_of_lambda(input_shape):
 
 def discriminator():
   
-    image=Input(shape=(51, 51, 25, 1))
+    image=Input(shape=(1, 51, 51, 25))
 
     x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
     x = LeakyReLU()(x)
@@ -166,7 +170,7 @@ def generator(latent_size=200, return_intermediate=False):
     
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
-        Reshape((9, 9, 8, 8)),
+        Reshape((8, 9, 9, 8)),
 
         Conv3D(64, 6, 6, 8, border_mode='same', init='he_uniform'),
         LeakyReLU(),
@@ -180,7 +184,7 @@ def generator(latent_size=200, return_intermediate=False):
         UpSampling3D(size=(2, 2, 3)),
 
         ZeroPadding3D((0, 2,0)),
-        Conv3D(6, 3, 5, 8, init='he_uniform'),
+        Conv3D(6, 3, 5, 8,init='he_uniform'),
         LeakyReLU(),
         Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
         Activation('relu')
