@@ -35,9 +35,9 @@ def ecal_angle(image):
     masked_events = K.sum(amask) # counting zero sum events
     
     # ref denotes barycenter as that is our reference point
-    x_ref = K.sum(K.sum(image, axis=(2, 3)) * K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32'), axis=1)# sum for x position * x index
-    y_ref = K.sum(K.sum(image, axis=(1, 3)) * K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32'), axis=1)
-    z_ref = K.sum(K.sum(image, axis=(1, 2)) * K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32'), axis=1)
+    x_ref = K.sum(K.sum(image, axis=(2, 3)) * (K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32') + 0.5), axis=1)# sum for x position * x index
+    y_ref = K.sum(K.sum(image, axis=(1, 3)) * (K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32') + 0.5), axis=1)
+    z_ref = K.sum(K.sum(image, axis=(1, 2)) * (K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32') + 0.5), axis=1)
     x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) * K.cast(x_shape - 1, dtype='float32'), x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
     y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref)* K.cast(y_shape - 1, dtype='float32'), y_ref/sumtot)
     z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref)* K.cast(z_shape - 1, dtype='float32'), z_ref/sumtot)
@@ -53,9 +53,9 @@ def ecal_angle(image):
     zunmasked_events = K.sum(zmask, axis=1)
     
     x = K.expand_dims(K.arange(x_shape), 0) # x indexes
-    x = K.cast(K.expand_dims(x, 2), dtype='float32')
+    x = K.cast(K.expand_dims(x, 2), dtype='float32') + 0.5
     y = K.expand_dims(K.arange(y_shape), 0)# y indexes
-    y = K.cast(K.expand_dims(y, 2), dtype='float32')
+    y = K.cast(K.expand_dims(y, 2), dtype='float32') + 0.5
   
     #barycenter for each z position
     x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
@@ -64,7 +64,7 @@ def ecal_angle(image):
     y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
 
     #Angle Calculations
-    z = K.cast(K.arange(z_shape), dtype='float32') * K.ones_like(z_ref) # Make an array of z indexes for all events
+    z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5) * K.ones_like(z_ref) # Make an array of z indexes for all events
     zproj = K.sqrt((x_mid-x_ref)**2.0 + (z - z_ref)**2.0)# projection from z axis
     m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
     m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
@@ -73,7 +73,7 @@ def ecal_angle(image):
     ang = ang * zmask # place zero where zsum is zero
     
     ang = K.sum(ang, axis=1)/zunmasked_events # Mean does not include positions where zsum=0
-    ang = K.tf.where(K.equal(amask, 0.), ang, 4 * K.ones_like(ang)) # Place a 4 for measured angle where no energy is deposited in events
+    ang = K.tf.where(K.equal(amask, 0.), ang, 100 * K.ones_like(ang)) # Place a 4 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
     print(K.int_shape(ang))
