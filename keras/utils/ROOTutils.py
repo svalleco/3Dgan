@@ -15,23 +15,7 @@ def BinLogX(h):
    axis.Set(bins, new_bins)
    new_bins=None
 
-#Fill a Tgraph with arrays
-def fill_graph(arrayx, arrayy):
-   n = arrayx.shape[0]
-   arrayx = np.squeeze(arrayx)
-   print n
-   x = np.zeros(n)
-   y = np.zeros(n)
-   print x.shape
-   print arrayx.shape
-   for i in np.arange(n):
-      x[i] = arrayx[i]
-      y[i] = arrayy[i]
-   graph = ROOT.TGraph(n, y, x)
-   return graph
-      
-
-#Fill a histogram from 1D numpy array                                                                                                                                                                            
+#Fill a histogram from 1D numpy array                                                                                                                                                                              
 def fill_hist(hist, array):
    [hist.Fill(_) for _ in array]
 
@@ -43,18 +27,7 @@ def fill_hist_wt(hist, weight):
      for j in np.arange(weight.shape[0]):
         hist.Fill(i, weight[j, i])
 
-#Fill a 2D histogram for event from numpy array                                                                                                                                                             
-def fill_hist_2D(hist, array):
-#   l=array.shape[0]
-   x = array.shape[0]
-   y = array.shape[1]
-#   for i in np.arange(l):
-   for j in np.arange(x):
-     for k in np.arange(y):
-       hist.Fill(j, k, array[j, k])
-
-
-#Hits above a threshold                                                                                                                                                                                           
+#Hits above a threshold                                                                                                                                                                                            
 def get_hits(events, thresh=0.0002):
    hit_array = events>thresh
    hits = np.sum(hit_array, axis=(1, 2, 3))
