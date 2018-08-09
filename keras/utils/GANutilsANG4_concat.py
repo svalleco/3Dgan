@@ -115,8 +115,8 @@ def get_sorted_angle(datafiles, energies, angles, aindexes, flag=False, num_even
                     srt["energy" + str(energy)] = np.append(srt["energy" + str(energy)], Y[indexes], axis=0)
                     srt["angle" + str(energy)]=np.append(srt["angle" + str(energy)], angle[indexes], axis=0)
                  else:
-                    srt["events_act" + str(energy)] = srt["events_act" + str(energy)][:num_events2]
-                    srt["energy" + str(energy)] = srt["energy" + str(energy)][:num_events2]
+                    srt["events_act" + str(energy)] = srt["events_act" + str(energy)][:num_events1]
+                    srt["energy" + str(energy)] = srt["energy" + str(energy)][:num_events1]
                     srt["angle" + str(energy)]=srt["angle" + str(energy)][:num_events1]
               print('For {} energy {} events were loaded'.format(energy, srt["events_act" + str(energy)].shape[0]))
     return srt
@@ -327,7 +327,8 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
          indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2))
          print('from {} to {}'.format(a - tolerance2,  a + tolerance2))
          print(var["angle" + str(energy)][:5])
-        
+         print (var["angle" + str(energy)].shape)
+         print (var["events_act" + str(energy)].shape)
          var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)][indexes]
          var["energy" + str(energy) + "ang_" + str(index)] = var["energy" + str(energy)][indexes]
          var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)][indexes]
