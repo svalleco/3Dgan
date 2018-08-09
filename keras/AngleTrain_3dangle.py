@@ -302,10 +302,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             #file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
-            print ('noise shape', noise.shape)
             generator_ip = np.concatenate((ang1_batch.reshape(-1, 1), noise), axis=1)
-            print ('generator_ip shape', generator_ip.shape)
-            print("running generator predict")
             generated_images = generator.predict(generator_ip, verbose=0)
             #print(ang2_batch[:5])
             #disc_out = discriminator.predict(image_batch)
@@ -313,9 +310,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             #print(len(disc_out[0]))
             #print(disc_out[:5][3][:5])
             #print(disc_out[0])
-            print("training discriminator on real data")
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
-            print("training discriminator on fake data")
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
             #print ('real_batch_loss', real_batch_loss)
             #print ('fake_batch_loss', fake_batch_loss)
@@ -328,12 +323,6 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
                 noise = np.random.normal(0, 1, (batch_size, latent_size-1))
                 noise = np.multiply(energy_batch.reshape(-1, 1), noise)
                 generator_ip = np.concatenate((ang1_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
-                print("training generator in combined model")
-                print ('generator_ip shape', generator_ip.shape)
-                print ('noise shape', noise.shape)
-                print ('ang1_batch shape', ang1_batch.reshape(-1, 1).shape)
-                print ('ang2_batch shape', ang2_batch.reshape(-1, 1).shape)
-                print ('ecal_batch shape', ecal_batch.reshape(-1, 1).shape)
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, energy_batch.reshape(-1, 1), ang1_batch.reshape(-1, 1), ang2_batch.reshape(-1, 1), ecal_batch]))

@@ -23,13 +23,8 @@ def ecal_sum(image):
     return sum
    
 def ecal_angle(image):
-    print(K.sum(image, axis=(2, 3)).shape)
     x_shape= K.int_shape(image)[1]
-    print(K.arange(0,25, dtype='float32').shape)
-    print(K.expand_dims(K.arange(0,x_shape, dtype='float32'), 0).shape) 
-    print("image", image.shape)
     image = K.squeeze(image, axis=1)
-    print("image", image.shape)
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
@@ -39,24 +34,18 @@ def ecal_angle(image):
     # get 1. where event sum is 0 and 0 elsewhere
     amask = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
     masked_events = K.sum(amask) # counting zero sum events
-    print("sumtot shape", sumtot.shape) 
     # ref denotes barycenter as that is our reference point
     x_ref = K.sum(K.sum(image, axis=(2, 3)) * K.expand_dims(K.arange(0,25, dtype='float32'), 0), axis=1)# sum for x position * x index
-    print("x_ref shape", x_ref.shape) 
-    print("x_ref/sum_tot shape", (x_ref/sumtot).shape) 
-    print("ones_like_x_ref", K.ones_like(x_ref).shape)
     y_ref = K.sum(K.sum(image, axis=(1, 3)) * K.expand_dims(K.arange(0,25, dtype='float32'), 0) , axis=1)
     z_ref = K.sum(K.sum(image, axis=(1, 2)) * K.expand_dims(K.arange(0,25, dtype='float32'), 0), axis=1)
     x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref), x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
     y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref), y_ref/sumtot)
     z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref), z_ref/sumtot)
-    print("after where x_ref shape", x_ref.shape) 
     #reshape    
     x_ref = K.expand_dims(x_ref, 1)
     y_ref = K.expand_dims(y_ref, 1)
     z_ref = K.expand_dims(z_ref, 1)
 
-    print("after where x_ref shape", x_ref.shape) 
     sumz = K.sum(image, axis =(1, 2)) # sum for x,y planes going along z
 
     # Get 0 where sum along z is 0 and 1 elsewhere
@@ -87,7 +76,6 @@ def ecal_angle(image):
     ang = K.tf.where(K.equal(amask, 0.), ang, 100 * K.ones_like(ang)) # Place a 4 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
-    print(K.int_shape(ang))
     return ang
                                                                                                                            
 # Angle Measure using weighting by z for all events
