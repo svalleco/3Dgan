@@ -52,24 +52,25 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 1
             SampleI[i]=EndI
     return out
 
-def GetAngleDataEta(datafile, thresh=1e-6):
+def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
     #get data for training                                                                                        
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     X=np.array(f.get('ECAL'))
     Y=np.array(f.get('energy'))
-    eta = np.array(f.get('eta'))
+    ang = np.array(f.get(angtype))
+    ang = ang + offset
     X[X < thresh] = 0
     X = np.expand_dims(X, axis=-1)
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
-    return X, Y, eta, ecal
+    return X, Y, ang, ecal
 
-def get_sorted_angle(datafiles, energies, angles, aindexes, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.05):
+def get_sorted_angle(datafiles, energies, angles, aindexes, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.05, Data=GetAngleData, angtype='eta', thresh=1e-6, offset=0.0):
     srt = {}
     for index, datafile in enumerate(datafiles):
-       data = GetAngleDataEta(datafile)
+       data = Data(datafile, thresh = thresh, angtype=angtype, offset= offset)
        X = data[0]
        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
        indexes= np.where(sumx>0)
@@ -262,7 +263,7 @@ def safe_mkdir(path):
         if exception.errno != EEXIST:
             raise exception
 
-def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele'):
+def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='eta', thresh=1e-6, offset=0.0):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     print flags
     Test = flags[0]
@@ -295,28 +296,36 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
        else:
           data_files = Trainfiles
        start = time.time()
-       var = get_sorted_angle(data_files, energies, True, num_events1, num_events2)
+       var = get_sorted_angle(data_files, energies, True, num_events1, num_events2, Data=Data, angtype=angtype, thresh=thresh, offset=offset)
        data_time = time.time() - start
        print "{} events were loaded in {} seconds".format(num_data, data_time)
        if save_data:
           save_sorted(var, energies, sortdir)
     total = 0
     for energy in energies:
-    #calculations for data events
+      x = var["events_act"+ str(energy)].shape[1]
+      y =var["events_act"+ str(energy)].shape[2]
+      z =var["events_act"+ str(energy)].shape[3]
+      #calculations for data events
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
       total += var["index" + str(energy)]
       var["ecal_act"+ str(energy)]=np.sum(var["events_act"+ str(energy)], axis=(1, 2, 3))
       var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)])
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
-      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
+      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m, x=x, y=y, z=z)
+      print ('angle varies from {} to {}'.format(np.amax(var["angle" + str(energy)]), np.amin(var["angle" + str(energy)])))
       for a, index in zip(angles, aindexes):
-         indexes = np.where((var["angle" + str(energy)] > a - tolerance2) & (var["angle" + str(energy)] < a + tolerance2))
+         indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2))
+         print('from {} to {}'.format(a - tolerance2,  a + tolerance2))
+         print(var["angle" + str(energy)][:5])
+        
          var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)][indexes]
          var["energy" + str(energy) + "ang_" + str(index)] = var["energy" + str(energy)][indexes]
          var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)][indexes]
          var["sumsx_act"+ str(energy) + "ang_" + str(index)] = var["sumsx_act"+ str(energy)][indexes]
          var["sumsy_act"+ str(energy) + "ang_" + str(index)] = var["sumsy_act"+ str(energy)][indexes]
          var["sumsz_act"+ str(energy) + "ang_" + str(index)] = var["sumsz_act"+ str(energy)][indexes]
+         print ('{} for angle bin {} total events were {}'.format(index, a, var["events_act" + str(energy) + "ang_" + str(index)].shape[0]))
     data_time = time.time() - start
     print "{} events were put in {} bins".format(total, len(energies))
     #### Generate Data table to screen                                                                                                                                                                             
@@ -364,7 +373,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
           else:
              g.load_weights(gen_weights)
              start = time.time()
-             var["events_gan" + str(energy)]['n_'+ str(i)] = generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, var["angle"+ str(energy)] * ascale, latent)
+             var["events_gan" + str(energy)]['n_'+ str(i)] = generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, (var["angle"+ str(energy)]) * ascale, latent)
              if save_gen:
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], var["energy" + str(energy)], var["angle"+ str(energy)], energy, gendir)
              gen_time = time.time() - start
@@ -388,13 +397,13 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
           print 'Calculations for ....', energy
           var["events_gan" + str(energy)]['n_'+ str(i)] = var["events_gan" + str(energy)]['n_'+ str(i)]/scale
           #var["isreal_act" + str(energy)]['n_'+ str(i)] = np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)])
-          var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["angle_act"+ str(energy)]['n_'+ str(i)])/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)
-          var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["angle_gan"+ str(energy)]['n_'+ str(i)])/ascale, np.squeeze(var["ecal_gan"+ str(energy)]['n_'+ str(i)]/scale)
+          var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze((var["angle_act"+ str(energy)]['n_'+ str(i)]))/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)
+          var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["angle_gan"+ str(energy)]['n_'+ str(i)] )/ascale, np.squeeze(var["ecal_gan"+ str(energy)]['n_'+ str(i)]/scale)
           var["max_pos_gan" + str(energy)]['n_'+ str(i)] = get_max(var["events_gan" + str(energy)]['n_'+ str(i)])
           var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)] = get_sums(var["events_gan" + str(energy)]['n_'+ str(i)])
-          var["momentX_gan" + str(energy)]['n_'+ str(i)], var["momentY_gan" + str(energy)]['n_'+ str(i)], var["momentZ_gan" + str(energy)]['n_'+ str(i)] = get_moments(var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)], m)
+          var["momentX_gan" + str(energy)]['n_'+ str(i)], var["momentY_gan" + str(energy)]['n_'+ str(i)], var["momentZ_gan" + str(energy)]['n_'+ str(i)] = get_moments(var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)], m, x=x, y=y, z=z)
           for a, index in zip(angles, aindexes):
-             indexes = np.where((var["angle" + str(energy)] > a - tolerance2) & (var["angle" + str(energy)] < a + tolerance2))
+             indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2))
              var["events_gan" + str(energy) + "ang_" + str(index)]['n_'+ str(i)] = var["events_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["sumsx_gan"+ str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["sumsx_gan"+ str(energy)]['n_'+ str(i)][indexes]
              var["sumsy_gan"+ str(energy)+ "ang_" + str(index)]['n_'+ str(i)] =var["sumsy_gan"+ str(energy)]['n_'+ str(i)][indexes]
