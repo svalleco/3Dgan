@@ -136,13 +136,13 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, ifpdf=True):
    color = 2
    if y.shape[0]> ecal1["n_0"].shape[0]:
       y = y[:ecal1["n_0"].shape[0]]
-   Eprof = ROOT.TProfile("Eprof", "Ratio of Ecal and Ep;Ep;Ecal/Ep", 100, 0, 520)
+   Eprof = ROOT.TProfile("Eprof", "Ratio of Ecal and Ep;Ep;Ecal/Ep", 100, 100, 200)
    Eprof.SetStats(ROOT.kFALSE)
    Eprof.SetTitle("Ratio of Ecal and Ep")
    my.fill_profile(Eprof, ecal1["n_0"]/y, y)
    Eprof.GetXaxis().SetTitle("Ep GeV")
    Eprof.GetYaxis().SetTitle("Ecal/Ep")
-   Eprof.GetYaxis().SetRangeUser(0, 2.)
+   Eprof.GetYaxis().SetRangeUser(0, 2.5)
    Eprof.Draw()
    Eprof.SetLineColor(color)
    color+=1
@@ -150,7 +150,7 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, ifpdf=True):
    legend.AddEntry(Eprof,"Geant4","l")
    Gprofs=[]
    for i, key in enumerate(ecal2):
-      Gprofs.append(ROOT.TProfile("Gprof" + str(i), "Gprof" + str(i), 100, 0, 520))
+      Gprofs.append(ROOT.TProfile("Gprof" + str(i), "Gprof" + str(i), 100, 100, 200))
       Gprof = Gprofs[i]
       Gprof.SetStats(ROOT.kFALSE)
       my.fill_profile(Gprof, ecal2[key]/y, y)
@@ -177,8 +177,8 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, ifpdf=True):
    Gprofs=[]
    Eprofs=[]
    for i, key in enumerate(aux1):
-     Eprofs.append(ROOT.TProfile("Eprof" + str(i),"Eprof" + str(i), 100, 0, 520))
-     Gprofs.append(ROOT.TProfile("Gprof" + str(i),"Gprof" + str(i), 100, 0, 520))
+     Eprofs.append(ROOT.TProfile("Eprof" + str(i),"Eprof" + str(i), 100, 100, 200))
+     Gprofs.append(ROOT.TProfile("Gprof" + str(i),"Gprof" + str(i), 100, 100, 200))
      Eprof= Eprofs[i]
      Gprof= Gprofs[i]
      if i== 0:
@@ -186,7 +186,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, ifpdf=True):
        Eprof.SetTitle("Relative Error for Primary Energy")
        Eprof.GetXaxis().SetTitle("Ep GeV")
        Eprof.GetYaxis().SetTitle("Ep - aux/Ep")
-       Eprof.GetYaxis().SetRangeUser(-0.2, 0.2)
+       Eprof.GetYaxis().SetRangeUser(-0.3, 0.3)
        my.fill_profile(Eprof, (y - 100 *aux1[key])/y, y)
        Eprof.Draw()
        Eprof.SetLineColor(color)
@@ -311,7 +311,7 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, ifpdf=True):
    thresh = 0.0002 # GeV
    color = 2
    hd = ROOT.TH1F("Geant4", "", 50, 0, 4000)
-   my.fill_hist(hd, my.get_hits(event1, thresh * 50))
+   my.fill_hist(hd, my.get_hits(event1, thresh))
    if energy == 0:
       hd.SetTitle("Ecal Hits Histogram (above {} GeV) for Uniform Spectrum".format(thresh))
    else:
@@ -347,7 +347,7 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, ifpdf=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color = 2
-   legend = ROOT.TLegend(.7, .8, .9, .9)
+   legend = ROOT.TLegend(.4, .8, .5, .9)
    hps=[]
    hgs=[]
    for i, key in enumerate(aux1):
@@ -356,7 +356,7 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, ifpdf=True):
      hp= hps[i]
      hg= hgs[i]
      if i== 0:
-       hp.SetStats(0)
+       #hp.SetStats(0)
        hp.SetTitle(" Primary Energy")
        hp.GetXaxis().SetTitle("Ep GeV")
        my.fill_hist(hp, 100 *aux1[key])
@@ -376,11 +376,14 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, ifpdf=True):
      else:
        hp.SetTitle("Aux Energy Histogram for {} GeV".format(energy) )
 
-     hg.SetStats(0)
+     #hg.SetStats(0)
+     #my.stat_pos(hg)
      my.fill_hist(hg, 100 *aux2[key])
      hg.SetLineColor(color)
      color+=1
      hg.Draw('sames')
+     c1.Update()
+     my.stat_pos(hg)
      c1.Update()
      legend.AddEntry(hg, "GAN {}".format(labels[i]), "l")
    legend.Draw()
@@ -395,7 +398,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, ifpdf=True)
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    c1.SetGrid()
    color = 2
-   legend = ROOT.TLegend(.7, .8, .9, .9)
+   legend = ROOT.TLegend(.4, .8, .5, .9)
    hps=[]
    hgs=[]
    if y.shape[0]> aux1["n_0"].shape[0]:
@@ -406,7 +409,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, ifpdf=True)
      hp= hps[i]
      hg= hgs[i]
      if i== 0:
-       hp.SetStats(0)
+       #hp.SetStats(0)
        if energy == 0:
           hp.SetTitle("Aux Energy Relative Error Histogram for Uniform Spectrum")
        else:
@@ -425,11 +428,14 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, ifpdf=True)
        hp.Draw('sames')
        legend.AddEntry(hp,"Geant4" + labels[i],"l")
        color+=1
-     hg.SetStats(0)
+     #hg.SetStats(0)
+     #my.stat_pos(hg)
      my.fill_hist(hg,  (y - aux2[key]*100)/y)
      hg.SetLineColor(color)
      color+=1
      hg.Draw('sames')
+     c1.Update()
+     my.stat_pos(hg)
      c1.Update()
      legend.AddEntry(hg, "GAN {}".format(labels[i]), "l")
    legend.Draw()
@@ -444,7 +450,7 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, ifpdf=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    c1.SetGrid()
    color = 2
-   legend = ROOT.TLegend(.7, .8, .9, .9)
+   legend = ROOT.TLegend(.4, .8, .5, .9)
    hps=[]
    hgs=[]
    for i, key in enumerate(array1):
@@ -453,7 +459,7 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, ifpdf=True):
      hp= hps[i]
      hg= hgs[i]
      if i== 0:
-       hp.SetStats(0)
+       #hp.SetStats(0)
        if energy == 0:
           hp.SetTitle("Real/Fake Histogram for Uniform Spectrum")
        else:
@@ -476,11 +482,14 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, ifpdf=True):
        legend.AddEntry(hp,"Geant4" + labels[i],"l")
        c1.Update()
        color+=1
-     hg.SetStats(0)
+     ##hg.SetStats(0)
+     #my.stat_pos(hg)
      my.fill_hist(hg,  array2[key])
      hg.SetLineColor(color)
      color+=1
      hg.Draw('sames')
+     c1.Update()
+     my.stat_pos(hg)
      c1.Update()
      legend.AddEntry(hg, "GAN" + labels[i], "l")
    legend.Draw()
