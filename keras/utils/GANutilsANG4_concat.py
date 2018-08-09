@@ -72,6 +72,8 @@ def get_sorted_angle(datafiles, energies, angles, aindexes, flag=False, num_even
     for index, datafile in enumerate(datafiles):
        data = Data(datafile, thresh = thresh, angtype=angtype, offset= offset)
        X = data[0]
+       #np.squeeze(X, axis=1)
+       print ('in get_sorted_angle', X.shape)
        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
        indexes= np.where(sumx>0)
        X=X[indexes]
@@ -189,13 +191,16 @@ def get_gen(energy, gendir):
     print "Generated file ", filename, " is loaded"
     return generated_images
 
-def generate(g, index, sampled_labels, sampled_angle, latent=256):
+def generate(g, index, sampled_labels, sampled_angle, latent=200):
     noise = np.random.normal(0, 1, (index, latent-1))
     sampled_labels=np.expand_dims(sampled_labels, axis=1)
     noise = sampled_labels * noise
     sampled = np.concatenate((sampled_angle.reshape(-1, 1), noise), axis=1)
     generated_images = g.predict(sampled, verbose=False, batch_size=50)
     generated_images[generated_images < 1e-4]= 0
+    print ('in generate',generated_images.shape )
+    generated_images=np.moveaxis(generated_images, 1, -1)
+    print ('in generate', generated_images.shape)
     return generated_images
 """                            
 def generate(g, index, sampled_labels, sampled_angle, latent=200):
@@ -209,11 +214,15 @@ def generate(g, index, sampled_labels, sampled_angle, latent=200):
     return generated_images
 """
 def discriminate(d, images):
+    print ('in discriminate',images.shape )
+    images=np.moveaxis(images, -1,1)
+    print ('in discriminate',images.shape )
     isreal, aux_out, angle1_out, angle2_out, ecal_out = np.array(d.predict(images, verbose=False, batch_size=50))
     return isreal, aux_out, angle1_out, angle2_out, ecal_out
 
 def get_max(images):
     index = images.shape[0]
+    print images.shape
     print images[0].shape
     x=images.shape[1]
     y=images.shape[2]
@@ -293,7 +302,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
        print "Events were loaded in {} seconds".format(sort_time)
     else:
        # Getting Data                                                                                                                                                                                           
-       events_per_file = 10000
+       events_per_file = 5000
        Filesused = int(math.ceil(num_data/events_per_file))
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
        Trainfiles = Trainfiles[: Filesused]

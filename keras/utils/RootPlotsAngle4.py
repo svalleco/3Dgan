@@ -1,13 +1,14 @@
 ########### Plots for Angle version ###################
+import matplotlib
+matplotlib.use('agg')
 import os
 import ROOT
 import numpy as np
 import math
 import time
 import numpy.core.umath_tests as umath
-import matplotlib
 import matplotlib.pyplot as plt
-plt.switch_backend('Agg')
+#plt.switch_backend('Agg')
 
 import RootPlotsGAN as rp # common root plots
 import ROOTutils as my # utility functions for root

@@ -1,38 +1,41 @@
 ## Plots for variable angle ##
+import matplotlib
+matplotlib.use('agg')
 from GANutilsANG4_concat import perform_calculations_angle
 from RootPlotsAngle4 import get_plots_angle 
 import h5py
 import numpy as np
-import setGPU
+#import setGPU
 import math
 
 def main():
    #Architectures 
    from EcalCondGanAngle_3d import generator, discriminator
    
-   disc_weights="3d_angleweights/params_discriminator_epoch_000.hdf5"
-   gen_weights= "3d_anglewights/params_generator_epoch_000.hdf5"
+   disc_weights="3d_angleweights/params_discriminator_epoch_049.hdf5"
+
+   gen_weights= "3d_angleweights/params_generator_epoch_049.hdf5"
 
    plots_dir = "3d_angleplots/"
-   latent = 256
-   num_data = 100000
+   latent = 200
+   num_data = 10000
    num_events = 2000
    m = 2
-   energies=[0, 110, 150, 190]
+   energies=[110, 150, 190]
    #angles = [-0.5, -0.25, 0, 0.25, 0.5]
    angles = [math.radians(x) for x in [62, 85, 90, 105, 118]]
    aindexes = [0, 1, 2, 3, 4]
    particle='Ele'
    angtype='theta'
    #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-   datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # imperium
+   datapath = "/data/svalleco/Ele_VarAngleMeas_100_200_*.h5" # imperium
    sortdir = 'SortedEAngleData'
    angledir = 'SortedAngleData'
    gendir = 'AngleGen'  
    discdir = 'AngleDisc'
    genangdir = 'AngleGenAngle'
     
-   Test = True # use test data
+   Test = False # use test data
    stest = False # K and chi2 test
    
    #following flags are used to save sorted and GAN data and to load from sorted data
@@ -55,7 +58,7 @@ def main():
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
                 aindexes, datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, 
                                    ascales, flags, latent, particle,
-                                    thresh=1e-5, angtype=angtype, offset=0.0)
+                                    thresh=1e-5, angtype=angtype, offset=0.0, Data=GetAngleData_reduced)
    get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, len(gweights), ifpdf, stest)
 
 # If using reduced Ecal 25x25x25 then use the following function as argument to perform_calculations_angle, Data=GetAngleDataEta_reduced
@@ -63,12 +66,13 @@ def GetAngleData_reduced(datafile, thresh=1e-6, angtype='theta', offset=0.0):
     #get data for training                                                                                        
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    X=np.array(f.get('ECAL'))[:, 13:38, 13:38, :]
+    X=np.array(f.get('ECAL'))[:, 11:36, 11:36, :]
     Y=np.array(f.get('energy'))
     ang = np.array(f.get(angtype))
     ang = ang + offset
     X[X < thresh] = 0
     X = np.expand_dims(X, axis=-1)
+    #X = np.moveaxis(X, -1, 1)
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))

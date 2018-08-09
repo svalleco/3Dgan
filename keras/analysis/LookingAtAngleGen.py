@@ -8,13 +8,13 @@ import math
 import time
 import glob
 import numpy.core.umath_tests as umath
-import GANutilsAngle as gan
+import GANutilsANG4_concat as gan
 import ROOTutils as r
-import setGPU #if Caltech
+#import setGPU #if Caltech
 
 def main():
-   genweight = "angleweights/params_generator_epoch_049.hdf5"
-   from EcalCondGan4 import generator
+   genweight = "/afs/cern.ch/user/s/svalleco/3Dgan_dev/keras/3d_angleweights/params_generator_epoch_049.hdf5"
+   from EcalCondGanAngle_3d import generator
    g=generator()
    g.load_weights(genweight)
    num_events = 1000
@@ -23,20 +23,20 @@ def main():
    thetamin = 60/f
    thetamax = 120/f
 
-   energies=[100, 250, 400]
+   energies=[100, 150, 200]
    thetas = [60, 90, 120]
-   xcuts = [10, 25, 40] 
-   ycuts = [10, 25, 40]
-   zcuts = [5, 12, 20]
+   xcuts = [12] 
+   ycuts = [12]
+   zcuts = [12]
    plotsdir = 'angle_plots_gan'
    gan.safe_mkdir(plotsdir)
    opt="colz"  
    for energy in energies:
-      for xcut, ycut, zcut in zip(xcuts, ycuts, zcuts):
-         sampled_energies=energy/100 * np.ones((num_events))
-         sampled_thetas = np.random.uniform(thetamin, thetamax, size=(num_events))
-         events = gan.generate(g, num_events, sampled_energies, sampled_thetas)  
-         PlotCut(events, xcut, ycut, zcut, energy, os.path.join(plotsdir, '2Dhits_cut{}_{}.pdf'.format(xcut, energy)), opt=opt)
+     # for xcut, ycut, zcut in zip(xcuts, ycuts, zcuts):
+      #    sampled_energies=energy/100 * np.ones((num_events))
+      #   sampled_thetas = np.random.uniform(thetamin, thetamax, size=(num_events))
+      #   events = gan.generate(g, num_events, sampled_energies, sampled_thetas)  
+      #   PlotAngleCut(events, xcut, ycut, zcut, energy, os.path.join(plotsdir, '2Dhits_cut{}_{}.pdf'.format(xcut, energy)), opt=opt)
       tevents =[]
       for t in thetas:
          sampled_energies=energy/100 * np.ones((num_events))
@@ -56,7 +56,7 @@ def main():
    events = gan.generate(g, num, sampled_energies, sampled_thetas)
 
    for n in np.arange(num):
-     PlotEvent(events[n], 25, 25, 12, sampled_energies[n], sampled_thetas[n], os.path.join(plotsdir, 'Event{}.pdf'.format(n)), n, f, opt=opt)
+     PlotEvent(events[n], 12, 12, 12, sampled_energies[n], sampled_thetas[n], os.path.join(plotsdir, 'Event{}.pdf'.format(n)), n, f, opt=opt)
    
 def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
    canvas = TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make  
@@ -144,7 +144,7 @@ def PlotEvent(event, x, y, z, energy, theta, out_file, n, f, opt=""):
    gPad.SetLogz()
    event = np.expand_dims(event, axis=0)
    print(event.shape)
-   print(event[0, 25, 25, 15])
+   print(event[0, 12, 12, 12])
    FillHist2D_wt(hx, event[:, x, :, :])
    FillHist2D_wt(hy, event[:, :, y, :])
    FillHist2D_wt(hz, event[:, :, :, z])
@@ -174,11 +174,11 @@ def PlotEvent(event, x, y, z, energy, theta, out_file, n, f, opt=""):
 def PlotAngleCut(events, ang, out_file, opt=""):
    canvas = TCanvas("canvas" ,"GAN 2D Hist" ,200 ,10 ,700 ,500) 
    canvas.Divide(2,2)
-   hx = ROOT.TH2F('x=25_{}cut'.format(str(ang)), '', 51, 0, 51, 25, 0, 25)
-   hy = ROOT.TH2F('y=25_{}cut'.format(str(ang)), '', 51, 0, 51, 25, 0, 25)
-   hz = ROOT.TH2F('z=12_{}cut'.format(str(ang)), '', 51, 0, 51, 51, 0, 51)
-   FillHist2D_wt(hx, events[:, 25, :, :])
-   FillHist2D_wt(hy, events[:, :, 25, :])
+   hx = ROOT.TH2F('x=12_{}cut'.format(str(ang)), '', 25, 0, 25, 25, 0, 25)
+   hy = ROOT.TH2F('y=12_{}cut'.format(str(ang)), '', 25, 0, 25, 25, 0, 25)
+   hz = ROOT.TH2F('z=12_{}cut'.format(str(ang)), '', 25, 0, 25, 25, 0, 25)
+   FillHist2D_wt(hx, events[:, 12, :, :])
+   FillHist2D_wt(hy, events[:, :, 12, :])
    FillHist2D_wt(hz, events[:, :, :, 12])
    canvas.cd(1)
    hx.Draw(opt)
