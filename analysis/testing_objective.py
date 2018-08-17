@@ -1,78 +1,48 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-   
 
-# This file has a function that will take a list of params as input and run training using that. Finally it will run analysis to get a single metric that we will need to optimize
-
+# This file tests the training results with the optimization function
 
 from __future__ import print_function
-from collections import defaultdict
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-
 import sys
 import h5py
 import os
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-from matplotlib.colors import LogNorm, Normalize
-plt.switch_backend('Agg')
 import numpy as np
 import glob
 import numpy.core.umath_tests as umath
 import time
 import math
-
-from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
-                          Dropout, BatchNormalization, Activation, Embedding)
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
-                                        AveragePooling3D)
-
-from keras.models import Model, Sequential
-from keras.optimizers import Adadelta, Adam, RMSprop
-from keras.utils.generic_utils import Progbar
-#from sklearn.cross_validation import train_test_split
-#K.set_image_dim_ordering('tf')
-import tensorflow as tf
-config = tf.ConfigProto(log_device_placement=True)
-from EcalCondGanAngle_3d_1loss import generator
-import setGPU
-import GANutilsANG_concat as ang
 import ROOT
 
+import setGPU # if caltech
+import GANutilsANG_concat as ang
+
 def main():
-    datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5"
-    genpath = "3d_angleweights_1loss/params_generator*.hdf5"
-    sorted_path = 'Anglesorted'
-    filename = 'angle_optimization/'
-    particle = "Ele"
+    # All of the following needs to be adjusted
+    from EcalCondGanAngle_3d_1loss import generator # architecture
+    datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
+    genpath = "3d_angleweights_1loss/params_generator*.hdf5"# path to weights
+    sorted_path = 'Anglesorted'  # where sorted data is to be placed
+    plotsdir = 'angle_optimization' # plot directory
+    particle = "Ele" 
     scale = 2
     threshold = 1e-4
     g= generator(latent_size=256)
     gen_weights=[]
     disc_weights=[]
+    ang.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    #gen_weights=gen_weights[:2]
-    print(gen_weights)
-    metrics = []
-    metric = 4
-    metrics.append(metric)
-    fig=1
-    resultfile = filename + 'result' + '_' + str(metric)
-    resultplot = filename + 'result' + '_' + str(metric) 
-    results2 = GetResults(metric, resultfile, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold)
-    PlotResultsRoot(results2, metric, resultplot, fig)
+    gen_weights=gen_weights[:2]
+    result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold)
+    PlotResultsRoot(result, plotsdir)
    
-def PlotResultsRoot(result, metric, resultplotall, fig):
+#Plots results in a root file
+def PlotResultsRoot(result, resultdir):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     c1.SetGrid ()
     legend = ROOT.TLegend(.6, .6, .9, .9)
     mg=ROOT.TMultiGraph()
-    graphs = []
     color1 = 2
     color2 = 8
     color3 = 4
@@ -118,7 +88,7 @@ def PlotResultsRoot(result, metric, resultplotall, fig):
     c1.Update()
     legend.Draw()
     c1.Update()
-    c1.Print(resultplotall + ".pdf")
+    c1.Print(os.path.join(resultdir, "result.pdf"))
       
     gt.Fit("pol1")
     gt.GetFunction("pol1").SetLineColor(color1)
@@ -133,7 +103,7 @@ def PlotResultsRoot(result, metric, resultplotall, fig):
     gp.GetFunction("pol1").SetLineStyle(2)
         
     c1.Update()
-    c1.Print(resultplotall + "Linfit.pdf")
+    c1.Print(os.path.join(resultdir, "result_Linfit.pdf"))
     gt.Fit("pol2")
     gt.GetFunction("pol2").SetLineColor(color1)
     gt.GetFunction("pol2").SetLineStyle(2)
@@ -147,62 +117,32 @@ def PlotResultsRoot(result, metric, resultplotall, fig):
     gp.GetFunction("pol2").SetLineStyle(2)
         
     c1.Update()
-    c1.Print(resultplotall + "pol2fit.pdf")
-    print ('The plot is saved to {}'.format(resultplotall))
+    c1.Print(os.path.join(resultdir, "pol2fit.pdf"))
+    print ('The plot is saved to {}'.format(resultdir))
 
-def GetResults(num, resultfile, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, thresh=1e-6):
-    results= []
-    file = open(resultfile + 'result.txt','w')
-    if num==3:
-        metric = metric3
-    elif num==4: 
-        metric = metric4                                                      
+# results are obtained using metric and saved to a log file
+def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, thresh=1e-6):
+    resultfile = os.path.join(resultdir,  'result_log.txt')
+    file = open(resultfile,'w')
+    result = []
     for i in range(len(gen_weights)):
        if i==0:
-         results.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh)) # For the first time when sorted data is not saved we can make use opposite flags
+         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh)) # For the first time when sorted data is not saved we can make use opposite flags
        else:
-         results.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh))
-       file.write("{}\t{}\t{}\n".format(results[i][0], results[i][1], results[i][2]))
+         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh))
+       file.write("{}\t{}\t{}\n".format(result[i][0], result[i][1], result[i][2]))
     #print all results together at end                                                                               
     for i in range(len(gen_weights)):                                                                                            
        print ('The results for ......',gen_weights[i])
-       print (" The result for {} = {:.4f} , {:.4f}, {:.4f}".format(i, results[i][0], results[i][1], results[i][2]))
+       print (" The result for {} = {:.4f} , {:.4f}, {:.4f}".format(i, result[i][0], result[i][1], result[i][2]))
     file.close
     print ('The results are saved to {}.txt'.format(resultfile))
-    return results
+    return result
 
-def PlotResults(results, metric, resultplot, fig):
-    total=[]
-    pos_e=[]
-    energy_e=[]
-    mine = 100
-    minp = 100
-    mint = 100
-    num = 0
-    for item in results:
-        total.append(item[0])
-        if item[0]< mint:
-           mint = item[0]
-           mint_n = num
-        pos_e.append(item[1])
-        if item[1]< minp:
-           minp = item[1]
-           minp_n = num
-        energy_e.append(item[2])
-        if item[2]< mine:
-           mine = item[2]
-           mine_n = num
-        num = num + 1
-
-    plt.figure(fig)
-    plt.plot(total, label = 'Total')
-    plt.plot(pos_e, label = 'Pos error (Moments)')
-    plt.plot(energy_e , label = 'Energy profile error')
-    plt.legend(title='Min total error{:.4f}({})\nPosition error {:.4f}({})\nEnergy error {:.4}({})'.format(mint, mint_n, minp, minp_n, mine, mine_n))
-    plt.xticks(np.arange(0, len(total), 5))
-    #plt.ylim(0, 1.0)
-    plt.savefig(resultplot)
-    print ('The plots are saved to {}.'.format(resultplot))
+# If reduced data is to be used in analyse function the line:
+#   var = ang.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
+# has to be replaced with:
+#   var = ang.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, Data= GetAngleData_reduced, thresh=thresh)
 
 def GetAngleData_reduced(datafile, thresh=1e-6):
     #get data for training
@@ -218,12 +158,11 @@ def GetAngleData_reduced(datafile, thresh=1e-6):
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, eta, ecal
                               
-
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
 def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, particle="Ele", thresh=1e-6):
    print ("Started")
    num_events=2000
-   num_data = 10000
+   num_data = 140000
    ascale = 1
    Test = True
    latent= 256
@@ -238,7 +177,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      sort_time = time.time()- start
      print ("Events were loaded in {} seconds".format(sort_time))
    else:
-     Trainfiles, Testfiles = ang.DivideFiles(datapath, nEvents=num_data, datasetnames=["ECAL"], Particles =["Ele"])
+     Trainfiles, Testfiles = ang.DivideFiles(datapath, nEvents=num_data, EventsperFile = 5000, Fractions=[.9,.1], datasetnames=["ECAL"], Particles =[particle])
      if Test:
        data_files = Testfiles
      else:
@@ -261,7 +200,6 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    start = time.time()
    for energy in energies:
      var["events_gan" + str(energy)] = ang.generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, var["angle" + str(energy)] * ascale, latent )
-     print (var["events_gan" + str(energy)].shape)
      var["events_gan" + str(energy)] = var["events_gan" + str(energy)]/xscale
    gen_time = time.time() - start
    print ("{} events were generated in {} seconds".format(total, gen_time))
@@ -279,7 +217,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      calc["momentX_gan" + str(energy)], calc["momentY_gan" + str(energy)], calc["momentZ_gan" + str(energy)] = ang.get_moments(calc["sumsx_gan"+ str(energy)], calc["sumsy_gan"+ str(energy)], calc["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m, x=x, y=y, z=z)
    return optimizer(calc, energies, m, x, y, z)                                        
  
-def metric4(var, energies, m, x=25, y=25, z=25):
+def metric(var, energies, m, x=25, y=25, z=25):
    metricp = 0
    metrice = 0
    for energy in energies:
@@ -315,11 +253,7 @@ def metric4(var, energies, m, x=25, y=25, z=25):
    metricp = metricp/len(energies)
    metrice = metrice/len(energies)    
    tot = metricp + metrice
-   #print('Energy\t\tEvents\t\tPosition Error\tEnergy Error')
-   """
-   for energy in energies:
-     print ("%d \t\t%d \t\t%f \t\t%f" %(energy, var["index" +str(energy)], var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
-   """
+   
    print(" Total Position Error = %.4f\t Total Energy Profile Error =   %.4f" %(metricp, metrice))
    print(" Total Error =  %.4f" %(tot))
    return(tot, metricp, metrice)
