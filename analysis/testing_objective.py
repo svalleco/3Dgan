@@ -38,15 +38,16 @@ from keras.utils.generic_utils import Progbar
 #K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
-from EcalCondGanAngle_3d import generator
+from EcalCondGanAngle_3d_1loss import generator
 import setGPU
 import GANutilsANG_concat as ang
+import ROOT
 
 def main():
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5"
-    genpath = "3d_angleweights/params_generator*.hdf5"
+    genpath = "3d_angleweights_1loss/params_generator*.hdf5"
     sorted_path = 'Anglesorted'
-    filename = 'angle_optimization'
+    filename = 'angle_optimization/'
     particle = "Ele"
     scale = 2
     threshold = 1e-4
@@ -55,55 +56,103 @@ def main():
     disc_weights=[]
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    gen_weights=gen_weights[:30]
+    #gen_weights=gen_weights[:2]
     print(gen_weights)
     metrics = []
     metric = 4
     metrics.append(metric)
     fig=1
-    resultfile = filename + '_' + str(metric) + 'result.txt'
-    resultplot = filename + '_' + str(metric) + 'result.pdf'
+    resultfile = filename + 'result' + '_' + str(metric)
+    resultplot = filename + 'result' + '_' + str(metric) 
     results2 = GetResults(metric, resultfile, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold)
-    PlotResults(results2, metric, resultplot, fig)
+    PlotResultsRoot(results2, metric, resultplot, fig)
    
-def PlotResultsAll(results, metrics, resultplotall, fig):
-    plt.figure(fig)
-    plt.ylim(0, 1.0)
-
-    for result, metric in zip(results, metrics):
-      total=[]
-      pos_e=[]
-      energy_e=[]
-      mine = 100
-      minp = 100
-      mint = 100
-      num = 0
-      for item in result:
-        total.append(item[0])
-        if item[0]< mint:
-           mint = item[0]
-           mint_n = num
-        pos_e.append(item[1])
-        if item[1]< minp:
-           minp = item[1]
-           minp_n = num
-        energy_e.append(item[2])
-        if item[2]< mine:
-           mine = item[2]
-           mine_n = num
-        num = num + 1
+def PlotResultsRoot(result, metric, resultplotall, fig):
+    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
+    c1.SetGrid ()
+    legend = ROOT.TLegend(.6, .6, .9, .9)
+    mg=ROOT.TMultiGraph()
+    graphs = []
+    color1 = 2
+    color2 = 8
+    color3 = 4
+    num = len(result)
+    print(num)
+    total = np.zeros((num))
+    energy_e = np.zeros((num))
+    pos_e = np.zeros((num))
+    epoch = np.zeros((num))
       
-      plt.xticks(np.arange(0, len(total), 5))
-      plt.plot(total, label = 'metric' + str(metric) + 'Tot min{:.4f}({})'.format(mint, mint_n))
-      plt.plot(pos_e, label = 'metric' + str(metric) + 'Pos min{:.4f}({})'.format(minp, minp_n))
-      plt.plot(energy_e , label = 'metric' + str(metric) + 'E min{:.4f}({})'.format(mine, mine_n))
-      plt.legend()
-    plt.savefig(resultplotall)
-    print ('The plot is saved to {}.'.format(resultplotall))
+    mine = 100
+    minp = 100
+    mint = 100
+    for i, item in enumerate(result):
+      epoch[i] = i  
+      total[i]=item[0]
+      if item[0]< mint:
+         mint = item[0]
+         mint_n = i
+      pos_e[i]=item[1]
+      if item[1]< minp:
+         minp = item[1]
+         minp_n = i
+      energy_e[i]=item[2]
+      if item[2]< mine:
+         mine = item[2]
+         mine_n = i
+    gt  = ROOT.TGraph( num , epoch, total )
+    gt.SetLineColor(color1)
+    mg.Add(gt)
+    legend.AddEntry(gt, "Total error", "l")
+    ge = ROOT.TGraph( num , epoch, energy_e )
+    ge.SetLineColor(color2)
+    legend.AddEntry(ge, "Energy error", "l")
+    mg.Add(ge)
+    gp = ROOT.TGraph( num , epoch, pos_e)
+    gp.SetLineColor(color3)
+    mg.Add(gp)
+    legend.AddEntry(gp, "Position error", "l")
+    c1.Update()
+    mg.SetTitle("Optimization function: Mean Relative Error on position and energy;Epochs;Error")
+    mg.Draw('ALP')
+    c1.Update()
+    legend.Draw()
+    c1.Update()
+    c1.Print(resultplotall + ".pdf")
+      
+    gt.Fit("pol1")
+    gt.GetFunction("pol1").SetLineColor(color1)
+    gt.GetFunction("pol1").SetLineStyle(2)
+
+    ge.Fit("pol1")
+    ge.GetFunction("pol1").SetLineColor(color2)
+    ge.GetFunction("pol1").SetLineStyle(2)
+        
+    gp.Fit("pol1")
+    gp.GetFunction("pol1").SetLineColor(color3)
+    gp.GetFunction("pol1").SetLineStyle(2)
+        
+    c1.Update()
+    c1.Print(resultplotall + "Linfit.pdf")
+    gt.Fit("pol2")
+    gt.GetFunction("pol2").SetLineColor(color1)
+    gt.GetFunction("pol2").SetLineStyle(2)
+        
+    ge.Fit("pol2")
+    ge.GetFunction("pol2").SetLineColor(color2)
+    ge.GetFunction("pol2").SetLineStyle(2)
+        
+    gp.Fit("pol2")
+    gp.GetFunction("pol2").SetLineColor(color3)
+    gp.GetFunction("pol2").SetLineStyle(2)
+        
+    c1.Update()
+    c1.Print(resultplotall + "pol2fit.pdf")
+    print ('The plot is saved to {}'.format(resultplotall))
 
 def GetResults(num, resultfile, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, thresh=1e-6):
     results= []
-    file = open(resultfile,'w')
+    file = open(resultfile + 'result.txt','w')
     if num==3:
         metric = metric3
     elif num==4: 
@@ -119,7 +168,7 @@ def GetResults(num, resultfile, gen_weights, g, datapath, sorted_path, particle=
        print ('The results for ......',gen_weights[i])
        print (" The result for {} = {:.4f} , {:.4f}, {:.4f}".format(i, results[i][0], results[i][1], results[i][2]))
     file.close
-    print ('The results are saved to {}.'.format(resultfile))
+    print ('The results are saved to {}.txt'.format(resultfile))
     return results
 
 def PlotResults(results, metric, resultplot, fig):
@@ -217,6 +266,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    gen_time = time.time() - start
    print ("{} events were generated in {} seconds".format(total, gen_time))
    calc={}
+   print("Weights are loaded in {}".format(gen_weights))
    for energy in energies:
      x = var["events_act" + str(energy)].shape[1]
      y = var["events_act" + str(energy)].shape[2]
