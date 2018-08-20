@@ -40,19 +40,20 @@ from sklearn.cross_validation import train_test_split
 K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
-from ecalvegan import generator
+from EcalEnergyGan_5layer import generator
 import setGPU
+from GANutils import get_sorted
 
 def main():
 #    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
 #    genpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_generator*.hdf5"
 #    discpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_discriminator*.hdf5"
     datapath = "/bigdata/shared/LCD/NewV1/*scan/*.h5"
-    genpath = "/nfshome/gkhattak/keras/pionweights2/params_generator*.hdf5"
-    sorted_path = 'Pionsorted_*.hdf5'
-    filename = 'pions2p1p2scale500'
-    particle = "Pi0"
-    scale = 500
+    genpath = "/nfshome/gkhattak/keras/veganweights2/params_generator*.hdf5"
+    sorted_path = 'Elesorted_*.hdf5'
+    filename = 'Ele_5layer'
+    particle = "Ele"
+    scale = 100
     g= generator()
     gen_weights=[]
     disc_weights=[]
@@ -329,15 +330,16 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      else:
         data_files = Trainfiles + Testfiles
      start = time.time()
-     for index, dfile in enumerate(data_files):
-        data = get_data(dfile)
-        sorted_data = sort(data, energies, num_events)
-        data = None
-        if index==0:
-          var.update(sorted_data)
-        else:
-          for key in var:
-            var[key]= np.append(var[key], sorted_data[key], axis=0)
+     #for index, dfile in enumerate(data_files):
+     #   data = get_data(dfile)
+     #   sorted_data = sort(data, energies, num_events)
+     #   data = None
+     #   if index==0:
+     #     var.update(sorted_data)
+     #   else:
+     #     for key in var:
+     #       var[key]= np.append(var[key], sorted_data[key], axis=0)
+     var = get_sorted(data_files, energies)
      data_time = time.time() - start
      print ("{} events were loaded in {} seconds".format(num_data, data_time))
      if save_data:
