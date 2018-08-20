@@ -12,28 +12,19 @@ import setGPU
 
 def main():
    #Architectures 
-   from EcalEnergyGan2 import generator, discriminator
-   gen_weights1 = 'generator_1gpu_042.hdf5'# 1 gpu  
-   gen_weights2 = 'generator_2gpu_023.hdf5'# 2 gpu                                                            
-   gen_weights3 = '4gpu_gen.hdf5'          # 4 gpu                                                            
-   gen_weights4 = 'generator_8gpu_005.hdf5'# 8 gpu                                                            
-   gen_weights5 = 'generator_16gpu_002.hdf5'# 16 gpu          
-
-   disc_weights1 = 'discriminator_1gpu_042.hdf5'# 1 gpu      
-   disc_weights2 = 'discriminator_2gpu_023.hdf5'# 2 gpu                                                           
-   disc_weights3 = '4gpu_disc.hdf5'             # 4 gpu                                                           
-   disc_weights4 = 'discriminator_8gpu_005.hdf5'# 8 gpu                                                   
-   disc_weights5 = 'discriminator_16gpu_002.hdf5'# 16 gpu   
+   from EcalEnergyGan import generator, discriminator
    
-   disc_weights="veganweights/params_discriminator_epoch_049.hdf5"
-   gen_weights= "veganweights/params_generator_epoch_049.hdf5"
+   disc_weights="ch_pionweights/params_discriminator_epoch_045.hdf5"
+   gen_weights= "ch_pionweights/params_generator_epoch_045.hdf5"
 
-   plots_dir = "16filter_ep50/"
-   latent = 1024
-   num_data = 100000
-   num_events = 2000
+   plots_dir = "ch_pion_s500_ep46_2p1p1_full/"
+   latent = 200
+   num_data = 150000
+   num_events = 3000
    m = 3
+   thresh=1e-6
    energies=[0, 50, 100, 200, 250, 300, 400, 500]
+   particle = 'ChPi'
 
    datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path                                         
    #datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
@@ -51,10 +42,10 @@ def main():
    flags =[Test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    dweights = [disc_weights]
    gweights = [gen_weights]
-   scales = [100]
+   scales = [500]
    d = discriminator()
    g = generator(latent)
-   var= perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data, num_events, m, scales, flags, latent)
+   var= perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data, num_events, m, scales, flags, latent, thresh, particle=particle)
    get_plots(var, plots_dir, energies, m, len(gweights))
 
 def BinLogX(h):
@@ -97,8 +88,8 @@ def fill_profile(prof, x, y):
 
 def plot_ecal_ratio_profile(ecal1, ecal2, y, out_file):
    c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
-   Eprof = ROOT.TProfile("Eprof", "Ratio of Ecal and Ep;Ep;Ecal/Ep", 100, 0, 520)
-   Gprof = ROOT.TProfile("Gprof", "Gprof", 100, 0, 520)
+   Eprof = ROOT.TProfile("Eprof", "Ratio of Ecal and Ep;Ep;Ecal/Ep", 50, 0, 520)
+   Gprof = ROOT.TProfile("Gprof", "Gprof", 50, 0, 520)
    c1.SetGrid()
    
    Eprof.SetStats(kFALSE)
@@ -110,7 +101,7 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, out_file):
    Eprof.SetTitle("Ratio of Ecal and Ep")
    Eprof.GetXaxis().SetTitle("Ep GeV")
    Eprof.GetYaxis().SetTitle("Ecal/Ep")
-   Eprof.GetYaxis().SetRangeUser(0, 0.03)
+   Eprof.GetYaxis().SetRangeUser(0, 0.018)
    Eprof.Draw()
    Eprof.SetLineColor(4)
    Gprof.SetLineColor(2)
@@ -168,7 +159,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file):
    Eprof.SetTitle("Relative Error for Primary Energy")
    Eprof.GetXaxis().SetTitle("Ep GeV")
    Eprof.GetYaxis().SetTitle("Ep - aux/Ep")
-   Eprof.GetYaxis().SetRangeUser(-0.2, 0.2)
+   Eprof.GetYaxis().SetRangeUser(-0.6, 0.6)
    Eprof.Draw()
    Eprof.SetLineColor(4)
    Gprof.SetLineColor(2)
@@ -184,8 +175,8 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file):
 
 def plot_ecal_hist(ecal1, ecal2, out_file, energy):
    c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                                                                                                                 
-   hd = ROOT.TH1F("DATA", "", 100, 0, 12)
-   hg = ROOT.TH1F("GAN", "GAN", 100, 0, 12)
+   hd = ROOT.TH1F("DATA", "", 100, 0, 10)
+   hg = ROOT.TH1F("GAN", "GAN", 100, 0, 10)
    c1.SetGrid()
 
    size = len(ecal2)
@@ -200,7 +191,7 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy):
    #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                                                                                                                            
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -233,7 +224,7 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy):
    #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                                                                                           
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -251,19 +242,19 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy):
    hd = ROOT.TH1F("DATA", "", 50, 0, 3000)
    hg = ROOT.TH1F("GAN", "GAN", 50, 0, 3000)
    c1.SetGrid()
-   thresh = 0.01 # GeV
-   fill_hist(hd, get_hits(event1 * 50, thresh))
-   fill_hist(hg, get_hits(event2 * 50, thresh))
+   thresh = 0.00002 # GeV
+   fill_hist(hd, get_hits(event1, thresh))
+   fill_hist(hg, get_hits(event2, thresh))
    if energy == 0:
       hd.SetTitle("Ecal Hits Histogram (above {} GeV) for Uniform Spectrum".format(thresh))
    else:
       hd.SetTitle("Ecal Hits Histogram (above {} GeV) for {} GeV".format(thresh, energy) )
-   hd.GetXaxis().SetTitle("Ecal GeV")
+   hd.GetXaxis().SetTitle("Ecal Hits above {} GeV".format(thresh))
 
    #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                                                                                                                            
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -278,8 +269,8 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy):
 
 def plot_primary_hist(aux1, aux2, out_file, energy):
    c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                
-   hd = ROOT.TH1F("DATA", "", 100, 0, 600)
-   hg = ROOT.TH1F("GAN", "GAN", 100, 0, 600)
+   hd = ROOT.TH1F("DATA", "", 50, 0, 600)
+   hg = ROOT.TH1F("GAN", "GAN", 50, 0, 600)
    c1.SetGrid()
 
    fill_hist(hd, aux1)
@@ -293,7 +284,7 @@ def plot_primary_hist(aux1, aux2, out_file, energy):
    #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                           
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -308,8 +299,8 @@ def plot_primary_hist(aux1, aux2, out_file, energy):
 
 def plot_primary_error_hist(aux1, aux2, y, out_file, energy):
    c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                
-   hd = ROOT.TH1F("DATA", "", 100, -0.2, 0.2)
-   hg = ROOT.TH1F("GAN", "GAN", 100, -0.2, 0.2)
+   hd = ROOT.TH1F("DATA", "", 50, -0.5, 0.5)
+   hg = ROOT.TH1F("GAN", "GAN", 50, -0.5, 0.5)
    c1.SetGrid()
 
    fill_hist(hd, (y - aux1*100)/y)
@@ -323,7 +314,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy):
    #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                           
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -352,7 +343,7 @@ def plot_realfake_hist(array1, array2, out_file, energy):
 
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -372,9 +363,9 @@ def plot_max(array1, array2, out_file1, out_file2, out_file3, energy, log=0):
    h1x = ROOT.TH1F('Datax' + str(energy), '', 25, 0, 25)
    h1y = ROOT.TH1F('Datay' + str(energy), '', 25, 0, 25)
    h1z = ROOT.TH1F('Dataz' + str(energy), '', 25, 0, 25)
-   h1x.SetLineColor(9)
-   h1y.SetLineColor(9)
-   h1z.SetLineColor(9)
+   h1x.SetLineColor(4)
+   h1y.SetLineColor(4)
+   h1z.SetLineColor(4)
    c1.cd(1)
    if log:
       gPad.SetLogy()
@@ -397,9 +388,9 @@ def plot_max(array1, array2, out_file1, out_file2, out_file3, energy, log=0):
    h2x = ROOT.TH1F('GANx' + str(energy), '', 25, 0, 25)
    h2y = ROOT.TH1F('GANy' + str(energy), '', 25, 0, 25)
    h2z = ROOT.TH1F('GANz' + str(energy), '', 25, 0, 25)
-   h2x.SetLineColor(46)
-   h2y.SetLineColor(46)  
-   h2z.SetLineColor(46)
+   h2x.SetLineColor(2)
+   h2y.SetLineColor(2)  
+   h2z.SetLineColor(2)
    
    c1.cd(1)
    fill_hist(h2x, array2[:,0])
@@ -458,15 +449,15 @@ def plot_energy_hist_root_all(array1z, array2z, array3z, array4z, arrayg1z, arra
    hg3z.Sumw2()
    hg4z.Sumw2()
 
-   h1z.SetLineColor(9)
-   h2z.SetLineColor(9)
-   h3z.SetLineColor(9)
-   h4z.SetLineColor(9)
+   h1z.SetLineColor(4)
+   h2z.SetLineColor(4)
+   h3z.SetLineColor(4)
+   h4z.SetLineColor(4)
    
-   hg1z.SetLineColor(46)
-   hg2z.SetLineColor(46)
-   hg3z.SetLineColor(46)
-   hg4z.SetLineColor(46)
+   hg1z.SetLineColor(2)
+   hg2z.SetLineColor(2)
+   hg3z.SetLineColor(2)
+   hg4z.SetLineColor(2)
 
    h1z.SetStats(kFALSE)
    h2z.SetStats(kFALSE)
@@ -551,9 +542,9 @@ def plot_energy_hist_root2(array1x, array1y, array1z, array2x, array2y, array2z,
    h1x.Sumw2()
    h1y.Sumw2()
    h1z.Sumw2()
-   h1x.SetLineColor(9)
-   h1y.SetLineColor(9)
-   h1z.SetLineColor(9)
+   h1x.SetLineColor(4)
+   h1y.SetLineColor(4)
+   h1z.SetLineColor(4)
    h1x.SetStats(kFALSE)
    h1y.SetStats(kFALSE)
    h1z.SetStats(kFALSE)
@@ -572,9 +563,9 @@ def plot_energy_hist_root2(array1x, array1y, array1z, array2x, array2y, array2z,
    h2x = ROOT.TH1F('GANx' + str(energy), '', 25, 0, 25)
    h2y = ROOT.TH1F('GANy' + str(energy), '', 25, 0, 25)
    h2z = ROOT.TH1F('GANz' + str(energy), '', 25, 0, 25)
-   h2x.SetLineColor(46)
-   h2y.SetLineColor(46)
-   h2z.SetLineColor(46)
+   h2x.SetLineColor(2)
+   h2y.SetLineColor(2)
+   h2z.SetLineColor(2)
    h2x.SetStats(kFALSE)
    h2y.SetStats(kFALSE)
    h2z.SetStats(kFALSE)
@@ -610,9 +601,9 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1x.Sumw2()
    h1y.Sumw2()
    h1z.Sumw2()
-   h1x.SetLineColor(9)
-   h1y.SetLineColor(9)
-   h1z.SetLineColor(9)
+   h1x.SetLineColor(4)
+   h1y.SetLineColor(4)
+   h1z.SetLineColor(4)
    
    canvas.cd(1)
    if log:
@@ -636,9 +627,9 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h2x = ROOT.TH1F('GANx' + str(energy), '', 25, 0, 25)
    h2y = ROOT.TH1F('GANy' + str(energy), '', 25, 0, 25)
    h2z = ROOT.TH1F('GANz' + str(energy), '', 25, 0, 25)
-   h2x.SetLineColor(46)
-   h2y.SetLineColor(46)
-   h2z.SetLineColor(46)
+   h2x.SetLineColor(2)
+   h2y.SetLineColor(2)
+   h2z.SetLineColor(2)
    canvas.cd(1)
    fill_hist_wt(h2x, array2x)
    h2x.Draw()
@@ -732,7 +723,7 @@ def plot_moment(array1, array2, out_file, dim, energy, moment):
    #Eprof.GetYaxis().SetRangeUser(0, 2)                                                                           
    hd.Draw()
    hd.SetLineColor(4)
-   hd.SetLineColor(2)
+   hg.SetLineColor(2)
    hg.Draw('sames')
    c1.Update()
    stat_pos(hg)
@@ -777,15 +768,15 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=400000, EventsperFile = 1
             SampleI[i]=EndI
     return out
 
-def get_data(datafile):
+def get_data(datafile, threshold=1e-6):
     #get data for training                                                                                                                                                                      
     print 'Loading Data from .....', datafile
     f=h5py.File(datafile,'r')
     y=f.get('target')
     x=np.array(f.get('ECAL'))
     y=(np.array(y[:,1]))
-    x[x < 1e-6] = 0
-    x = np.expand_dims(x, axis=1)
+    x[x < threshold] = 0
+    x = np.expand_dims(x, axis=-1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
     return x, y
@@ -794,11 +785,14 @@ def sort(data, energies, flag=False, num_events=2000):
     X = data[0]
     Y = data[1]
     tolerance = 5
+    indexes = np.where(np.sum(X, axis=(1, 2, 3, 4)) >0)
+    X = X[indexes]
+    Y = Y[indexes]
     srt = {}
     for energy in energies:
        if energy == 0 and flag:
-          srt["events_act" + str(energy)] = X[:2000]
-          srt["energy" + str(energy)] = Y[:2000]
+          srt["events_act" + str(energy)] = X[:10000]
+          srt["energy" + str(energy)] = Y[:10000]
           print srt["events_act" + str(energy)].shape
        else:
           indexes = np.where((Y > energy - tolerance ) & ( Y < energy + tolerance))
@@ -875,6 +869,7 @@ def generate(g, index, sampled_labels, latent=200):
     sampled_labels=np.expand_dims(sampled_labels, axis=1)
     gen_in = sampled_labels * noise
     generated_images = g.predict(gen_in, verbose=False, batch_size=50)
+    #generated_images[generated_images < 1e-1] = 0
     return generated_images
 
 def discriminate(d, images):
@@ -892,8 +887,8 @@ def get_max(images):
 
 def get_sums(images):
     sumsx = np.squeeze(np.sum(images, axis=(2,3)))
-    sumsy = np.squeeze(np.sum(images, axis=(3,4)))
-    sumsz = np.squeeze(np.sum(images, axis=(2,4)))
+    sumsy = np.squeeze(np.sum(images, axis=(1,3)))
+    sumsz = np.squeeze(np.sum(images, axis=(1,2)))
     return sumsx, sumsy, sumsz
 
 def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
@@ -936,7 +931,7 @@ def safe_mkdir(path):
         if exception.errno != EEXIST:
             raise exception
 
-def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, flags, latent, events_per_file=10000):
+def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, flags, latent, events_per_file=10000, thresh=1e-6, particle='Pi0'):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     Test = flags[0]
     save_data = flags[1]  
@@ -954,9 +949,9 @@ def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, 
        print "Events were loaded in {} seconds".format(sort_time)
     else:
        # Getting Data
-       events_per_file = 10000
+       events_per_file = 2000
        Filesused = int(math.ceil(num_data/events_per_file))
-       Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =["Ele"])
+       Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], EventsperFile = events_per_file, Particles =[particle])
        Trainfiles = Trainfiles[: Filesused]
        Testfiles = Testfiles[: Filesused]
        print Trainfiles
@@ -967,11 +962,14 @@ def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, 
           data_files = Trainfiles 
        start = time.time()
        for index, dfile in enumerate(data_files):
-          data = get_data(dfile)
+          data = get_data(dfile, thresh)
           if index==0:
              var = sort(data, energies, True, num_events)
           else:
-             sorted_data = sort(data, energies, False, num_events)
+             if var["events_act0"].shape[0] > 10000:
+                sorted_data = sort(data, energies, False, num_events)
+             else:
+                sorted_data = sort(data, energies, True, num_events)
              for key in var:
                 var[key]= np.append(var[key], sorted_data[key], axis=0)
        data = None
@@ -986,7 +984,7 @@ def perform_calculations(g, d, gweights, dweights, energies, datapath, sortdir, 
       total += var["index" + str(energy)]
       var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)])
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
-      var["ecal_act"+ str(energy)]= np.sum(var["events_act" + str(energy)], axis=(2, 3, 4))
+      var["ecal_act"+ str(energy)]= np.sum(var["events_act" + str(energy)], axis=(1, 2, 3))
       var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["events_act" + str(energy)], var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
       
     data_time = time.time() - start
@@ -1087,7 +1085,7 @@ def get_plots(var, plots_dir, energies, m, n):
          plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var['n_' + str(i)]["sumsx_gan"+ str(energy)], var['n_' + str(i)]["sumsy_gan"+ str(energy)], var['n_' + str(i)]["sumsz_gan"+ str(energy)], os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), os.path.join(alldir, "histl_" + str(energy) ), i, energy, log=1)
          plot_ecal_hist(var["ecal_act" + str(energy)], var['n_' + str(i)]["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy)
          plot_ecal_flatten_hist(var["events_act" + str(energy)], var['n_' + str(i)]["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy)
-        # plot_ecal_hits_hist(var["events_act" + str(energy)], var['n_' + str(i)]["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy)
+         plot_ecal_hits_hist(var["events_act" + str(energy)], var['n_' + str(i)]["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy)
          plot_primary_hist(var['n_' + str(i)]["aux_act" + str(energy)] * 100, var['n_' + str(i)]["aux_gan" + str(energy)] * 100, os.path.join(discdir, energyfile), energy)
          plot_realfake_hist(var['n_' + str(i)]["isreal_act" + str(energy)], var['n_' + str(i)]["isreal_gan" + str(energy)], os.path.join(discdir, realfile), energy)
          plot_primary_error_hist(var['n_' + str(i)]["aux_act" + str(energy)], var['n_' + str(i)]["aux_gan" + str(energy)], var["energy" + str(energy)], os.path.join(discdir, 'error_' + energyfile), energy)
