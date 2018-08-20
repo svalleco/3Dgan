@@ -68,22 +68,22 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     #get data for training                                                                                                                             
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    ang = np.array(f.get('theta'))
+    ang = np.array(f.get('eta'))
     X=np.array(f.get('ECAL'))* xscale
     Y=np.array(f.get('energy'))/yscale
     X[X < thresh] = 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    ang = AngProc(ang, -1.0, angscale)
+    ang = AngProc(ang, 0.6, angscale)
     ang = ang.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
     indexes = np.where(ecal>(10.0/xscale))
-    X =X[indexes]
+    X = X[indexes]
     Y = Y[indexes]
     ang = ang[indexes]
     ecal = ecal[indexes]
     X = np.expand_dims(X, axis=-1)
-    ecal =np.expand_dims(ecal, axis=-1)
+    ecal = np.expand_dims(ecal, axis=-1)
     return X, Y, ang, ecal
 
 def AngProc(angle, f1=0.0, f2=1.0):
@@ -157,7 +157,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
  
     print(Trainfiles)
     print(Testfiles)
-    numTest = nEvents * f[1]
+    numTest = nEvents * f[1]   
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
@@ -213,7 +213,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             used_data = file_index * batch_size
             if (loaded_data - used_data) < batch_size + 1 and (nb_file < len(Trainfiles)):
                 X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(Trainfiles[nb_file], xscale=xscale, angscale=angscale, thresh=1e-4)
-                #print("\nData file loaded..........",Trainfiles[nb_file])
+                print("\nData file loaded..........",Trainfiles[nb_file])
                 nb_file+=1
                 X_left = X_train[(file_index * batch_size):]
                 Y_left = Y_train[(file_index * batch_size):]
@@ -224,7 +224,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
                 ang_train = np.concatenate((ang_left, ang_temp))
                 ecal_train = np.concatenate((ecal_left, ecal_temp))
                 nb_batches = int(X_train.shape[0] / batch_size)                
-                #print("{} batches loaded..........".format(nb_batches))
+                print("{} batches loaded..........".format(nb_batches))
                 file_index = 0
 
             image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
@@ -320,11 +320,11 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
                                overwrite=True)
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
-        
+
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-theta.pkl', 'wb'))
+    open('dcgan-history-eta.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -376,7 +376,7 @@ if __name__ == '__main__':
     #fitmod = params.mod
     fitmod = 3
     #weightdir = params.weightsdir
-    weightdir = 'thetaweights'
+    weightdir = 'etaweights'
     #xscale = params.xscale
     xscale = 2
     print(params)
