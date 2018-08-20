@@ -302,10 +302,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         train_history['discriminator'].append(discriminator_train_loss)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s} | {5:5s}'.format(
+        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s} | {5:5s}| {6:5s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
-        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f} | {5:<5.2f}'
+        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f} | {5:<5.2f}| {6:<5.2f}'
         print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',
@@ -324,7 +324,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds".format(epoch, epoch_time))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-angle_reducedFit.pkl', 'wb'))
+    open('dcgan-history-angle_reducedFit2.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -358,7 +358,7 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     #Architectures to import
-    from EcalCondGan_reducedFit import generator, discriminator
+    from EcalCondGan_reducedFit2 import generator, discriminator
 
      #Values to be set by user
     parser = get_parser()
@@ -376,7 +376,7 @@ if __name__ == '__main__':
     #fitmod = params.mod
     fitmod = 4
     #weightdir = params.weightsdir
-    weightdir = 'angleweights_reducedfit'
+    weightdir = 'angleweights_reducedfit2'
     #xscale = params.xscale
     xscale = 2
     print(params)
