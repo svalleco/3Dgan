@@ -40,27 +40,26 @@ from sklearn.cross_validation import train_test_split
 K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
-from EcalEnergyGan_5layer import generator
+from ecalvegan import generator
 import setGPU
-from GANutils import get_sorted
 
 def main():
 #    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
 #    genpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_generator*.hdf5"
 #    discpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_discriminator*.hdf5"
     datapath = "/bigdata/shared/LCD/NewV1/*scan/*.h5"
-    genpath = "/nfshome/gkhattak/keras/veganweights2/params_generator*.hdf5"
-    sorted_path = 'Elesorted_*.hdf5'
-    filename = 'Ele_5layer'
-    particle = "Ele"
-    scale = 100
+    genpath = "/nfshome/gkhattak/keras/ch_pionweights/params_generator*.hdf5"
+    sorted_path = 'ChPionsorted_*.hdf5'
+    filename = 'chpions2p1p2scale500'
+    particle = "ChPi"
+    scale = 500
     g= generator()
     gen_weights=[]
     disc_weights=[]
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    #gen_weights=gen_weights[:30]
-    print(gen_weights)
+    gen_weights=gen_weights[:50]
+    #print(gen_weights)
     metrics = []
     metric = 3
     """
@@ -278,28 +277,35 @@ def get_sums(images):
 def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
     ecal_size = 25
     totalE = np.squeeze(totalE)
+    
     index = images.shape[0]
     momentX = np.zeros((index, m))
     momentY = np.zeros((index, m))
     momentZ = np.zeros((index, m))
+   
     ECAL_midX = np.zeros(index)
     ECAL_midY = np.zeros(index)
     ECAL_midZ = np.zeros(index)
+    indexes = np.where(totalE>0)
+
     for i in range(m):
       relativeIndices = np.tile(np.arange(ecal_size), (index,1))
       moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
-      ECAL_momentX = umath.inner1d(sumsx, moments) /totalE
+      ECAL_momentX = momentX[:,i]
+      ECAL_momentX[indexes] = umath.inner1d(sumsx[indexes], moments[indexes]) /totalE[indexes]
       if i==0: ECAL_midX = ECAL_momentX.transpose()
       momentX[:,i] = ECAL_momentX
     for i in range(m):
       relativeIndices = np.tile(np.arange(ecal_size), (index,1))
       moments = np.power((relativeIndices.transpose()-ECAL_midY).transpose(), i+1)
-      ECAL_momentY = umath.inner1d(sumsy, moments) /totalE
+      ECAL_momentY = momentY[:,i]
+      ECAL_momentY[indexes] = umath.inner1d(sumsy[indexes], moments[indexes]) /totalE[indexes]
       if i==0: ECAL_midY = ECAL_momentY.transpose()
       momentY[:,i]= ECAL_momentY
     for i in range(m):
       moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
-      ECAL_momentZ = umath.inner1d(sumsz, moments)/totalE
+      ECAL_momentZ = momentZ[:,i]
+      ECAL_momentZ[indexes] = umath.inner1d(sumsz[indexes], moments[indexes])/totalE[indexes]
       if i==0: ECAL_midZ = ECAL_momentZ.transpose()
       momentZ[:,i]= ECAL_momentZ
     return momentX, momentY, momentZ
@@ -322,24 +328,23 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      print ("Events were loaded in {} seconds".format(sort_time))
    else:
      # Getting Data
-     events_per_file = 10000
+     events_per_file = 2000
      energies = [50, 100, 200, 250, 300, 400, 500]
-     Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Pi0"]) 
+     Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =[particle]) 
      if Test:
         data_files = Testfiles
      else:
         data_files = Trainfiles + Testfiles
      start = time.time()
-     #for index, dfile in enumerate(data_files):
-     #   data = get_data(dfile)
-     #   sorted_data = sort(data, energies, num_events)
-     #   data = None
-     #   if index==0:
-     #     var.update(sorted_data)
-     #   else:
-     #     for key in var:
-     #       var[key]= np.append(var[key], sorted_data[key], axis=0)
-     var = get_sorted(data_files, energies)
+     for index, dfile in enumerate(data_files):
+        data = get_data(dfile)
+        sorted_data = sort(data, energies, num_events)
+        data = None
+        if index==0:
+          var.update(sorted_data)
+        else:
+          for key in var:
+            var[key]= np.append(var[key], sorted_data[key], axis=0)
      data_time = time.time() - start
      print ("{} events were loaded in {} seconds".format(num_data, data_time))
      if save_data:
@@ -381,9 +386,16 @@ def metric4(var, energies, m):
      y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
      z_act= np.mean(var["momentZ_act"+ str(energy)], axis=0)
      z_gan= np.mean(var["momentZ_gan"+ str(energy)], axis=0)
-     var["posx_error"+ str(energy)]= (x_act - x_gan)/x_act
-     var["posy_error"+ str(energy)]= (y_act - y_gan)/y_act
-     var["posz_error"+ str(energy)]= (z_act - z_gan)/z_act
+     indexes = np.where(x_act > 0)
+     print(len(x_act))
+     var["posx_error"+ str(energy)]= np.zeros_like(x_act)
+     var["posy_error"+ str(energy)]= np.zeros_like(y_act)
+     var["posz_error"+ str(energy)]= np.zeros_like(z_act)
+     var["posx_error"+ str(energy)][indexes]= (x_act[indexes] - x_gan[indexes])/x_act[indexes]
+     indexes = np.where(y_act > 0)
+     var["posy_error"+ str(energy)][indexes]= (y_act[indexes] - y_gan[indexes])/y_act[indexes]
+     indexes = np.where(z_act > 0)
+     var["posz_error"+ str(energy)][indexes]= (z_act - z_gan)[indexes]/z_act[indexes]
      #Taking absolute of errors and adding for each axis then scaling by 3
      var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
      #Summing over moments and dividing for number of moments
