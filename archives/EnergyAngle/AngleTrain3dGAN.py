@@ -74,14 +74,14 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     X[X < thresh] = 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    ang = AngProc(ang, 0.0, angscale)
+    ang = AngProc(ang, -1.0, angscale)
     ang = ang.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
-    #indexes = np.where(ecal>(10.0/xscale))
-    #X =X[indexes]
-    #Y = Y[indexes]
-    #ang = ang[indexes]
-    #ecal = ecal[indexes]
+    indexes = np.where(ecal>(10.0/xscale))
+    X =X[indexes]
+    Y = Y[indexes]
+    ang = ang[indexes]
+    ecal = ecal[indexes]
     X = np.expand_dims(X, axis=-1)
     ecal =np.expand_dims(ecal, axis=-1)
     return X, Y, ang, ecal
@@ -136,7 +136,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     )
  
     # build combined Model
-    latent = Input(shape=(latent_size, ), name='combined_z')   
+    latent = Input(shape=(2, latent_size, ), name='combined_z')   
     fake_image = generator( latent)
     discriminator.trainable = False
     fake, aux, ang, ecal= discriminator(fake_image)
@@ -157,7 +157,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
  
     print(Trainfiles)
     print(Testfiles)
-    numTest = int(nEvents * f[1])
+    numTest = nEvents * f[1]
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
@@ -232,14 +232,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size] 
             file_index +=1
-            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            noise = np.random.normal(0, 1, (batch_size, 2, latent_size))
             sampled_energies = np.random.uniform(pmin, pmax,( batch_size))
             sampled_ang = np.random.uniform(angmin, angmax, (batch_size))
             #print('sampled ang varies from {} to {} '.format(np.amin(sampled_ang), np.amax(sampled_ang)))
-            generator_ip = np.column_stack((sampled_energies, sampled_ang, noise))
-            #cond = np.expand_dims(cond, axis=2)
-            #generator_ip = np.concatenate(cond, noise, axis=0)
-            #print('generator_ip', generator_ip.shape)
+            cond = np.column_stack((sampled_energies, sampled_ang))
+            cond = np.expand_dims(cond, axis=2)
+            generator_ip = np.multiply(cond, noise)
             #ecal sum from fit
             ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
             #print(sampled_energies[:10])
@@ -254,13 +253,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             trick = np.ones(batch_size)
             gen_losses = []
             for _ in range(2):
-                noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+                noise = np.random.normal(0, 1, (batch_size, 2, latent_size))
                 sampled_energies = np.random.uniform(pmin, pmax, ( batch_size))
                 sampled_ang = np.random.uniform(angmin, angmax, (batch_size))
-                generator_ip = np.column_stack((sampled_energies, sampled_ang, noise))
-                #cond = np.expand_dims(cond, axis=2)
-                #generator_ip = np.expand_dims(generator_ip, axis=2)
-                #generator_ip = np.multiply(cond, noise)
+                cond = np.column_stack((sampled_energies, sampled_ang))
+                cond = np.expand_dims(cond, axis=2)
+
+                generator_ip = np.multiply(cond, noise)
                 ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
@@ -271,34 +270,30 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         print('\nTesting for epoch {}:'.format(epoch))
         test_start = time.time()
-        noise = np.random.normal(0, 1, (nb_test, latent_size-2))
-        sampled_energies = np.random.uniform(pmin , pmax, (nb_test))
+        noise = np.random.normal(0, 1, (nb_test,2, latent_size))
+        sampled_energies = np.random.uniform(pmin, pmax, (nb_test))
         sampled_ang = np.random.uniform(angmin, angmax, (nb_test))
         ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
-        generator_ip = np.column_stack((sampled_energies, sampled_ang, noise))
-        #generator_ip  = np.expand_dims(cond, axis=2)
-        #generator_ip = np.multiply(cond, noise)
+        cond = np.column_stack((sampled_energies, sampled_ang))
+        cond = np.expand_dims(cond, axis=2)
+        generator_ip = np.multiply(cond, noise)
         generated_images = generator.predict(generator_ip, verbose=False)
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
         ang = np.concatenate((ang_test, sampled_ang))
         ecal = np.concatenate((ecal_test, ecal_ip.reshape(-1, 1)))
         aux_y = np.concatenate((Y_test, sampled_energies), axis=0)
-        print (X.shape)
-        print (y.shape)
-        print (aux_y.shape)
-        print (ang.shape)
-        print(ecal.shape)
-        discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal], verbose=False, batch_size=batch_size)
+        discriminator_test_loss = discriminator.evaluate(
+            X, [y, aux_y, ang, ecal], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
-        noise = np.random.normal(0, 1, (2 * nb_test, latent_size - 2))
+        noise = np.random.normal(0, 1, (2 * nb_test, 2, latent_size))
         sampled_energies = np.random.uniform(pmin, pmax, (2 * nb_test))
         sampled_ang = np.random.uniform(angmin, angmax, (2 * nb_test))
         ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
-        generator_ip = np.column_stack((sampled_energies, sampled_ang, noise))
-        #generator_ip = np.expand_dims(cond, axis=2)
-        #generator_ip = np.multiply(cond, noise)
+        cond = np.column_stack((sampled_energies, sampled_ang))
+        cond = np.expand_dims(cond, axis=2)
+        generator_ip = np.multiply(cond, noise)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
                                                 [trick, sampled_energies, sampled_ang, ecal_ip], verbose=False, batch_size=batch_size)
@@ -329,7 +324,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-theta_concat.pkl', 'wb'))
+    open('dcgan-history-theta.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -337,7 +332,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
@@ -363,7 +358,7 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     #Architectures to import
-    from EcalCondGan_concat import generator, discriminator
+    from EcalCondGan6 import generator, discriminator
 
      #Values to be set by user
     parser = get_parser()
@@ -381,7 +376,7 @@ if __name__ == '__main__':
     #fitmod = params.mod
     fitmod = 3
     #weightdir = params.weightsdir
-    weightdir = 'thetaweights_concat'
+    weightdir = 'thetaweights'
     #xscale = params.xscale
     xscale = 2
     print(params)
@@ -390,5 +385,5 @@ if __name__ == '__main__':
 
     d=discriminator()
     g=generator(latent_size)
-    Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=3, aux_weight=0.1, ang_weight=0.1, ecal_weight=0.1, xscale = xscale, angscale=1)
+    Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=3, aux_weight=0.1, ang_weight=0.1, ecal_weight=0.1, xscale = xscale, angscale=10)
     
