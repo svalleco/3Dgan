@@ -76,11 +76,11 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     Y = Y.astype(np.float32)
     #ang = AngProc(ang, 0.0, angscale)
     ang1 = ang1.astype(np.float32)
-    angthresh = math.radians(90)
+    angthresh = math.pi/2
     indexes = np.where(ang1 <= angthresh )
     X =X[indexes]
     Y = Y[indexes]
-    ang1 = ang1[indexes]
+    ang1 = (math.pi/2) - ang1[indexes]
     ang2 = Meas(X)
     X = np.expand_dims(X, axis=-1)
     ecal = np.sum(X, axis=(1, 2, 3))
@@ -126,7 +126,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     start_init = time.time()
     verbose = False
     pmin, pmax = 2/100, 500/100
-    angmin, angmax= 1.0, (2.1) * angscale 
+    angmin, angmax= 0.0, (math.radians(30) * angscale) 
     print(angmin, angmax)
     particle='Ele'
     f = [0.9, 0.1]
@@ -324,7 +324,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-angle-concat-2loss-positive.pkl', 'wb'))
+    open('dcgan-history-angle-concat-2loss-positive2.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -376,7 +376,7 @@ if __name__ == '__main__':
     #fitmod = params.mod
     fitmod = 3
     #weightdir = params.weightsdir
-    weightdir = 'thetaweights_concat_2loss_positive'
+    weightdir = 'thetaweights_concat_2loss_positive2'
     #xscale = params.xscale
     xscale = 2
     print(params)
