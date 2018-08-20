@@ -28,7 +28,7 @@ def BitFlip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
-def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=80000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     
     Files =sorted( glob.glob(FileSearch))
     Filesused = int(math.ceil(nEvents/EventsperFile))
@@ -48,6 +48,7 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 1
         if MaxFiles>0:
             if FileCount>MaxFiles:
                 break
+
     out=[]
     for j in range(len(Fractions)):
         out.append([])
@@ -241,8 +242,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             generated_images = generator.predict(generator_ip, verbose=0)        
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, theta_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, sampled_theta, ecal_ip])
+            #print('Batch = {}'.format(index))
             #print('real batch loss = {}'.format(real_batch_loss))
             #print('fake batch loss = {}'.format(fake_batch_loss))
+            #print('Batch loss = {}'.format((np.array(real_batch_loss) + np.array(fake_batch_loss))/2))
             #discout = discriminator.predict(image_batch)
             #print('Discout = ', len(discout), len(discout[0]))
             #print('theta batch = ', theta_batch[:5])
@@ -331,7 +334,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds".format(epoch, epoch_time))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-angle2.pkl', 'wb'))
+    open('dcgan-history-angle3.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -343,7 +346,7 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='angleweights2', help='Directory to store weights.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='angleweights3', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
@@ -389,7 +392,7 @@ if __name__ == '__main__':
     print(params)
  
     # Building discriminator and generator
-    from EcalCondGanAngle import generator, discriminator
+    from EcalCondGanAngleFit import generator, discriminator
     d=discriminator()
     g=generator(latent_size)
     Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=3, aux_weight=0.1, theta_weight=100, ecal_weight=0.1, xscale = xscale)
