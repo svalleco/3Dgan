@@ -13,11 +13,9 @@ import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
-#import setGPU
+
 import h5py 
 import numpy as np
-import time
-
 def bit_flip(x, prob=0.05):
     """ flips a int array's values with some probability """
     x = np.array(x)
@@ -40,12 +38,12 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    from  arch16 import generator, discriminator 
-    init_start = time.time()
+    from EcalEnergyGan import generator, discriminator 
+
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
 
-    nb_epochs = 30
+    nb_epochs = 50 
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -115,10 +113,14 @@ if __name__ == '__main__':
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
 
     # tensorflow ordering
-    X_train =np.expand_dims(X_train, axis=-1)
-    X_test = np.expand_dims(X_test, axis=-1)
-    y_train= (y_train)/100
-    y_test= (y_test)/100
+    X_train =np.array(np.expand_dims(X_train, axis=-1))
+    X_test = np.array(np.expand_dims(X_test, axis=-1))
+    y_train= np.array(y_train)/100
+    y_test=np.array(y_test)/100
+    print(X_train.shape)
+    print(X_test.shape)
+    print(y_train.shape)
+    print(y_test.shape)
     print('*************************************************************************************')
 
 
@@ -131,14 +133,17 @@ if __name__ == '__main__':
     ecal_train = np.sum(X_train, axis=(1, 2, 3))
     ecal_test = np.sum(X_test, axis=(1, 2, 3))
 
+    print(X_train.shape)
+    print(X_test.shape)
+    print(ecal_train.shape)
+    print(ecal_test.shape)
     print('*************************************************************************************')
     train_history = defaultdict(list)
     test_history = defaultdict(list)
-    init_time = time.time()- init_start
-    print('Initialization time is {} seconds'.format(init_time))
+
     for epoch in range(nb_epochs):
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-        epoch_start = time.time()
+
         nb_batches = int(X_train.shape[0] / batch_size)
         if verbose:
             progress_bar = Progbar(target=nb_batches)
@@ -160,7 +165,7 @@ if __name__ == '__main__':
 
             print(image_batch.shape)
             print(ecal_batch.shape)
-            sampled_energies = np.reshape(energy_batch, (-1, 1))
+            sampled_energies = np.random.uniform(0, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
             ecal_ip = np.multiply(2, sampled_energies)
             generated_images = generator.predict(generator_ip, verbose=0)
@@ -184,9 +189,9 @@ if __name__ == '__main__':
 
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size))
-                #sampled_energies = np.random.uniform(0, 5, ( batch_size,1 ))
-                #generator_ip = np.multiply(sampled_energies, noise)
-                #ecal_ip = np.multiply(2, sampled_energies)
+                sampled_energies = np.random.uniform(0, 5, ( batch_size,1 ))
+                generator_ip = np.multiply(sampled_energies, noise)
+                ecal_ip = np.multiply(2, sampled_energies)
 
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
@@ -195,8 +200,7 @@ if __name__ == '__main__':
             epoch_gen_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
-        epoch_time = time.time()- epoch_start
-        print('Time for the {} epoch was {} seconds'.format(index, epoch_time))
+
         print('\nTesting for epoch {}:'.format(epoch + 1))
 
         noise = np.random.normal(0, 1, (nb_test, latent_size))
@@ -220,7 +224,7 @@ if __name__ == '__main__':
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
-        sampled_energies = np.random.uniform(0, 5, (2 * nb_test, 1))
+        sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
         ecal_ip = np.multiply(2, sampled_energies)
 
