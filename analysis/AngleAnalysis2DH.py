@@ -8,76 +8,72 @@ import math
 import time
 import glob
 import numpy.core.umath_tests as umath
-import GANutilsAngle as gan
+import GANutilsANG_concat as gan
 import ROOTutils as r
 import setGPU #if Caltech
 
 def main():
-   genweight = "angleweights/params_generator_epoch_049.hdf5"
-   from EcalCondGan4 import generator
-   g=generator()
+   genweight = "3d_angleweights_1loss/params_generator_epoch_046.hdf5"
+   from EcalCondGanAngle_3d_1loss import generator
+   latent = 256
+   g=generator(latent)
    g.load_weights(genweight)
-   num_events = 1000
-   num=10
+
+   num_events = 1000 # Number of events for each bin
+   num=10 # random events generated
    f = 57.325
    thetamin = 60/f
    thetamax = 120/f
+   energies=[100, 150, 200]
+   thetas = [62, 90, 118]
 
-   energies=[100, 250, 400]
-   thetas = [60, 90, 120]
-   xcuts = [10, 25, 40] 
-   ycuts = [10, 25, 40]
-   zcuts = [5, 12, 20]
-   plotsdir = 'angle_plots_gan'
+   plotsdir = 'genplots_ep047'
    gan.safe_mkdir(plotsdir)
-   opt="colz"  
+   opt="colz"
+   events = {}
    for energy in energies:
-      for xcut, ycut, zcut in zip(xcuts, ycuts, zcuts):
-         sampled_energies=energy/100 * np.ones((num_events))
-         sampled_thetas = np.random.uniform(thetamin, thetamax, size=(num_events))
-         events = gan.generate(g, num_events, sampled_energies, sampled_thetas)  
-         PlotCut(events, xcut, ycut, zcut, energy, os.path.join(plotsdir, '2Dhits_cut{}_{}.pdf'.format(xcut, energy)), opt=opt)
-      tevents =[]
-      for t in thetas:
-         sampled_energies=energy/100 * np.ones((num_events))
-         sampled_thetas = (t /f )* np.ones((num_events))
-         events = gan.generate(g, num_events, sampled_energies, sampled_thetas)
-         tevents.append(events)
-         PlotAngleCut(events, t, os.path.join(plotsdir, 'Theta{}_GeV{}.pdf'.format(t, energy)), opt=opt)
-      plot_energy_hist_gen(tevents, os.path.join(plotsdir, 'GeV{}_hist.pdf'.format(energy)), energy, thetas, log=0, ifC=False)
+     events[str(energy)] = {} 
+     for t in thetas:
+         sampled_energies=energy/100 * np.ones((num_events))  # scale energy
+         sampled_thetas = (np.float(t)/f )* np.ones((num_events)) # get radian
+         events[str(energy)][str(t)] = gan.generate(g, num_events, sampled_energies, sampled_thetas) # generate list of events
+         PlotAngleCut(events[str(energy)][str(t)], t, os.path.join(plotsdir, 'Theta{}_GeV{}.pdf'.format(t, energy)), opt=opt)
+     plot_energy_hist_gen(events[str(energy)], os.path.join(plotsdir, 'Hist_GeV{}.pdf'.format(energy)), energy, thetas)
    for t in thetas:
-         sampled_energies=np.random.uniform(0.2, 5, size=(num_events))
-         sampled_thetas = (t /f )* np.ones((num_events))
-         events = gan.generate(g, num_events, sampled_energies, sampled_thetas)
-         PlotAngleCut(events, t, os.path.join(plotsdir, 'Theta_cut{}.pdf'.format(t)), opt=opt)
+      sampled_energies=np.random.uniform(1, 2, size=(num_events))
+      sampled_thetas = (np.float(t) /f )* np.ones((num_events))
+      events = gan.generate(g, num_events, sampled_energies, sampled_thetas)
+      PlotAngleCut(events, t, os.path.join(plotsdir, 'Theta_cut{}.pdf'.format(t)), opt=opt)
 
-   sampled_energies=np.random.uniform(0.2, 5, size=(num))
+   sampled_energies=np.random.uniform(1, 2, size=(num))
    sampled_thetas = np.random.uniform(thetamin, thetamax, size=(num))
    events = gan.generate(g, num, sampled_energies, sampled_thetas)
 
    for n in np.arange(num):
-     PlotEvent(events[n], 25, 25, 12, sampled_energies[n], sampled_thetas[n], os.path.join(plotsdir, 'Event{}.pdf'.format(n)), n, f, opt=opt)
-   
+     PlotEvent(events[n], sampled_energies[n], sampled_thetas[n], os.path.join(plotsdir, 'Event{}.pdf'.format(n)), n, f, opt=opt)
+   print('Plots are saved in {}'.format(plotsdir))
+     
 def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
    canvas = TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make  
    canvas.SetGrid()
    canvas.Divide(2,2)
-   hx=[]
-   hy=[]
-   hz=[]
    color = 2
    leg = ROOT.TLegend(0.1,0.6,0.7,0.9)
    print (len(events))
+   hx=[]
+   hy=[]
+   hz=[]
+   thetas = list(reversed(thetas))
    for i, theta in enumerate(thetas):
-      event=events[i]
-      num=event.shape[0]
+      event = events[str(theta)]
+      num = event.shape[0]
       sumx, sumy, sumz=gan.get_sums(event)
       x=sumx.shape[1]
       y=sumy.shape[1]
       z=sumz.shape[1]
-      hx.append( ROOT.TH1F('GANx' + str(theta), '', x, 0, x))
-      hy.append( ROOT.TH1F('GANy' + str(theta), '', y, 0, y))
-      hz.append( ROOT.TH1F('GANz' + str(theta), '', z, 0, z))
+      hx.append(ROOT.TH1F('GANx{:d}theta_{:d}GeV'.format(theta, energy), '', x, 0, x))
+      hy.append(ROOT.TH1F('GANy{:d}theta_{:d}GeV'.format(theta, energy), '', y, 0, y))
+      hz.append(ROOT.TH1F('GANz{:d}theta_{:d}GeV'.format(theta, energy), '', z, 0, z))
       hx[i].SetLineColor(color)
       hy[i].SetLineColor(color)
       hz[i].SetLineColor(color)
@@ -85,18 +81,18 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
       if log:
          gPad.SetLogy()
       r.fill_hist_wt(hx[i], sumx)
-      if i==0:
-         hx[i].Draw('hist')
+      if i ==0:
+         hx[i].DrawNormalized('hist')
       else:
-         hx[i].Draw('hist sames')
+         hx[i].DrawNormalized('sames hist')
       canvas.cd(2)
       if log:
          gPad.SetLogy()
       r.fill_hist_wt(hy[i], sumy)
       if i==0:
-         hy[i].Draw('hist')
+         hy[i].DrawNormalized('hist')
       else:
-         hy[i].Draw('hist sames')
+         hy[i].DrawNormalized('sames hist')
       canvas.cd(3)
       if log:
          gPad.SetLogy()
@@ -104,7 +100,8 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
       if i==0:
          hz[i].DrawNormalized('hist')
       else:
-          hz[i].DrawNormalized('hist sames')
+         hz[i].DrawNormalized('sames hist')
+                  
       canvas.cd(4)
       leg.AddEntry(hx[i], '{}theta {}events'.format(theta, num),"l")
       canvas.Update()
@@ -115,39 +112,77 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
    if ifC:
       canvas.Print(out_file + '.C')
 
-def SortTheta(data, energies, flag=False, num_events=2000, tolerance=5):
-    X = data[0]
-    Y = data[1]
-    theta = data[2]
-    srt = {}
-    for energy in energies:
-       if energy == 0 and flag:
-          srt["events_act" + str(energy)] = X[:10000] # More events in random bin
-          srt["energy" + str(energy)] = Y[:10000]
-          print srt["events_act" + str(energy)].shape
-       else:
-          indexes = np.where((Y > energy - tolerance ) & ( Y < energy + tolerance))
-          print(len(indexes))
-          srt["events_act" + str(energy)] = X[indexes][:num_events]
-          srt["energy" + str(energy)] = Y[indexes][:num_events]
-          srt["theta_act"+ str(energy)] = theta[indexes][:num_events]
-    return srt
+def Meas3(event, p1=5, p2=15):
+   z_shape = event.shape[2]
+   x = np.zeros(z_shape) # shape = (z)
+   y = np.zeros(z_shape)
+   ang = np.zeros(z_shape)
+   sumz = np.zeros(z_shape) 
+   for j in np.arange(p2 + 1): # Looping over z
+      sumz[j] = np.sum(event[:, :, j])
+      x[j] = 0
+      y[j] = 0
+      for k in np.arange(event.shape[0]):  # Looping over x
+         for l in np.arange(event.shape[1]): # Looping over y
+            x[j] = x[j] + event[k, l, j] * k
+            y[j] = y[j] + event[k, l, j] * l
+      if sumz[j] > 0:                         # check for zero sum
+         x[j] = x[j]/sumz[j]
+         y[j] = y[j]/sumz[j]
+         if j >p1:
+           zproj = np.sqrt((x[j] - x[p1])**2 + (j-p1)**2) 
+           ang[j] = np.arctan((y[j] - y[p1])/zproj)
+           ang[j] = math.pi/2 - ang[j]
+   result = ProcAngle1(ang[p1:p2+1], sumz[p1:p2+1])
+   return result
 
-def PlotEvent(event, x, y, z, energy, theta, out_file, n, f, opt=""):
+def ProcAngle1(meas, sumz):
+   sumtot = np.sum(sumz)
+   avg = np.sum( meas * sumz)/ sumtot
+   return avg
+
+def ProcAngle2(meas, sumz):
+   l = meas.shape[0]
+   index = np.arange(1, l+1)
+   sumtot = l * (l+ 1) * 0.5
+   avg = np.sum( meas * index)/ sumtot
+   return avg
+      
+def Meas1(event, yp1 = 3, yp2 = 21):
+   event = np.sum(event , axis=(0))
+   y = np.arange(event.shape[1])
+   maxy = np.argmax(event, axis=0)
+   p = np.polyfit(y[yp1:yp2], maxy[yp1:yp2], 1)
+   angle = math.pi/2 - math.atan(p[0])
+   return angle
+
+def Meas2(event, yp1 = 3, yp2 = 21):
+    event = np.sum(event, axis=(0))
+    y = np.arange(event.shape[1])
+    maxy = np.argmax(event, axis=0)
+    tan = (maxy[yp2]-maxy[yp1]) / np.float(yp2 - yp1)
+    angle = math.pi/2 - math.atan(tan)
+    return angle
+
+def PlotEvent(event, energy, theta, out_file, n, factor, opt=""):
    canvas = TCanvas("canvas" ,"GAN 2D Hist" ,200 ,10 ,700 ,500) #make 
    canvas.Divide(2,2)
-   sum = np.sum(event)     
-   hx = ROOT.TH2F('x_{:.2f}GeV_{:.2f}sum_{:.2f}theta'.format(100 * energy, sum, f * theta), '', 51, 0, 51, 25, 0, 25)
-   hy = ROOT.TH2F('y_{:.2f}GeV_{:.2f}theta'.format(100 * energy, f * theta), '', 51, 0, 51, 25, 0, 25)
-   hz = ROOT.TH2F('z_{:.2f}GeV_{:.2f}theta'.format(100 * energy, f * theta), '', 51, 0, 51, 51, 0, 51)
+   x = event.shape[0]
+   y = event.shape[1]
+   z = event.shape[2]
+   ang1 = Meas1(event)
+   ang2 = Meas2(event)
+   ang3 = Meas3(event)
+   leg = ROOT.TLegend(0.1,0.6,0.7,0.9)
+   hx = ROOT.TH2F('x_{:.2f}GeV_{:.2f}degree'.format(100 * energy, factor * theta), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('y_{:.2f}GeV_{:.2f}degree'.format(100 * energy, factor * theta), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('z_{:.2f}GeV_{:.2f}degree'.format(100 * energy, factor * theta), '', x, 0, x, y, 0, y)
    gStyle.SetPalette(1)
    gPad.SetLogz()
    event = np.expand_dims(event, axis=0)
-   print(event.shape)
-   print(event[0, 25, 25, 15])
-   FillHist2D_wt(hx, event[:, x, :, :])
-   FillHist2D_wt(hy, event[:, :, y, :])
-   FillHist2D_wt(hz, event[:, :, :, z])
+   FillHist2D_wt(hx, np.sum(event, axis=1))
+   FillHist2D_wt(hy, np.sum(event, axis=2))
+   FillHist2D_wt(hz, np.sum(event, axis=3))
    canvas.cd(1)
    hx.Draw(opt)
    hx.GetXaxis().SetTitle("Y axis")
@@ -167,6 +202,11 @@ def PlotEvent(event, x, y, z, energy, theta, out_file, n, f, opt=""):
    hz.GetXaxis().SetTitle("X axis")
    hz.GetYaxis().SetTitle("Y axis")
    canvas.Update()
+   canvas.cd(4)
+   leg.AddEntry(hx, 'Sampled Energy={:.2f} GeV'.format(100 * energy),"l")
+   leg.AddEntry(hy, 'Sampled Theta ={:.2f} Degree'.format(theta * factor),"l")
+   leg.AddEntry(hz, 'Computed Theta={:.2f}/{:.2f}/{:.2f} Degree'.format(ang1 * factor, ang2 * factor, ang3 * factor),"l")
+   leg.Draw()
    r.stat_pos(hz)
    canvas.Update()
    canvas.Print(out_file)
@@ -174,12 +214,18 @@ def PlotEvent(event, x, y, z, energy, theta, out_file, n, f, opt=""):
 def PlotAngleCut(events, ang, out_file, opt=""):
    canvas = TCanvas("canvas" ,"GAN 2D Hist" ,200 ,10 ,700 ,500) 
    canvas.Divide(2,2)
-   hx = ROOT.TH2F('x=25_{}cut'.format(str(ang)), '', 51, 0, 51, 25, 0, 25)
-   hy = ROOT.TH2F('y=25_{}cut'.format(str(ang)), '', 51, 0, 51, 25, 0, 25)
-   hz = ROOT.TH2F('z=12_{}cut'.format(str(ang)), '', 51, 0, 51, 51, 0, 51)
-   FillHist2D_wt(hx, events[:, 25, :, :])
-   FillHist2D_wt(hy, events[:, :, 25, :])
-   FillHist2D_wt(hz, events[:, :, :, 12])
+   x = events.shape[1]
+   y = events.shape[2]
+   z = events.shape[3]
+   gStyle.SetPalette(1)
+   gPad.SetLogz()
+      
+   hx = ROOT.TH2F('X{} Degree'.format(str(ang)), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('Y{} Degree'.format(str(ang)), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('Z{} Degree'.format(str(ang)), '', x, 0, x, y, 0, y)
+   FillHist2D_wt(hx, np.sum(events, axis=1))
+   FillHist2D_wt(hy, np.sum(events, axis=2))
+   FillHist2D_wt(hz, np.sum(events, axis=3))
    canvas.cd(1)
    hx.Draw(opt)
    hx.GetXaxis().SetTitle("Y axis")
@@ -217,62 +263,8 @@ def FillHist2D_wt(hist, array):
         for i in bin1:
             hist.Fill(j, k, array[i, j, k])
             count+=1
-   print('For {} events with {} xbins and {} ybins the countis {}'.format(dim1, dim2, dim3, count))
+
    #hist.Sumw2()
-
-def GetAngleData(datafile):
-    #get data for training
-    print 'Loading Data from .....', datafile
-    f=h5py.File(datafile,'r')
-    y=np.array(f.get('energy'))
-    x=np.array(f.get('ECAL'))
-    phi = np.array(f.get('phi')) * 57.325
-    theta = np.array(f.get('theta')) * 57.325
-    angle = np.array(f.get('openingAngle')) * 57.325
-    x[x < 1e-6] = 0
-    x = np.expand_dims(x, axis=-1)
-    x = x.astype(np.float32)
-    y = y.astype(np.float32)
-    
-    return x, y, theta, phi, angle
-   
-def GetAllData(datafiles):
-   for index, datafile in enumerate(datafiles):
-       if index == 0:
-          x, y, theta, phi, angle = GetAngleData(datafile)
-       else:
-          x_temp, y_temp, theta_temp, phi_temp, angle_temp = GetAngleData(datafile)
-          x = np.concatenate((x, x_temp), axis=0)
-          y = np.concatenate((y, y_temp), axis=0)
-          theta = np.concatenate((theta, theta_temp), axis=0)
-          phi = np.concatenate((phi, phi_temp), axis=0)
-          angle = np.concatenate((angle, angle_temp), axis=0)
-   return x, y, theta, phi, angle  
-
-def GetDataFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 10000, Particles=[], MaxFiles=-1):
-   print ("Searching in :",FileSearch)
-   Files =sorted( glob.glob(FileSearch))
-   print ("Found {} files. ".format(len(Files)))
-   Filesused = int(math.ceil(nEvents/EventsperFile))
-   FileCount=0
-   Samples={}
-   for F in Files:
-       FileCount+=1
-       basename=os.path.basename(F)
-       ParticleName=basename.split("_")[0].replace("Escan","")
-       if ParticleName in Particles:
-           try:
-               Samples[ParticleName].append(F)
-           except:
-               Samples[ParticleName]=[(F)]
-       if MaxFiles>0:
-           if FileCount>MaxFiles:
-               break
-   SampleI=len(Samples.keys())*[int(0)]
-   for i,SampleName in enumerate(Samples):
-       Sample=Samples[SampleName][:Filesused]
-       NFiles=len(Sample)
-   return Sample
 
 if __name__ == "__main__":
     main()
