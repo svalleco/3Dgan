@@ -13,9 +13,11 @@ import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
-
+#import setGPU
 import h5py 
 import numpy as np
+import time
+
 def bit_flip(x, prob=0.05):
     """ flips a int array's values with some probability """
     x = np.array(x)
@@ -38,12 +40,12 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    from EcalEnergyGan import generator, discriminator
-
+    from  arch16 import generator, discriminator 
+    init_start = time.time()
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
 
-    nb_epochs = 30 
+    nb_epochs = 30
     batch_size = 128
     latent_size = 200
     verbose = 'false'
@@ -60,7 +62,7 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[6, 0.1, 0.1]
+        loss_weights=[8, 0.2, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
     )
 
@@ -89,84 +91,54 @@ if __name__ == '__main__':
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[6, 0.1, 0.1]
+        loss_weights=[8, 0.2, 0.1]
     )
 
 
-    ECALShape= None, 25, 25, 25
-    HCALShape= None, 5, 5, 60
-
-    FileSearch="/data/LCD/V1/*/*.h5"
-
-    TrainSampleList,TestSampleList,Norms,shapes=SetupData(FileSearch,
-                                                          True,False,False,2,
-                                                          [.9,.1],
-                                                          ["Ele","Gamma"],
-                                                          100,
-                                                          1,
-                                                          ECALShape,
-                                                          HCALShape,
-                                                          100.,
-                                                          100.)
-
-
-    def GANNormalization(Norms):
-        def NormalizationFunction(Ds):
-            Ds=Ds[0]/100.
-            Ds[0] = np.expand_dims(Ds[0], axis=-1)
-            return Ds
-    	return NormalizationFunction
-
-    # Use DLGenerators to read data
-    Train_genC = MakeGenerator(True,False,TrainSampleList, 100000, GANNormalization(Norms),
-                               batchsize=1000,
-                               shapes=shapes,
-                               n_threads=4,
-                               multiplier=1,
-                               cachefile="/tmp/Farbin-CaloDNN-LCD-TrainEvent-Cache.h5")
-    
-    Test_genC = MakeGenerator(True,False,TestSampleList, 10000, LCDNormalization(Norms),
-                               batchsize=1000,
-                               shapes=shapes,
-                               n_threads=4,
-                               multiplier=1,
-                               cachefile="/tmp/Farbin-CaloDNN-LCD-TestEvent-Cache.h5")
+    d=h5py.File("/nfshome/gkhattak/Ele_v1_1_2.h5",'r')
+    e=d.get('target')
+    X=np.array(d.get('ECAL'))
+    y=(np.array(e[:,1]))
+    print(X.shape)
+    #print('*************************************************************************************')
+    print(y)
+    print('*************************************************************************************')
+   
+    #Y=np.sum(X, axis=(1,2,3))
+    #print(Y)
+    #print('*************************************************************************************')
 
     
-    Train_gen=Train_genC.DiskCacheGenerator(4)
-    Test_genC.Preload()
-    X_test, y_test=Test_genC.D
-    
-    # remove unphysical values
-    #X[X < 1e-3] = 0
-    
+   # remove unphysical values
+    X[X < 1e-6] = 0
 
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9)
 
-    nb_train, nb_test = 100000,10000
-    X_train =np.array(np.expand_dims(X_train, axis=-1))
-    X_test = np.array(np.expand_dims(X_test, axis=-1))
-    y_train= np.array(y_train)/100
-    y_test=np.array(y_test)/100
-    print(X_train.shape)
-    print(X_test.shape)
-    print(y_train.shape)
-    print(y_test.shape)
+    # tensorflow ordering
+    X_train =np.expand_dims(X_train, axis=-1)
+    X_test = np.expand_dims(X_test, axis=-1)
+    y_train= (y_train)/100
+    y_test= (y_test)/100
     print('*************************************************************************************')
 
+
+    nb_train, nb_test = X_train.shape[0], X_test.shape[0]
+
+    X_train = X_train.astype(np.float32)  
+    X_test = X_test.astype(np.float32)
+    y_train = y_train.astype(np.float32)
+    y_test = y_test.astype(np.float32)
     ecal_train = np.sum(X_train, axis=(1, 2, 3))
     ecal_test = np.sum(X_test, axis=(1, 2, 3))
 
-    print(X_train.shape)
-    print(X_test.shape)
-    print(ecal_train.shape)
-    print(ecal_test.shape)
     print('*************************************************************************************')
     train_history = defaultdict(list)
     test_history = defaultdict(list)
-
+    init_time = time.time()- init_start
+    print('Initialization time is {} seconds'.format(init_time))
     for epoch in range(nb_epochs):
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-
+        epoch_start = time.time()
         nb_batches = int(X_train.shape[0] / batch_size)
         if verbose:
             progress_bar = Progbar(target=nb_batches)
@@ -188,7 +160,7 @@ if __name__ == '__main__':
 
             print(image_batch.shape)
             print(ecal_batch.shape)
-            sampled_energies = np.random.uniform(1, 5,( batch_size,1 ))
+            sampled_energies = np.reshape(energy_batch, (-1, 1))
             generator_ip = np.multiply(sampled_energies, noise)
             ecal_ip = np.multiply(2, sampled_energies)
             generated_images = generator.predict(generator_ip, verbose=0)
@@ -212,9 +184,9 @@ if __name__ == '__main__':
 
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size))
-                sampled_energies = np.random.uniform(1, 5, ( batch_size,1 ))
-                generator_ip = np.multiply(sampled_energies, noise)
-                ecal_ip = np.multiply(2, sampled_energies)
+                #sampled_energies = np.random.uniform(0, 5, ( batch_size,1 ))
+                #generator_ip = np.multiply(sampled_energies, noise)
+                #ecal_ip = np.multiply(2, sampled_energies)
 
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
@@ -223,12 +195,13 @@ if __name__ == '__main__':
             epoch_gen_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
-
+        epoch_time = time.time()- epoch_start
+        print('Time for the {} epoch was {} seconds'.format(index, epoch_time))
         print('\nTesting for epoch {}:'.format(epoch + 1))
 
         noise = np.random.normal(0, 1, (nb_test, latent_size))
 
-        sampled_energies = np.random.uniform(1, 5, (nb_test, 1))
+        sampled_energies = np.random.uniform(0, 5, (nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
         generated_images = generator.predict(generator_ip, verbose=False)
         ecal_ip = np.multiply(2, sampled_energies)
@@ -247,7 +220,7 @@ if __name__ == '__main__':
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
-        sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
+        sampled_energies = np.random.uniform(0, 5, (2 * nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
         ecal_ip = np.multiply(2, sampled_energies)
 
