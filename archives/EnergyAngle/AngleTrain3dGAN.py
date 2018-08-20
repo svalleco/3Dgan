@@ -76,11 +76,6 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     Y = Y.astype(np.float32)
     #ang = AngProc(ang, 0.0, angscale)
     ang1 = ang1.astype(np.float32)
-    angthresh = math.pi/2
-    indexes = np.where(ang1 <= angthresh )
-    X =X[indexes]
-    Y = Y[indexes]
-    ang1 = (math.pi/2) - ang1[indexes]
     ang2 = Meas(X)
     X = np.expand_dims(X, axis=-1)
     ecal = np.sum(X, axis=(1, 2, 3))
@@ -89,18 +84,32 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
 def AngProc(angle, f1=0.0, f2=1.0):
     return (angle + f1) * f2
 
-def Meas(events, yp1 = 3, yp2 = 21):
+def Meas(events, mod=0):
     a = []
-    for i in np.arange(events.shape[0]):
-       event = np.sum(np.squeeze(events[i]), axis=(0))
-       y = np.arange(25)
-       maxy = np.argmax(event, axis=0)
-       tan = (maxy[yp2]-maxy[yp1]) / np.float(yp2 - yp1)
-       angle = math.atan(tan)
-       a.append(angle)
-    return np.array(a)
-                                                          
-    
+    x = np.zeros((events.shape[0], events.shape[3])) # shape = (num events, z)
+    y = np.zeros((events.shape[0], events.shape[3]))
+    ang = np.zeros((events.shape[0], events.shape[3]))
+    length = np.zeros((events.shape[0], events.shape[3]))
+    for i in np.arange(events.shape[0]): # Looping over events
+        event = events[i]
+        for j in np.arange(events.shape[3]): # Looping over z
+            sum = np.sum(event[:, :, j])
+            x[i, j] = 0
+            y[i, j] = 0
+            for k in np.arange(events.shape[1]):  # Looping over x
+                for l in np.arange(events.shape[2]): # Looping over y
+                    x[i, j] = x[i, j] + event[k, l, j] * k
+                    y[i, j] = y[i, j] + event[k, l, j] * l
+            if sum > 0:                         # check for zero sum
+                x[i, j] = x[i, j]/sum
+                y[i, j] = y[i, j]/sum
+            if j >0:
+                length[i, j] = math.sqrt((x[i, j] - x[i, 0])**2 + (y[i, j] - y[i, 0])**2 + j**2)
+                zproj = math.sqrt((x[i, j] - x[i, 0])**2 + j**2)
+                #ang[i, j] = np.arcsin((y[i, j] - y[i, 0])/length[i, j])
+                ang[i, j] = np.arctan(zproj/length[i, j])
+    return x, y, length, ang
+                                                                                                                                  
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
     if particle == 'Ele':
        if mod==0:
@@ -122,11 +131,11 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
          ratio = np.polyval(root_fit, sampled_energies)
          return np.multiply(ratio, sampled_energies) * xscale
     
-def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang1_weight=0.1, ang2_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1):
+def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1):
     start_init = time.time()
     verbose = False
     pmin, pmax = 2/100, 500/100
-    angmin, angmax= 0.0, (math.radians(30) * angscale) 
+    angmin, angmax= 1.0, (2.1) * angscale 
     print(angmin, angmax)
     particle='Ele'
     f = [0.9, 0.1]
@@ -136,7 +145,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     discriminator.compile(
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mae', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ang1_weight, ang2_weight, ecal_weight]
+        loss_weights=[gen_weight, aux_weight, ang_weight, ang_weight, ecal_weight]
     )
 
     # build the generator
@@ -161,7 +170,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mae', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ang1_weight, ang2_weight, ecal_weight]
+        loss_weights=[gen_weight, aux_weight, ang_weight, ang_weight, ecal_weight]
     )
 
     # Getting Data
@@ -324,7 +333,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-angle-concat-2loss-positive2.pkl', 'wb'))
+    open('dcgan-history-angle-concat-2loss-3d.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -332,7 +341,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/data/shared/gkhattak/*scan/*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='/data/shared//gkhattak/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
@@ -358,7 +367,7 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     #Architectures to import
-    from EcalCondGan_2loss_concat import generator, discriminator
+    from EcalCondGanAngle_3d import generator, discriminator
 
      #Values to be set by user
     parser = get_parser()
@@ -376,7 +385,7 @@ if __name__ == '__main__':
     #fitmod = params.mod
     fitmod = 3
     #weightdir = params.weightsdir
-    weightdir = 'thetaweights_concat_2loss_positive2'
+    weightdir = 'thetaweights_concat_2loss_3d'
     #xscale = params.xscale
     xscale = 2
     print(params)
@@ -385,5 +394,5 @@ if __name__ == '__main__':
 
     d=discriminator()
     g=generator(latent_size)
-    Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=3, aux_weight=0.1, ang1_weight=5, ang2_weight=10, ecal_weight=0.1, xscale = xscale, angscale=1)
+    Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=3, aux_weight=0.1, ang_weight=5, ecal_weight=0.1, xscale = xscale, angscale=1)
     
