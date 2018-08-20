@@ -186,9 +186,6 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     else:
         numTest = X_test.shape[0]
     print('Test Data loaded of shapes:')
-    #print(ecal_test[:10])
-    #print(Y_test[:10])
-    #print('theta test', theta_test[:10])
     print(X_test.shape)
     print(Y_test.shape)
     #print(Y_test[:10])
@@ -196,10 +193,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print('Ang1 varies from {} to {}'.format(np.amin(ang1_test), np.amax(ang1_test)))
     print('Ang2 varies from {} to {}'.format(np.amin(ang2_test), np.amax(ang2_test)))
     nb_test = numTest
-    #nb_train = nEvents * f[0] # Total events in training files
-    #total_batches = int(nb_train / batch_size)
-    #print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
- 
+   
     train_history = defaultdict(list)
     test_history = defaultdict(list)
     init_time = time.time()- start_init
@@ -208,19 +202,14 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         X_train, Y_train, ang1_train, ang2_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, angscale=angscale, thresh=1e-4)
-        #print(ecal_train[:10])
-        #print('theta train ', theta_train[:10])
         nb_file=1
-        #nb_batches = int(X_train.shape[0] / batch_size)
-        #if verbose:
-        #    progress_bar = Progbar(target=total_batches)
-
+  
         epoch_gen_loss = []
         epoch_disc_loss = []
         index = 0
         total_batches = 0
         file_index=0
-        #for index in range(total_batches):
+     
         while nb_file < len(Trainfiles):
             if verbose:
                 progress_bar.update(index)
@@ -255,27 +244,27 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
-            #sampled_ang = ang1_batch # Same angle as G4 global theta
-            #print('sampled ang varies from {} to {} '.format(np.amin(sampled_ang), np.amax(sampled_ang)))
             generator_ip = np.concatenate((ang1_batch.reshape(-1, 1), noise), axis=1)
-            #print(generator_ip.shape)
-            #ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
-            #print(sampled_energies[:10])
-            #print(ecal_ip[:10])
-            generated_images = generator.predict(generator_ip, verbose=0)        
+            generated_images = generator.predict(generator_ip, verbose=0)
+            #print(ang2_batch[:5])
+            disc_out = discriminator.predict(image_batch)
+            #print(len(disc_out))
+            #print(len(disc_out[0]))
+            #print(disc_out[:5][3][:5])
+            #print(disc_out[0][3])
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang1_batch, ang2_batch, ecal_batch])
+            #print (real_batch_loss)
+            #print (fake_batch_loss)
             epoch_disc_loss.append([
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
-
             trick = np.ones(batch_size)
             gen_losses = []
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size-1))
                 noise = np.multiply(energy_batch.reshape(-1, 1), noise)
                 generator_ip = np.concatenate((ang1_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
-                #ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, energy_batch.reshape(-1, 1), ang1_batch, ang2_batch, ecal_batch]))
@@ -283,14 +272,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
             index +=1
-        print ('Toatl batches were {}'.format(index))
+        print ('Total batches were {}'.format(index))
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         print('\nTesting for epoch {}:'.format(epoch))
         test_start = time.time()
         noise = np.random.normal(0, 1, (nb_test, latent_size-1))
-        #sampled_energies = np.random.uniform(pmin , pmax, (nb_test, 1))
         noise = np.multiply(Y_test.reshape(-1, 1), noise)
-        #ecal_ip = GetEcalFit(Y_test, particle=particle, mod=mod, xscale=xscale)
         generator_ip = np.concatenate((ang1_test.reshape(-1, 1), noise), axis=1)
         generated_images = generator.predict(generator_ip, verbose=False)
         X = np.concatenate((X_test, generated_images))
@@ -299,20 +286,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         ang2 = np.concatenate((ang2_test, ang2_test))
         ecal = np.concatenate((ecal_test, ecal_test))
         aux_y = np.concatenate((Y_test, Y_test), axis=0)
-        #print (X.shape)
-        #print (y.shape)
-        #print (aux_y.shape)
-        #print (ang1.shape)
-        #print (ang2.shape)
-        #print(ecal.shape)
+                
         discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang1, ang2, ecal], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         noise = np.random.normal(0, 1, (2 * nb_test, latent_size - 1))
-        #sampled_energies = np.random.uniform(pmin, pmax, (2 * nb_test, 1))
         noise = np.multiply(aux_y.reshape(-1, 1), noise)
-        #sampled_ang = np.random.uniform(angmin, angmax, (2 * nb_test, 1))
-        #ecal_ip = GetEcalFit(sampled_energies, particle=particle, mod=mod, xscale=xscale)
         generator_ip = np.concatenate((ang1.reshape(-1, 1), noise), axis=1)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
@@ -344,7 +323,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-angle-concat-2loss.pkl', 'wb'))
+    open('dcgan-history-angle-concat-2loss-sorted.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -352,7 +331,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared//gkhattak/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
@@ -396,7 +375,7 @@ if __name__ == '__main__':
     #fitmod = params.mod
     fitmod = 3
     #weightdir = params.weightsdir
-    weightdir = 'thetaweights_concat_2loss'
+    weightdir = 'thetaweights_concat_2loss_sorted'
     #xscale = params.xscale
     xscale = 2
     print(params)
