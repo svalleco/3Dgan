@@ -75,12 +75,13 @@ def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     X=np.array(f.get('ECAL'))
     Y=(np.array(Y[:,1]))
     X[X < limit] = 0
-    X = np.expand_dims(X, axis=1)
-    X = X.astype(np.float32)
-    Y = Y.astype(np.float32)
+    X = np.expand_dims(X, axis=-1)
+    X = X.astype(np.float64)
+    Y = Y.astype(np.float64)
     X = xscale * X
     Y = Y/yscale
-    ecal = np.sum(X, axis=(2, 3, 4))
+    ecal = np.sum(X, axis=(1, 2, 3))
+    ecal = ecal.astype(np.float64)
     return X, Y, ecal
 
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
@@ -208,9 +209,10 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
             noise = np.random.normal(0, 1, (batch_size, latent_size))
             sampled_energies = np.random.uniform(0.1, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
-      
+            generator_ip = generator_ip.astype(np.float64)
             #ecal sum from fit
             ecal_ip = GetEcalFit(sampled_energies, particle,mod, xscale)
+            ecal_ip = ecal_ip.astype(np.float64)
             generated_images = generator.predict(generator_ip, verbose=0)        
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
@@ -295,11 +297,11 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='veganweights', help='Directory to store weights.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='veganweightsf64', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
-    parser.add_argument('--pklfile', action='store', type=str, default='dcgan-history.pkl', help='File to save losses.')
+    parser.add_argument('--pklfile', action='store', type=str, default='dcgan-history_f64.pkl', help='File to save losses.')
     return parser
 
 if __name__ == '__main__':
@@ -318,15 +320,14 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     #Architectures to import
-    from EcalEnergyGan2 import generator, discriminator
+    from EcalEnergyGan import generator, discriminator
 
      #Values to be set by user
     parser = get_parser()
     params = parser.parse_args()
     nb_epochs = params.nbepochs #Total Epochs
     batch_size = params.batchsize #batch size
-    #latent_size = params.latentsize #latent vector size
-    latent_size = 1024
+    latent_size = params.latentsize #latent vector size
     verbose = params.verbose
     datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Data path on Caltech
     #datapath = params.datapath#Data path on EOS CERN default
@@ -345,5 +346,5 @@ if __name__ == '__main__':
     # Building discriminator and generator
     d=discriminator()
     g=generator(latent_size)
-    Gan3DTrain(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , gen_weight=2, aux_weight=0.1, ecal_weight=0.1, xscale = xscale)
+    Gan3DTrain(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, gen_weight=2, aux_weight=0.1, ecal_weight=0.1, xscale = xscale)
     
