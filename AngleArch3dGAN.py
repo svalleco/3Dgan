@@ -50,12 +50,11 @@ def ecal_angle(image):
 
     # Get 0 where sum along z is 0 and 1 elsewhere
     zmask = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz) , K.ones_like(sumz))
-    #zunmasked = K.sum(zmask, axis=1)
-    
+        
     x = K.expand_dims(K.arange(x_shape), 0) # x indexes
-    x = K.cast(K.expand_dims(x, 2), dtype='float32')
+    x = K.cast(K.expand_dims(x, 2), dtype='float32') + 0.5
     y = K.expand_dims(K.arange(y_shape), 0)# y indexes
-    y = K.cast(K.expand_dims(y, 2), dtype='float32')
+    y = K.cast(K.expand_dims(y, 2), dtype='float32') + 0.5
   
     #barycenter for each z position
     x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
@@ -65,20 +64,21 @@ def ecal_angle(image):
 
     #Angle Calculations
     z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5)  * K.ones_like(z_ref) # Make an array of z indexes for all events
-    zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis
+    zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis with stability check
     m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
     m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
     ang = (math.pi/2.0) - tf.atan(m)# angle correction
     zmask = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
     ang = ang * zmask # place zero where zsum is zero
     
-    ang = ang * z
-    sumz_tot = K.sum(z * zmask, axis=1)
+    ang = ang * z  # weighted by position
+    sumz_tot = z * zmask # removing indexes with 0 energies or angles
 
-    #zunmasked = K.sum(zmask, axis=1)
+    #zunmasked = K.sum(zmask, axis=1) # used for simple mean 
     #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
-    ang = K.sum(ang, axis=1)/sumz_tot
-    ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place a 4 for measured angle where no energy is deposited in events
+
+    ang = K.sum(ang, axis=1)/K.sum(sumz_tot, axis=1) # sum ( measured * weights)/sum(weights)
+    ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
     print(K.int_shape(ang))
