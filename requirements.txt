@@ -1,5 +1,6 @@
-tensorflow
-keras
-numpy
+python 2.7.12
+tensorflow 1.0.0
+keras 1.2.2
+numpy 1.14.2
 sklearn
 
