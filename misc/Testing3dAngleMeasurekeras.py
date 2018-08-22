@@ -17,15 +17,18 @@ plt.switch_backend('Agg')
 import setGPU
 
 def main():
+   #datapath = '/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5' #Training data path       
+   #datapath = "/eos/project/d/dshep/LCD/DDHEP/*scan_RandomAngle_*_MERGED/*Escan_RandomAngle_*.h5"
    datapath = '/bigdata/shared/gkhattak/*scan/*.h5'
    numdata = 1000
    numevents=10
    ypoint1 = 3 
    ypoint2 = 21
    datafiles = GetDataFiles(datapath, 10000, Particles=['Ele'])
-   plotsdir = 'keras_3d_p5'
+   plotsdir = 'keras_vskeras'
    filename = plotsdir + '/'
    gan.safe_mkdir(plotsdir)
+   #Get data
    X, Y, theta, alpha= GetAngleData(datafiles[0], num_data=numdata)
    x, y, l, m, m_meas = Meas2(X)  # keras
    event_id = 3
@@ -47,46 +50,46 @@ def main():
    #m_meas = ProcAngles2(m)
    PlotHistMeas(m_meas, 'keras', filename + 'keras_angle_hist_all.pdf', fig=fig)
    fig+=1
-   PlotHistError([m_meas], theta, ['Measured '], filename + 'Error_keras_hist.pdf', fig=fig)
+   PlotHistError([m_meas], theta, ['3d Measured '], filename + 'Error_keras_hist.pdf', fig=fig)
    fig+=1
-   PlotAngleMeasure(m_meas, theta, filename + 'actual_keras.pdf', fig=fig)
-   fig+=1
-      
-   x2, y2, l2, m2 = Meas5_4(X) # python
-   PlotHistcenter(x2[event_id], filename + 'x_center_hist_python.pdf', 'global {:.4f} x'.format(theta[event_id]), fig)
-   fig+=1
-   PlotHistcenter(y2[event_id], filename + 'y_center_hist_python.pdf', 'global {:.4f}y'.format(theta[event_id]), fig)
-   fig+=1
-   Plotcenter(x2[event_id], filename + 'x_center_python.pdf', 'global {:.4f} x'.format(theta[event_id]), fig)
-   fig+=1
-   Plotcenter(y2[event_id], filename + 'y_center_python.pdf', 'global {:.4f} y'.format(theta[event_id]), fig)
-   fig+=1
-   Plotcenter(l2[event_id], filename + 'l_python.pdf', 'global {:.4f} '.format(theta[event_id]), fig)
-   fig+=1
-   PlotAngle(m2[event_id], filename + 'angle_python.pdf', 'global {:.4f}'.format(theta[event_id]), fig)
+   PlotAngleMeasure(m_meas, theta, ['3d Measured', 'Theta'], filename + 'actual_keras.pdf', fig=fig)
    fig+=1
       
-   PlotHistMeas(m2[event_id], 'global {} python'.format(alpha[event_id]), filename + 'python_angle_hist_event.pdf', fig=fig)
+   x2, y2, l2, m2, m2_meas = Meas2_prev(X) # keras 2
+   PlotHistcenter(x2[event_id], filename + 'x_center_hist_keras2.pdf', 'global {:.4f} x'.format(theta[event_id]), fig)
+   fig+=1
+   PlotHistcenter(y2[event_id], filename + 'y_center_hist_keras2.pdf', 'global {:.4f}y'.format(theta[event_id]), fig)
+   fig+=1
+   Plotcenter(x2[event_id], filename + 'x_center_keras2.pdf', 'global {:.4f} x'.format(theta[event_id]), fig)
+   fig+=1
+   Plotcenter(y2[event_id], filename + 'y_center_keras2.pdf', 'global {:.4f} y'.format(theta[event_id]), fig)
+   fig+=1
+   Plotcenter(l2[event_id], filename + 'l_keras2.pdf', 'global {:.4f} '.format(theta[event_id]), fig)
+   fig+=1
+   PlotAngle(m2[event_id], filename + 'angle_keras2.pdf', 'global {:.4f}'.format(theta[event_id]), fig)
+   fig+=1
+      
+   PlotHistMeas(m2[event_id], 'global {} keras2'.format(alpha[event_id]), filename + 'python_angle_hist_event.pdf', fig=fig)
    fig+=1
 
-   angle = ProcAngles2(m2)
-   PlotHistMeas(angle, 'python', filename + 'python_angle_hist.pdf', fig=fig)
+   #angle = ProcAngles2(m2)
+   PlotHistMeas(m2_meas, 'keras2', filename + 'keras2_angle_hist.pdf', fig=fig)
    fig+=1
-   PlotAngleMeasure(m_meas, angle, filename + 'python_keras.pdf', fig=fig, yp1 = ypoint1, yp2 = ypoint2)
+   PlotAngleMeasure(m_meas, m2_meas, ['Keras1', 'Keras2'],filename + 'keras1_2.pdf', fig=fig, yp1 = ypoint1, yp2 = ypoint2)
    fig+=1
-   PlotHistError([m_meas], angle, ['Fit', 'Approx'], filename + 'error_hist.pdf', fig=fig)
+   PlotHistError([m_meas], m2_meas, ['Keras1', 'Keras2'], filename + 'error_hist.pdf', fig=fig)
    fig+=1
    
    # Plots event with error > 0.5
-   indexes = np.where(np.absolute(angle - m_meas)> 0.5)
+   indexes = np.where(np.absolute(m2_meas - m_meas)> 0.005)
    events = X[indexes]
-   angle = angle[indexes]
+   angle = m2_meas[indexes]
    meas = m_meas[indexes]
    x = X.shape[1]
    y = X.shape[2]
    z = X.shape[3]
    for i in np.arange(min(numevents, events.shape[0])):
-      PlotEvent(events[i], x, y, z, angle[i], meas[i], meas[i], plotsdir + '/Event1_{}.pdf'.format(i), i, fig= fig, yp1 = ypoint1, yp2 = ypoint2)
+      PlotEvent(events[i], x, y, z, m2_meas[i], meas[i], meas[i], plotsdir + '/Event1_{}.pdf'.format(i), i, fig= fig, yp1 = ypoint1, yp2 = ypoint2)
       fig+=1
    print('Plots are saved in {}.'.format(plotsdir))
 
@@ -164,7 +167,7 @@ def PlotEvent(event, x, y, z, angle, m1, m2, outfile, n, fig, yp1 = 3, yp2 = 21)
    plt.ylim =(0, y)
    plt.savefig(outfile)
 
-def PlotAngleMeasure(measured, angle, outfile, fig=1, degree=False, yp1 = 3, yp2 = 21):
+def PlotAngleMeasure(measured, angle, labels, outfile, fig=1, degree=False, yp1 = 3, yp2 = 21):
    error = np.absolute(angle - measured)
    if degree:
       angle = np.degrees(angle)
@@ -173,14 +176,11 @@ def PlotAngleMeasure(measured, angle, outfile, fig=1, degree=False, yp1 = 3, yp2
       unit = 'degrees'
    else:
       unit = 'radians'
-   print(measured[:5])
-   print(angle[:5])
-   print(error[:5])
    plt.figure(fig)
    plt.scatter(angle, measured, label='Error Mean={:.4f}, std={:.4f}'.format(np.mean(error), np.std(error)))
    plt.legend()
-   plt.xlabel('Python Angle ({})'.format(unit))
-   plt.ylabel('Keras Angle ({})'.format(unit))
+   plt.xlabel(labels[1] +' Angle ({})'.format(unit))
+   plt.ylabel(labels[0] + ' Angle ({})'.format(unit))
    plt.savefig(outfile)
 
 def GetAngleData_reduced(datafile, num_data=10000):
@@ -347,6 +347,12 @@ def Meas2(events, yp1 = 3, yp2 = 21):
     #m = np.mean(m)
     return x, y, l, m, m_meas
 
+def Meas2_prev(events, yp1 = 3, yp2 = 21):
+    images = tf.convert_to_tensor(events, dtype=tf.float32)
+    x, y, l, m, m_meas = ecal_angle_3d_ver3(images)
+    return x, y, l, m, m_meas
+                         
+
 def Meas3(events, yp1 = 3, yp2 = 21):
     event = np.sum(np.squeeze(events), axis=(1))
     maxy = np.argmax(event, axis=(0, 1))
@@ -397,6 +403,48 @@ def ecal_angle_3d(image):
    print ('The time taken by Keras meas1 = {} seconds'.format(time.time()-start))
    return K.eval(x_mid), K.eval(y_mid), K.eval(l), K.eval(ang)
 
+def ecal_angle_3d_ver3(image):
+   start = time.time()
+   image = K.squeeze(image, axis=4)
+   sumtot = K.sum(image, axis=(1, 2, 3))# sum of events
+   x_shape= K.int_shape(image)[1]
+   y_shape= K.int_shape(image)[2]
+   z_shape= K.int_shape(image)[3]
+   print(x_shape, y_shape, z_shape)
+   x_ref = K.sum(K.sum(image, axis=(2, 3)) * (K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32') + 0.5), axis=1)
+   y_ref = K.sum(K.sum(image, axis=(1, 3)) * (K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32') + 0.5), axis=1)
+   z_ref = K.sum(K.sum(image, axis=(1, 2)) * (K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32') + 0.5), axis=1)
+
+   x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) * K.cast(x_shape - 1, dtype='float32'), x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
+   y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref)* K.cast(y_shape - 1, dtype='float32'), y_ref/sumtot)
+   z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref)* K.cast(z_shape - 1, dtype='float32'), z_ref/sumtot)
+
+   x_ref = K.expand_dims(x_ref, 1)
+   y_ref = K.expand_dims(y_ref, 1)
+   z_ref = K.expand_dims(z_ref, 1)
+   
+   sumz = K.sum(image, axis =(1, 2)) # sum for x,y planes going along z
+   
+   x = K.expand_dims(K.arange(x_shape), 0)
+   x = K.cast(K.expand_dims(x, 2), dtype='float32') + 0.5
+   y = K.expand_dims(K.arange(y_shape), 0)
+   y = K.cast(K.expand_dims(y, 2), dtype='float32') + 0.5
+   xsum = K.sum(image, axis=2)
+   x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
+   y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
+
+   x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
+   y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
+   z = K.cast(K.arange(z_shape), dtype='float32') * K.ones_like(z_ref)
+   zproj = K.sqrt((x_mid-x_ref)**2.0 + (z - z_ref)**2.0)
+   m = (y_mid-y_ref)/zproj
+   m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)
+   ang = (math.pi/2.0) - tf.atan(m)
+   mang = K.mean(ang, axis=1)
+   print ('The time taken by Keras 1 = {} seconds'.format(time.time()-start))
+   return K.eval(x_mid), K.eval(y_mid), K.eval(zproj), K.eval(ang), K.eval(mang)
+                                                                                                                           
+                                                                     
 def ecal_angle_3d_ver2(image):
    start = time.time()
    image = K.squeeze(image, axis=4)
