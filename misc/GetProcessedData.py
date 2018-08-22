@@ -4,7 +4,7 @@ import numpy as np
 import math
 import time
 import glob
-import GANutils as gan
+import GANutilsANG as gan
 import setGPU
 import keras.backend as K
 import tensorflow as tf
@@ -37,11 +37,11 @@ def GetAngleDataProcessed(datafile):
    eta = np.array(f.get('eta'))
    X=np.array(f.get('ECAL'))
    Y=np.array(f.get('energy'))
-   X = X.astype(np.float32)
-   Y = Y.astype(np.float32)
-   theta = theta.astype(np.float32)
+   #X = X.astype(np.float32)
+   #Y = Y.astype(np.float32)
+   #theta = theta.astype(np.float32)
    m_theta = measPython(X)
-   eta = eta.astype(np.float32)
+   #eta = eta.astype(np.float32)
    ecal = np.sum(X, axis=(1, 2, 3))
    return X, Y, theta, m_theta, eta, ecal
 
