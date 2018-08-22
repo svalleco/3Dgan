@@ -75,7 +75,12 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 1
 
     return out
 
-def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
+def sqrt(x):
+    epsilon= np.finfo(float).eps
+    x[x < epsilon] = 0
+    return np.sqrt(x)
+            
+def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     #get data for training                                                                                                                             
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
@@ -88,7 +93,7 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, angtype='theta',
     ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
     ecal = np.sum(X, axis=(1, 2, 3))
-    return X, Y, ang, ecal
+    return preproc(X), Y, ang, ecal
 
 def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4):
     start_init = time.time()
@@ -209,8 +214,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
 
-            #print ('real_batch_loss', real_batch_loss)
-            #print ('fake_batch_loss', fake_batch_loss)
+            print ('real_batch_loss', real_batch_loss)
+            print ('fake_batch_loss', fake_batch_loss)
             
             # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0:
@@ -321,7 +326,7 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     #Architectures to import
-    from AngleArch3dGAN import generator, discriminator
+    from AngleArch3dGAN_sqrt import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
