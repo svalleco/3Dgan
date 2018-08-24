@@ -70,7 +70,7 @@ def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
 def get_sorted_angle(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.05, Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0):
     srt = {}
     for index, datafile in enumerate(datafiles):
-       data = Data(datafile, thresh = thresh, angtype=angtype)
+       data = Data(datafile, thresh = thresh, angtype=angtype, offset= offset)
        X = data[0]
        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
        indexes= np.where(sumx>0)
@@ -117,7 +117,7 @@ def get_sorted_angle(datafiles, energies, flag=False, num_events1=10000, num_eve
                  else:
                     srt["events_act" + str(energy)] = srt["events_act" + str(energy)][:num_events2]
                     srt["energy" + str(energy)] = srt["energy" + str(energy)][:num_events2]
-                    srt["angle" + str(energy)]=srt["angle" + str(energy)][:num_events1]
+                    srt["angle" + str(energy)]=srt["angle" + str(energy)][:num_events2]
               print('For {} energy {} events were loaded'.format(energy, srt["events_act" + str(energy)].shape[0]))
     return srt
 
@@ -189,14 +189,13 @@ def get_gen(energy, gendir):
     print "Generated file ", filename, " is loaded"
     return generated_images
 
-def generate(g, index, sampled_labels, sampled_angle, latent=200):
-    noise = np.random.normal(0, 1, (index, 2, latent))
+def generate(g, index, sampled_labels, sampled_angle, latent=256):
+    noise = np.random.normal(0, 1, (index, latent-1))
     sampled_labels=np.expand_dims(sampled_labels, axis=1)
-    sampled_angle=np.expand_dims(sampled_angle, axis=1)
-    sampled = np.concatenate((sampled_labels, sampled_angle), axis=1)
-    sampled = np.expand_dims(sampled, axis=2)
-    gen_in = sampled * noise
-    generated_images = g.predict(gen_in, verbose=False, batch_size=50)
+    noise = sampled_labels * noise
+    sampled = np.concatenate((sampled_angle.reshape(-1, 1), noise), axis=1)
+    generated_images = g.predict(sampled, verbose=False, batch_size=50)
+    generated_images[generated_images < 1e-4]= 0
     return generated_images
 
 def discriminate(d, images):
