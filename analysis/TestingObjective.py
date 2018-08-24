@@ -23,22 +23,23 @@ def main():
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
     genpath = "3d_angleweights_1loss/params_generator*.hdf5"# path to weights
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'angle_optimization' # plot directory
+    plotsdir = 'angle_optimization_2loss_pos' # plot directory
     particle = "Ele" 
     scale = 2
     threshold = 1e-4
     g= generator(latent_size=256)
+    start = 10
     gen_weights=[]
     disc_weights=[]
     ang.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    gen_weights=gen_weights[:2]
+    #gen_weights=gen_weights[:2]
     result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold)
-    PlotResultsRoot(result, plotsdir)
+    PlotResultsRoot(result, plotsdir, start)
    
 #Plots results in a root file
-def PlotResultsRoot(result, resultdir):
+def PlotResultsRoot(result, resultdir, start):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     c1.SetGrid ()
     legend = ROOT.TLegend(.6, .6, .9, .9)
@@ -70,18 +71,18 @@ def PlotResultsRoot(result, resultdir):
       if item[2]< mine:
          mine = item[2]
          mine_n = i
-    gt  = ROOT.TGraph( num , epoch, total )
+    gt  = ROOT.TGraph( num- start , epoch[start:], total[start:] )
     gt.SetLineColor(color1)
     mg.Add(gt)
-    legend.AddEntry(gt, "Total error", "l")
-    ge = ROOT.TGraph( num , epoch, energy_e )
+    legend.AddEntry(gt, "Total error min = {} (epoch {})".format(mint, mint_n), "l")
+    ge = ROOT.TGraph( num- start , epoch[start:], energy_e[start:] )
     ge.SetLineColor(color2)
-    legend.AddEntry(ge, "Energy error", "l")
+    legend.AddEntry(ge, "Energy error min = {} (epoch {})".format(mine, mine_n), "l")
     mg.Add(ge)
-    gp = ROOT.TGraph( num , epoch, pos_e)
+    gp = ROOT.TGraph( num- start , epoch[start:], pos_e[start:])
     gp.SetLineColor(color3)
     mg.Add(gp)
-    legend.AddEntry(gp, "Position error", "l")
+    legend.AddEntry(gp, "Position error  = {} (epoch {})".format(minp, minp_n), "l")
     c1.Update()
     mg.SetTitle("Optimization function: Mean Relative Error on position and energy;Epochs;Error")
     mg.Draw('ALP')
