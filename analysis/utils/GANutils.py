@@ -121,7 +121,7 @@ def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ang, ecal
 
-def get_sorted_angle(datafiles, energies, angles, aindexes, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.05, Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0):
+def get_sorted_angle(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.5, Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0):
     srt = {}
     for index, datafile in enumerate(datafiles):
        data = Data(datafile, thresh = thresh, angtype=angtype, offset= offset)
@@ -175,7 +175,7 @@ def get_sorted_angle(datafiles, energies, angles, aindexes, flag=False, num_even
               print('For {} energy {} events were loaded'.format(energy, srt["events_act" + str(energy)].shape[0]))
     return srt
 
-def save_sorted(srt, energies, aindexes, srtdir, ang=0):
+def save_sorted(srt, energies, srtdir, ang=0):
     safe_mkdir(srtdir)
     for energy in energies:
        srtfile = os.path.join(srtdir, "events_{:03d}.h5".format(energy))
@@ -350,7 +350,13 @@ def safe_mkdir(path):
         if exception.errno != EEXIST:
             raise exception
 
-def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='eta', thresh=1e-6, offset=0.0, nloss=3, concat=1):
+def preproc(n, xscale=1):
+    return n * xscale
+
+def postproc(n, xscale=1):
+    return n/xscale
+
+def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0, nloss=3, concat=1, pre=preproc, post=postproc):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     print flags
     Test = flags[0]
@@ -491,10 +497,10 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              d.load_weights(disc_weights)
              start = time.time()
              if nloss==4:
-                 var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["angle2_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_act" + str(energy)] * scale)
+                 var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["angle2_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, pre(var["events_act" + str(energy)], scale))
                  var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["angle2_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
              elif nloss==3:
-                 var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_act" + str(energy)] * scale)
+                 var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, pre(var["events_act" + str(energy)], scale))
                  var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
                               
              disc_time = time.time() - start
@@ -507,7 +513,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
                      discout[key]=var[key]['n_'+ str(i)]
                save_discriminated(discout, energy, discdir, ang)
           print 'Calculations for ....', energy
-          var["events_gan" + str(energy)]['n_'+ str(i)] = var["events_gan" + str(energy)]['n_'+ str(i)]/scale
+          var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale)
           var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0
           #var["isreal_act" + str(energy)]['n_'+ str(i)] = np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)])
           var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze((var["angle_act"+ str(energy)]['n_'+ str(i)]))/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)

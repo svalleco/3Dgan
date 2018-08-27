@@ -29,18 +29,24 @@ def main():
     particle = "Ele" 
     scale = 2
     threshold = 1e-4
-    ang = 0
+    ang = 1
     g= generator(latent_size=256)
-    start = 0
+    start = 5
     gen_weights=[]
     disc_weights=[]
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    gen_weights=gen_weights[:5]
-    result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold, ang=ang)
+    #gen_weights=gen_weights[:5]
+    result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold, ang=ang, preproc=sqrt, postproc=square)
     PlotResultsRoot(result, plotsdir, start, ang=ang)
-   
+
+def sqrt(n, scale=1):
+    return np.sqrt(n * scale)
+
+def square(n, scale=1):
+    return np.square(n)/scale
+
 #Plots results in a root file
 def PlotResultsRoot(result, resultdir, start, ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
@@ -152,16 +158,22 @@ def PlotResultsRoot(result, resultdir, start, ang=1):
                                             
     print ('The plot is saved to {}'.format(resultdir))
 
+def preproc(n, scale=1):
+    return n * scale
+
+def postproc(n, scale=1):
+    return n/scale
+        
 # results are obtained using metric and saved to a log file
-def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, thresh=1e-6, ang=1):
+def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, thresh=1e-6, ang=1, preproc=preproc, postproc=postproc):
     resultfile = os.path.join(resultdir,  'result_log.txt')
     file = open(resultfile,'w')
     result = []
     for i in range(len(gen_weights)):
        if i==0:
-         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh, ang=ang)) # For the first time when sorted data is not saved we can make use opposite flags
+         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh, ang=ang, postproc=postproc)) # For the first time when sorted data is not saved we can make use opposite flags
        else:
-         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh, ang=ang))
+         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, particle, thresh=thresh, ang=ang, postproc=postproc))
        #file.write(len(result[i]) * '{:.4f}\t'.format(*result[i]))
        file.write('\t'.join(str(r) for r in result[i]))
        file.write('\n')
@@ -193,9 +205,15 @@ def GetAngleData_reduced(datafile, thresh=1e-6):
     Y = Y.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, eta, ecal
-                              
+
+def preproc(n, scale=1):
+    return n * scale
+
+def postproc(n, scale=1):
+    return n/scale
+
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, particle="Ele", thresh=1e-6, ang=1):
+def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, particle="Ele", thresh=1e-6, ang=1, preproc=preproc, postproc=postproc):
    print ("Started")
    num_events=2000
    num_data = 140000
@@ -239,7 +257,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
         var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, var["angle" + str(energy)] * ascale, latent=latent)
      else:
         var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, latent=latent, ang=ang) 
-     var["events_gan" + str(energy)] = var["events_gan" + str(energy)]/xscale
+     var["events_gan" + str(energy)] = postproc(var["events_gan" + str(energy)], xscale)
    gen_time = time.time() - start
    print ("{} events were generated in {} seconds".format(total, gen_time))
    calc={}
