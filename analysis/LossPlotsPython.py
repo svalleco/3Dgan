@@ -11,11 +11,11 @@ except ImportError:
 
 def main():
    #pkl file name and plots dir
-   lossfile =  'dcgan-history-3d-1loss.pkl'
+   lossfile =  'results/dcgan-history-3d-1loss.pkl'
    outdir = 'loss_plots_1loss'
 
    # limits for plots. Adjust according to current plots
-   ymax = [25, 5, 5, 40, 2., 4., 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
+   ymax = [20, 5, 5, 40, 2.4, 3.6, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
 
    start_epoch =7 # removing initial epochs to check for overfitting of Generation loss
    
@@ -33,7 +33,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, num_ang_losses, fig=1):
    angtype = 'theta'
             
    if num_ang_losses==1:
-      weights = [1, 3, 0.1, 100, 0.1]
+      weights = [1, 3, 0.1, 50, 0.1]
       losstype = ['Weighted sum', bloss, ploss, aloss, ploss]
       lossnames = ['tot', 'gen', 'aux', '{}'.format(angtype), 'ecal sum']
 
@@ -115,6 +115,8 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, num_ang_losses, fig=1):
    plt.title('{} losses for Generator'.format(losstype[1]))
    epochs = np.arange(start_epoch, gen_train.shape[0])
    plt.plot(epochs, gen_train[start_epoch:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
+   fit = np.polyfit(epochs, gen_train[start_epoch:,1], 2)
+   plt.plot(epochs, np.polyval(fit, epochs), label='Gen fit {} ({})'.format(lossnames[1], losstype[1]), linestyle='--')
    plt.legend()
    plt.xlabel('Epochs starting from epoch' + str(start_epoch))  
    plt.ylabel('Loss')                            
