@@ -181,7 +181,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
       y = y[:ecal1["n_0"].shape[0]]
    Eprof = ROOT.TProfile("Eprof", "Relative error for Ecal sum vs. Ep", 50, p[0], p[1])
    Eprof.SetStats(ROOT.kFALSE)
-   Eprof.SetTitle("Relative Error for sum of  Ecal energies and Ep")
+   Eprof.SetTitle("Relative Error for sum of  Ecal energies and Ep {}-{} GeV".format(p[0], p[1]))
    my.fill_profile(Eprof, (ecal1["n_0"] - ecal1["n_0"])/ ecal1["n_0"], y)
    Eprof.GetXaxis().SetTitle("Ep GeV")
    Eprof.GetYaxis().SetTitle("(Ecal_{G4} - Ecal_{GAN})/Ecal_{G4}")
@@ -226,7 +226,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], ifpdf
      Gprof= Gprofs[i]
      if i== 0:
        Eprof.SetStats(0)
-       Eprof.SetTitle("Relative Error for Primary Energy")
+       Eprof.SetTitle("Relative Error for Primary Energy for {}-{} GeV".format(p[0], p[1]))
        Eprof.GetXaxis().SetTitle("Ep GeV")
        Eprof.GetYaxis().SetTitle("(Ep_{g4} - Ep_{predicted})/Ep")
        Eprof.GetYaxis().CenterTitle()
@@ -428,7 +428,6 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
        #hp.SetTitle(" Primary Energy")
        hp.GetXaxis().SetTitle("Ep GeV")
        my.fill_hist(hp, 100 *aux1[key])
-       hp =my.normalize(hp)
        hp.Draw()
        hp.Draw('sames hist')
        hp.SetLineColor(color)
@@ -472,7 +471,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    c1.SetGrid()
    color = 2
-   legend = ROOT.TLegend(.1, .7, .2, .8)
+   legend = ROOT.TLegend(.1, .6, .2, .75)
    hps=[]
    hgs=[]
    if y.shape[0]> aux1["n_0"].shape[0]:
@@ -593,7 +592,7 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifp
 
 def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, labels, log=0, p=[2, 500], ifpdf=True, stest=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
-   c1.SetTitle('Weighted 1d Histogram for point of maximum energy deposition along x, y, z axis')
+   c1.SetTitle('Weighted Histogram for point of maximum energy deposition along x, y, z axis')
    c1.SetGrid()
    color = 2
    c1.Divide(2,2)
@@ -611,6 +610,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1x, array1[:,0])
+   h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
    h1x.GetXaxis().SetTitle("Position of Max Energy (x axis)")
@@ -618,6 +618,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1y, array1[:,1])
+   h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
    h1y.GetXaxis().SetTitle("Position of Max Energy (y axis)")
@@ -625,6 +626,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1z, array1[:,2])
+   h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
    h1z.GetXaxis().SetTitle("Position of Max Energy (z axis)")
@@ -656,6 +658,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       h2z.SetLineColor(color)
       c1.cd(1)
       my.fill_hist(h2x, array2[key][:,0])
+      h2x=my.normalize(h2x)
       if i==0:
          h2x.Draw()
          h2x.Draw('sames hist')
@@ -672,6 +675,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       my.stat_pos(h2x)
       c1.cd(2)
       my.fill_hist(h2y, array2[key][:,1])
+      h2y=my.normalize(h2y)
       if i==0:
          h2y.Draw()
          h2y.Draw('sames hist')
@@ -689,6 +693,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
  
       c1.cd(3)
       my.fill_hist(h2z, array2[key][:,2])
+      h2z=my.normalize(h2z)
       if i==0:
          h2z.Draw()
          h2z.Draw('sames hist')
@@ -723,7 +728,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    c1.Update()
    c1.cd(4)
    leg.AddEntry(h1x,"G4","l")
-   leg.SetHeader("#splitline{1D Weighted Histograms for position of}{ max energy deposition along x, y, z axis}", "C")
+   leg.SetHeader("#splitline{Weighted Histograms for position of}{ max energy deposition along x, y, z axis}", "C")
    if not stest:
      leg.AddEntry(h2x, glabel,"l")
    leg.Draw()
@@ -735,7 +740,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
 
 def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, x, y, z, out_file1, out_file2, out_file3, energy, labels, log=0, p=[2, 500], ifpdf=True, stest=True):
    canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
-   canvas.SetTitle('Weighted 1d Histogram for energy deposition along x, y, z axis')
+   canvas.SetTitle('Weighted Histogram for energy deposition along x, y, z axis')
    canvas.SetGrid()
    color = 2
    canvas.Divide(2,2)
@@ -753,6 +758,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1x, array1x)
+   h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
    h1x.GetXaxis().SetTitle("Energy deposition along x axis")
@@ -760,6 +766,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1y, array1y)
+   h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
    h1y.GetXaxis().SetTitle("Energy deposition along y axis")
@@ -767,6 +774,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1z, array1z)
+   h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
    h1z.GetXaxis().SetTitle("Energy deposition along z axis")
@@ -797,6 +805,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       h2z.SetLineColor(color)
       canvas.cd(1)
       my.fill_hist_wt(h2x, array2x[key])
+      h2x=my.normalize(h2x)
       h2x.Draw()
       h2x.Draw('sames hist')
       h2x.GetXaxis().SetTitle("Energy deposition along x axis")
@@ -813,6 +822,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(2)
       my.fill_hist_wt(h2y, array2y[key])
+      h2y=my.normalize(h2y)
       h2y.Draw()
       h2y.Draw('sames hist')
       h2y.GetXaxis().SetTitle("Energy deposition along y axis")
@@ -826,6 +836,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(3)
       my.fill_hist_wt(h2z, array2z[key])
+      h2z=my.normalize(h2z)
       h2z.Draw()
       h2z.Draw('sames hist')
       h2z.GetXaxis().SetTitle("Energy deposition along z axis")
@@ -854,7 +865,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1z.Draw('sames hist')
    canvas.cd(4)
    leg.AddEntry(h1x, "G4","l")
-   leg.SetHeader("#splitline{1D Weighted Histograms for energies}{ deposited along x, y, z axis}", "C")
+   leg.SetHeader("#splitline{Weighted Histograms for energies}{ deposited along x, y, z axis}", "C")
    if not stest:
       leg.AddEntry(h2x, "GAN","l")
    leg.Draw()
@@ -1220,8 +1231,8 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
       safe_mkdir(egendir)
       for a, angle in zip(aindexes, angles):
          #alabels = ['ang_' + str() for _ in aindexes]
-         alabels = ['angle_' for _ in aindexes]
-         a2labels = ['angle2_' for _ in aindexes]
+         alabels = ['angle_{:.2f}{}'.format(angle, _) for _ in labels]
+         a2labels = ['angle2_{:.2f}{}'.format(angle, _) for _ in labels]
          plot_energy_hist_root(var["sumsx_act"+ str(energy) + "ang_" + str(a)], var["sumsy_act"+ str(energy)+ "ang_" + str(a)],
                                   var["sumsz_act"+ str(energy) + "ang_" + str(a)], var["sumsx_gan"+ str(energy)+ "ang_" + str(a)],
                                   var["sumsy_gan"+ str(energy)+ "ang_" + str(a)], var["sumsz_gan"+ str(energy)+ "ang_" + str(a)],
@@ -1237,6 +1248,11 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
          plot_ang_hist(var["angle_act" + str(energy) + "ang_" + str(a)], var["angle_gan" + str(energy) + "ang_" + str(a)] ,
                        os.path.join(ediscdir, "ang_" + str(a)), angle, angtype, alabels)
          plots+=1
+         plot_angle_error_hist(var["angle_act" + str(energy) + "ang_" + str(a)], var["angle_gan" + str(energy) + "ang_" + str(a)],
+                               var["angle" + str(energy) + "ang_" + str(a)], os.path.join(ediscdir, aerrorfile + "ang2_" + str(a)),
+                               angle, angtype, alabels)
+         plots+=1
+
          if nloss==4:
             plot_ang_hist(var["angle2_act" + str(energy) + "ang_" + str(a)], var["angle2_gan" + str(energy) + "ang_" + str(a)] ,
                       os.path.join(ediscdir, "ang2_" + str(a)), angle, angtype, a2labels)
