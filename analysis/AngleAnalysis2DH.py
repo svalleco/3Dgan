@@ -8,13 +8,13 @@ import math
 import time
 import glob
 import numpy.core.umath_tests as umath
-import GANutilsANG_concat as gan
+import GANutils as gan
 import ROOTutils as r
 import setGPU #if Caltech
 
 def main():
-   genweight = "3d_angleweights_1loss/params_generator_epoch_046.hdf5"
-   from EcalCondGanAngle_3d_1loss import generator
+   genweight = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight_withoutsqrt/params_generator_epoch_022.hdf5"
+   from EcalCondGanAngle_3d_1 import generator
    latent = 256
    g=generator(latent)
    g.load_weights(genweight)
@@ -27,7 +27,7 @@ def main():
    energies=[100, 150, 200]
    thetas = [62, 90, 118]
 
-   plotsdir = 'genplots_ep047'
+   plotsdir = 'genplots_without_sqrt_ep22'
    gan.safe_mkdir(plotsdir)
    opt="colz"
    events = {}
@@ -43,6 +43,11 @@ def main():
       sampled_energies=np.random.uniform(1, 2, size=(num_events))
       sampled_thetas = (np.float(t) /f )* np.ones((num_events))
       events = gan.generate(g, num_events, sampled_energies, sampled_thetas)
+      theta_dir = plotsdir+ '/theta_{}'.format(t)
+      gan.safe_mkdir(theta_dir)
+      for n in np.arange(num):
+              PlotEvent(events[n], sampled_energies[n], sampled_thetas[n], os.path.join(theta_dir, 'Event{}.pdf'.format(n)), n, f, opt=opt)
+            
       PlotAngleCut(events, t, os.path.join(plotsdir, 'Theta_cut{}.pdf'.format(t)), opt=opt)
 
    sampled_energies=np.random.uniform(1, 2, size=(num))
@@ -54,11 +59,13 @@ def main():
    print('Plots are saved in {}'.format(plotsdir))
      
 def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
-   canvas = TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make  
+   canvas = TCanvas("canvas" ,"abc" ,200 ,10 ,700 ,500) #make  
    canvas.SetGrid()
+   label = "Weighted Histograms for {} GeV".format(energy)
    canvas.Divide(2,2)
    color = 2
-   leg = ROOT.TLegend(0.1,0.6,0.7,0.9)
+   leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
+   leg.SetTextSize(0.05)
    print (len(events))
    hx=[]
    hy=[]
@@ -77,12 +84,17 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
       hx[i].SetLineColor(color)
       hy[i].SetLineColor(color)
       hz[i].SetLineColor(color)
+      hx[i].GetXaxis().SetTitle("X axis")
+      hy[i].GetXaxis().SetTitle("Y axis")
+      hz[i].GetXaxis().SetTitle("Z axis")
       canvas.cd(1)
       if log:
          gPad.SetLogy()
       r.fill_hist_wt(hx[i], sumx)
+   
       if i ==0:
-         hx[i].DrawNormalized('hist')
+         hx[i].DrawNormalized('sames hist')
+         canvas.Update()
       else:
          hx[i].DrawNormalized('sames hist')
       canvas.cd(2)
@@ -90,7 +102,8 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
          gPad.SetLogy()
       r.fill_hist_wt(hy[i], sumy)
       if i==0:
-         hy[i].DrawNormalized('hist')
+         hy[i].DrawNormalized('sames hist')
+         canvas.Update()
       else:
          hy[i].DrawNormalized('sames hist')
       canvas.cd(3)
@@ -98,12 +111,14 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
          gPad.SetLogy()
       r.fill_hist_wt(hz[i], sumz)
       if i==0:
-         hz[i].DrawNormalized('hist')
+         hz[i].DrawNormalized('sames hist')
+         canvas.Update()
       else:
          hz[i].DrawNormalized('sames hist')
                   
       canvas.cd(4)
       leg.AddEntry(hx[i], '{}theta {}events'.format(theta, num),"l")
+      leg.SetHeader(label, 'C')
       canvas.Update()
       color+= 1
    leg.Draw()
@@ -112,72 +127,85 @@ def plot_energy_hist_gen(events, out_file, energy, thetas, log=0, ifC=False):
    if ifC:
       canvas.Print(out_file + '.C')
 
-def Meas3(event, p1=5, p2=15):
-   z_shape = event.shape[2]
-   x = np.zeros(z_shape) # shape = (z)
-   y = np.zeros(z_shape)
-   ang = np.zeros(z_shape)
-   sumz = np.zeros(z_shape) 
-   for j in np.arange(p2 + 1): # Looping over z
-      sumz[j] = np.sum(event[:, :, j])
-      x[j] = 0
-      y[j] = 0
-      for k in np.arange(event.shape[0]):  # Looping over x
-         for l in np.arange(event.shape[1]): # Looping over y
-            x[j] = x[j] + event[k, l, j] * k
-            y[j] = y[j] + event[k, l, j] * l
-      if sumz[j] > 0:                         # check for zero sum
-         x[j] = x[j]/sumz[j]
-         y[j] = y[j]/sumz[j]
-         if j >p1:
-           zproj = np.sqrt((x[j] - x[p1])**2 + (j-p1)**2) 
-           ang[j] = np.arctan((y[j] - y[p1])/zproj)
-           ang[j] = math.pi/2 - ang[j]
-   result = ProcAngle1(ang[p1:p2+1], sumz[p1:p2+1])
-   return result
+def MeasPython1(image, mod=0):
+    x_shape= image.shape[1]
+    y_shape= image.shape[2]
+    z_shape= image.shape[3]
+            
+    sumtot = np.sum(image, axis=(1, 2, 3))# sum of events
+    indexes = np.where(sumtot > 0)
+    amask = np.ones_like(sumtot)
+    amask[indexes] = 0
+    #amask = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
+    masked_events = np.sum(amask) # counting zero sum events
 
-def ProcAngle1(meas, sumz):
-   sumtot = np.sum(sumz)
-   avg = np.sum( meas * sumz)/ sumtot
-   return avg
+    x_ref = np.sum(np.sum(image, axis=(2, 3)) * np.expand_dims(np.arange(x_shape) + 0.5, axis=0), axis=1)
+    y_ref = np.sum(np.sum(image, axis=(1, 3)) * np.expand_dims(np.arange(y_shape) + 0.5, axis=0), axis=1)
+    z_ref = np.sum(np.sum(image, axis=(1, 2)) * np.expand_dims(np.arange(z_shape) + 0.5, axis=0), axis=1)
 
-def ProcAngle2(meas, sumz):
-   l = meas.shape[0]
-   index = np.arange(1, l+1)
-   sumtot = l * (l+ 1) * 0.5
-   avg = np.sum( meas * index)/ sumtot
-   return avg
-      
-def Meas1(event, yp1 = 3, yp2 = 21):
-   event = np.sum(event , axis=(0))
-   y = np.arange(event.shape[1])
-   maxy = np.argmax(event, axis=0)
-   p = np.polyfit(y[yp1:yp2], maxy[yp1:yp2], 1)
-   angle = math.pi/2 - math.atan(p[0])
-   return angle
+    x_ref[indexes] = x_ref[indexes]/sumtot[indexes]
+    y_ref[indexes] = y_ref[indexes]/sumtot[indexes]
+    z_ref[indexes] = z_ref[indexes]/sumtot[indexes]
+                         
+    sumz = np.sum(image, axis =(1, 2)) # sum for x,y planes going along z
 
-def Meas2(event, yp1 = 3, yp2 = 21):
-    event = np.sum(event, axis=(0))
-    y = np.arange(event.shape[1])
-    maxy = np.argmax(event, axis=0)
-    tan = (maxy[yp2]-maxy[yp1]) / np.float(yp2 - yp1)
-    angle = math.pi/2 - math.atan(tan)
-    return angle
+    x = np.expand_dims(np.arange(x_shape) + 0.5, axis=0)
+    x = np.expand_dims(x, axis=2)
+    y = np.expand_dims(np.arange(y_shape) + 0.5, axis=0)
+    y = np.expand_dims(y, axis=2)
+    x_mid = np.sum(np.sum(image, axis=2) * x, axis=1)
+    y_mid = np.sum(np.sum(image, axis=1) * y, axis=1)
+    indexes = np.where(sumz > 0)
+
+    zmask = np.zeros_like(sumz)
+    zmask[indexes] = 1
+    zunmasked_events = np.sum(zmask, axis=1)
+
+    x_mid[indexes] = x_mid[indexes]/sumz[indexes]
+    y_mid[indexes] = y_mid[indexes]/sumz[indexes]
+    z = np.arange(z_shape) + 0.5# z indexes
+    x_ref = np.expand_dims(x_ref, 1)
+    y_ref = np.expand_dims(y_ref, 1)
+    z_ref = np.expand_dims(z_ref, 1)
+
+    zproj = np.sqrt((x_mid-x_ref)**2.0  + (z - z_ref)**2.0)
+    m = (y_mid-y_ref)/zproj
+    z = z * np.ones_like(z_ref)
+    indexes = np.where(z<z_ref)
+    m[indexes] = -1 * m[indexes]
+    ang = (math.pi/2.0) - np.arctan(m)
+    ang = ang * zmask
+    if mod==0:
+       ang = np.sum(ang, axis=1)/zunmasked_events
+    if mod==1:
+       wang = ang * sumz
+       sumz_tot = sumz * zmask
+       ang = np.sum(wang, axis=1)/np.sum(sumz_tot, axis=1)
+              
+    indexes = np.where(amask>0)
+    ang[indexes] = 100.
+                                                       #ang = ang.reshape(-1, 1)
+    return ang
+                                                             
 
 def PlotEvent(event, energy, theta, out_file, n, factor, opt=""):
-   canvas = TCanvas("canvas" ,"GAN 2D Hist" ,200 ,10 ,700 ,500) #make 
+   canvas = TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make 
    canvas.Divide(2,2)
+   event[event<1e-4]=0
    x = event.shape[0]
    y = event.shape[1]
    z = event.shape[2]
-   ang1 = Meas1(event)
-   ang2 = Meas2(event)
-   ang3 = Meas3(event)
-   leg = ROOT.TLegend(0.1,0.6,0.7,0.9)
+   print(event.shape)
+   print(np.expand_dims(event, axis=0).shape)
+   ang1 = MeasPython1(np.moveaxis(event, 3, 0))
+   ang2 = MeasPython1(np.moveaxis(event, 3, 0), mod=1)
+  
+   leg = ROOT.TLegend(0.1,0.4,0.8,0.9)
+   leg.SetTextSize(0.04)
+   leg.SetHeader("#splitline{Weighted Histograms for energies deposited in}{x, y and z planes}", 'C')
    hx = ROOT.TH2F('x_{:.2f}GeV_{:.2f}degree'.format(100 * energy, factor * theta), '', y, 0, y, z, 0, z)
    hy = ROOT.TH2F('y_{:.2f}GeV_{:.2f}degree'.format(100 * energy, factor * theta), '', x, 0, x, z, 0, z)
    hz = ROOT.TH2F('z_{:.2f}GeV_{:.2f}degree'.format(100 * energy, factor * theta), '', x, 0, x, y, 0, y)
-   gStyle.SetPalette(1)
    gPad.SetLogz()
    event = np.expand_dims(event, axis=0)
    FillHist2D_wt(hx, np.sum(event, axis=1))
@@ -187,6 +215,7 @@ def PlotEvent(event, energy, theta, out_file, n, factor, opt=""):
    hx.Draw(opt)
    hx.GetXaxis().SetTitle("Y axis")
    hx.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
    canvas.Update()
    r.stat_pos(hx)
    canvas.Update()
@@ -194,6 +223,7 @@ def PlotEvent(event, energy, theta, out_file, n, factor, opt=""):
    hy.Draw(opt)
    hy.GetXaxis().SetTitle("X axis")
    hy.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
    canvas.Update()
    r.stat_pos(hy)
    canvas.Update()
@@ -201,25 +231,30 @@ def PlotEvent(event, energy, theta, out_file, n, factor, opt=""):
    hz.Draw(opt)
    hz.GetXaxis().SetTitle("X axis")
    hz.GetYaxis().SetTitle("Y axis")
+   hx.GetYaxis().CenterTitle()
    canvas.Update()
    canvas.cd(4)
-   leg.AddEntry(hx, 'Sampled Energy={:.2f} GeV'.format(100 * energy),"l")
-   leg.AddEntry(hy, 'Sampled Theta ={:.2f} Degree'.format(theta * factor),"l")
-   leg.AddEntry(hz, 'Computed Theta={:.2f}/{:.2f}/{:.2f} Degree'.format(ang1 * factor, ang2 * factor, ang3 * factor),"l")
+   leg.AddEntry(hx, 'Energy Input = {:.2f} GeV'.format(100 * energy),"l")
+   leg.AddEntry(hy, 'Theta Input  = {:.2f} Degree'.format(theta * factor),"l")
+   print (ang1.shape)
+   leg.AddEntry(hz, 'Computed Theta (mean)     = {:.2f} Degree'.format(ang1[0] * factor),"l")
+   leg.AddEntry(hz, 'Computed Theta (weighted) = {:.2f} Degree'.format(ang2[0]* factor),"l")
    leg.Draw()
    r.stat_pos(hz)
    canvas.Update()
    canvas.Print(out_file)
 
 def PlotAngleCut(events, ang, out_file, opt=""):
-   canvas = TCanvas("canvas" ,"GAN 2D Hist" ,200 ,10 ,700 ,500) 
+   canvas = TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) 
    canvas.Divide(2,2)
+   n = events.shape[0]
    x = events.shape[1]
    y = events.shape[2]
    z = events.shape[3]
    gStyle.SetPalette(1)
    gPad.SetLogz()
-      
+   leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
+   leg.SetTextSize(0.05)
    hx = ROOT.TH2F('X{} Degree'.format(str(ang)), '', y, 0, y, z, 0, z)
    hy = ROOT.TH2F('Y{} Degree'.format(str(ang)), '', x, 0, x, z, 0, z)
    hz = ROOT.TH2F('Z{} Degree'.format(str(ang)), '', x, 0, x, y, 0, y)
@@ -230,6 +265,7 @@ def PlotAngleCut(events, ang, out_file, opt=""):
    hx.Draw(opt)
    hx.GetXaxis().SetTitle("Y axis")
    hx.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
    canvas.Update()
    r.stat_pos(hx)
    canvas.Update()
@@ -237,6 +273,7 @@ def PlotAngleCut(events, ang, out_file, opt=""):
    hy.Draw(opt)
    hy.GetXaxis().SetTitle("X axis")
    hy.GetYaxis().SetTitle("Z axis")
+   hy.GetYaxis().CenterTitle()
    canvas.Update()
    r.stat_pos(hy)
    canvas.Update()
@@ -244,6 +281,11 @@ def PlotAngleCut(events, ang, out_file, opt=""):
    hz.Draw(opt)
    hz.GetXaxis().SetTitle("X axis")
    hz.GetYaxis().SetTitle("Y axis")
+   hz.GetYaxis().CenterTitle()
+   canvas.cd(4)
+   leg.SetHeader("#splitline{Weighted Histograms for energies}{deposited in x, y, z planes}", 'C')
+   leg.AddEntry(hx, "{} Theta and {} events".format(ang, n), 'l')
+   leg.Draw()
    canvas.Update()
    r.stat_pos(hz)
    canvas.Update()
