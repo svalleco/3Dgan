@@ -59,16 +59,16 @@ def discriminator():
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     theta = Dense(1, activation='linear', name='theta')(dnn_out)
-    phi = Dense(1, activation='linear', name='phi')(dnn_out)
+    #phi = Dense(1, activation='linear', name='phi')(dnn_out)
 
     ecal = Lambda(lambda x: K.sum(x, axis=(1, 2, 3)))(image)
-    Model(input=image, output=[fake, aux, theta, phi, ecal]).summary()
-    return Model(input=image, output=[fake, aux, theta, phi, ecal])
+    Model(input=image, output=[fake, aux, theta, ecal]).summary()
+    return Model(input=image, output=[fake, aux, theta, ecal])
 
 def generator(latent_size=200, return_intermediate=False):
     
     loc = Sequential([
-        Dense(1728, input_shape=(3,latent_size)),
+        Dense(2592, input_shape=(2,latent_size)),
         Reshape((9, 9, 8, 8)),
 
         Conv3D(32, 6, 6, 8, border_mode='same', init='he_uniform'),
@@ -88,7 +88,7 @@ def generator(latent_size=200, return_intermediate=False):
         Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
         Activation('relu')
     ])
-    latent = Input(shape=(3, latent_size ))   
+    latent = Input(shape=(2, latent_size ))   
     fake_image = loc(latent)
     loc.summary()
     Model(input=[latent], output=fake_image).summary()
