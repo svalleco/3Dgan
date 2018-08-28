@@ -40,8 +40,7 @@ def ecal_angle2(image):
     b = K.argmax(a, axis=1)
     c = K.cast(b[:,21] - b[:,3], dtype='float32')/18.0
     d = tf.atan(c)
-    #d = K.abs(d)
-    d = (3.14158/2.0) - d
+    #e = (3.14158/2.0) - d
     d = K.expand_dims(d)
     return d
 
@@ -82,20 +81,19 @@ def discriminator():
     x = AveragePooling3D((2, 2, 2))(x)
     h = Flatten()(x)
 
-    dnn = Model(image, h)
-    dnn.summary()
+    #dnn = Model(image, h)
+    #dnn.summary()
 
-    dnn_out = dnn(image)
+    #dnn_out = dnn(image)
 
-    fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-    aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ang = Dense(100, activation='linear', name= 'ang')(dnn_out)
+    fake = Dense(1, activation='sigmoid', name='generation')(h)
+    aux = Dense(1, activation='linear', name='auxiliary')(h)
+    ang = Dense(100, activation='linear', name= 'ang')(h)
     ang1 = Dense(1, activation='linear', name='ang1')(ang)
     ang2 = Lambda(ecal_angle2)(image)
     ecal = Lambda(ecal_sum)(image)
     Model(input=image, output=[fake, aux, ang1, ang2, ecal]).summary()
     return Model(input=image, output=[fake, aux, ang1, ang2, ecal])
-
 
 def generator(latent_size=200, return_intermediate=False):
     
