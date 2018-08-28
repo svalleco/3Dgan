@@ -214,8 +214,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
 
-            print ('real_batch_loss', real_batch_loss)
-            print ('fake_batch_loss', fake_batch_loss)
+            #print ('real_batch_loss', real_batch_loss)
+            #print ('fake_batch_loss', fake_batch_loss)
             
             # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0:
@@ -345,18 +345,19 @@ if __name__ == '__main__':
     #following can be changed if using from command line
         
     #weightdir = params.weightsdir
-    weightdir = 'weights/3Dweights_1loss_50weight' # renamed to keep record
+    weightdir = 'weights/3Dweights_1loss_25weight_sqrt' # renamed to keep record
     #pklfile = params.pklfile
-    pklfile = '3dgan-history-1loss-50weight.pkl'
+    pklfile = '3dgan-history-1loss-25weight_sqrt.pkl'
     #xscale = params.xscale
     xscale=1
+    nb_epochs = 120
     
     print(params)
 
     # set for each training
     gen_weight = 3  # weight for generation loss
-    aux_weight=0.1  # weight for primary energy regression loss
-    ang_weight=50   # weight for angle loss
+    aux_weight= 0.1  # weight for primary energy regression loss
+    ang_weight= 25   # weight for angle loss
     ecal_weight = 0.1 # weight for ecal loss
     thresh = 0 # threshold for data
     angtype = 'mtheta'

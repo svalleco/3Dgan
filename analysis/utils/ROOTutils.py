@@ -19,6 +19,15 @@ def BinLogX(h):
 def fill_hist(hist, array):
    [hist.Fill(_) for _ in array]
 
+def normalize(hist, mod=0):
+   if mod==0:
+      norm = hist.GetEntries()
+      hist.Scale(1/norm)
+   elif mod==1:   
+      if hist.Integral()!=0:
+         hist.Scale(1/hist.Integral())
+   return hist
+
 #Fill a weighted histogram for event from numpy array
 def fill_hist_wt(hist, weight):
    l=weight.shape[1]
@@ -27,7 +36,22 @@ def fill_hist_wt(hist, weight):
      for j in np.arange(weight.shape[0]):
         hist.Fill(i, weight[j, i])
 
-#Hits above a threshold                                                                                                                                                                                            
+def FillHist2D_wt(hist, array):
+   array= np.squeeze(array, axis=3)
+   dim1 = array.shape[0]
+   dim2 = array.shape[1]
+   dim3 = array.shape[2]
+   bin1 = np.arange(dim1)
+   bin2 = np.arange(dim2)
+   bin3 = np.arange(dim3)
+   count = 0
+   for j in bin2:
+      for k in bin3:
+         for i in bin1:
+            hist.Fill(j, k, array[i, j, k])
+            count+=1
+                                                                            
+#Hits above a threshold
 def get_hits(events, thresh=0.0002):
    hit_array = events>thresh
    hits = np.sum(hit_array, axis=(1, 2, 3))

@@ -322,7 +322,7 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     #Architectures to import
-    from AngleArch3dGAN import generator, discriminator
+    from AngleArch3dGAN_5layer import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
@@ -341,9 +341,9 @@ if __name__ == '__main__':
     #following can be changed if using from command line
         
     #weightdir = params.weightsdir
-    weightdir = 'weights/3Dweights_1loss_25weight' # renamed to keep record
+    weightdir = 'weights/3Dweights_1loss_25weight_5layer' # renamed to keep record
     #pklfile = params.pklfile
-    pklfile = '3dgan-history-1loss-25weight.pkl'
+    pklfile = '3dgan-history-1loss-25weight_5layer.pkl'
     #xscale = params.xscale
     xscale=1
     nb_epochs = 120
