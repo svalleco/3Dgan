@@ -56,12 +56,11 @@ def discriminator():
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    #eta = Dense(1, activation='linear', name='eta')(dnn_out)
-    theta = Dense(1, activation='linear', name='theta')(dnn_out)
-
+    angle = Dense(100, activation='relu', name='angle1')(dnn_out)
+    angle = Dense(1, activation='linear', name='angle2')(angle)
     ecal = Lambda(lambda x: K.sum(x, axis=(1, 2, 3)))(image)
-    Model(input=image, output=[fake, aux, theta, ecal]).summary()
-    return Model(input=image, output=[fake, aux, theta, ecal])
+    Model(input=image, output=[fake, aux, angle, ecal]).summary()
+    return Model(input=image, output=[fake, aux, angle, ecal])
 
 def generator(latent_size=256, return_intermediate=False):
     
