@@ -214,8 +214,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
 
-            print ('real_batch_loss', real_batch_loss)
-            print ('fake_batch_loss', fake_batch_loss)
+            #print ('real_batch_loss', real_batch_loss)
+            #print ('fake_batch_loss', fake_batch_loss)
             
             # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0:

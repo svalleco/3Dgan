@@ -21,25 +21,37 @@ sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
 
 def main():
     # All of the following needs to be adjusted
-    from AngleArch3dGAN_sqrt import generator # architecture
+    from AngleArch3dGAN import generator # architecture
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
-    genpath = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_generator*.hdf5"# path to weights
+    genpath = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight_withoutsqrt/params_generator*.hdf5"# path to weights
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/angle_optimization_1loss_50' # plot directory
+    plotsdir = 'results/angle_optimization_without_sqrt' # plot directory
     particle = "Ele" 
     scale = 2
     threshold = 1e-4
     ang = 1
     g= generator(latent_size=256)
-    start = 5
+    start = 0
     gen_weights=[]
     disc_weights=[]
+    fits = ['pol1', 'pol2', 'expo']
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    #gen_weights=gen_weights[:5]
-    result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold, ang=ang, preproc=sqrt, postproc=square)
-    PlotResultsRoot(result, plotsdir, start, ang=ang)
+    #gen_weights=gen_weights[:3]
+    epoch = []
+    for i in np.arange(len(gen_weights)):
+      name = os.path.basename(gen_weights[i])
+      print( name)
+      num = int(filter(str.isdigit, name)[:-1])
+      print(num)
+      epoch.append(num)
+    print("{} weights are found".format(len(gen_weights)))
+    print(epoch)
+    result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold, ang=ang
+                        #, preproc = sqrt, postproc=square
+                        )
+    PlotResultsRoot(result, plotsdir, start, epoch, fits, ang=ang)
 
 def sqrt(n, scale=1):
     return np.sqrt(n * scale)
@@ -48,7 +60,7 @@ def square(n, scale=1):
     return np.square(n)/scale
 
 #Plots results in a root file
-def PlotResultsRoot(result, resultdir, start, ang=1):
+def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     c1.SetGrid ()
     legend = ROOT.TLegend(.6, .6, .9, .9)
@@ -61,101 +73,83 @@ def PlotResultsRoot(result, resultdir, start, ang=1):
     print(num)
     total = np.zeros((num))
     energy_e = np.zeros((num))
-    pos_e = np.zeros((num))
+    mmt_e = np.zeros((num))
     ang_e = np.zeros((num))
     epoch = np.zeros((num))
       
     mine = 100
-    minp = 100
+    minm = 100
     mint = 100
     mina = 100
     for i, item in enumerate(result):
-      epoch[i] = i  
+      epoch[i] = epochs[i]  
       total[i]=item[0]
       if item[0]< mint:
          mint = item[0]
-         mint_n = i
-      pos_e[i]=item[1]
-      if item[1]< minp:
-         minp = item[1]
-         minp_n = i
+         mint_n = epoch[i]
+      mmt_e[i]=item[1]
+      if item[1]< minm:
+         minm = item[1]
+         minm_n = epoch[i]
       energy_e[i]=item[2]
       if item[2]< mine:
          mine = item[2]
-         mine_n = i
-      if item[3]< mina:
-         mina = item[3]
-         mina_n = i
+         mine_n = epoch[i]
+      if ang:   
+         if item[3]< mina:
+           mina = item[3]
+           mina_n = epoch[i]
                                
     gt  = ROOT.TGraph( num- start , epoch[start:], total[start:] )
     gt.SetLineColor(color1)
     mg.Add(gt)
-    legend.AddEntry(gt, "Total error min = {} (epoch {})".format(mint, mint_n), "l")
+    legend.AddEntry(gt, "Total error min = {:.4f} (epoch {})".format(mint, mint_n), "l")
     ge = ROOT.TGraph( num- start , epoch[start:], energy_e[start:] )
     ge.SetLineColor(color2)
-    legend.AddEntry(ge, "Energy error min = {} (epoch {})".format(mine, mine_n), "l")
+    legend.AddEntry(ge, "Energy error min = {:.4f} (epoch {})".format(mine, mine_n), "l")
     mg.Add(ge)
-    gp = ROOT.TGraph( num- start , epoch[start:], pos_e[start:])
-    gp.SetLineColor(color3)
-    mg.Add(gp)
-    legend.AddEntry(gp, "Position error  = {} (epoch {})".format(minp, minp_n), "l")
+    gm = ROOT.TGraph( num- start , epoch[start:], mmt_e[start:])
+    gm.SetLineColor(color3)
+    mg.Add(gm)
+    legend.AddEntry(gm, "Moment error  = {:.4f} (epoch {})".format(minm, minm_n), "l")
     c1.Update()
-    ga = ROOT.TGraph( num- start , epoch[start:], ang_e[start:])
-    ga.SetLineColor(color4)
-    mg.Add(ga)
-    legend.AddEntry(ga, "Angle error  = {} (epoch {})".format(mina, mina_n), "l")
-    c1.Update()
+    if ang:
+      ga = ROOT.TGraph( num- start , epoch[start:], ang_e[start:])
+      ga.SetLineColor(color4)
+      mg.Add(ga)
+      legend.AddEntry(ga, "Angle error  = {:4f} (epoch {})".format(mina, mina_n), "l")
+      c1.Update()
                     
-    mg.SetTitle("Optimization function: Mean Relative Error on position and energy;Epochs;Error")
+    mg.SetTitle("Optimization function: Mean Relative Error on moment and energy;Epochs;Error")
     mg.Draw('ALP')
     c1.Update()
     legend.Draw()
     c1.Update()
     c1.Print(os.path.join(resultdir, "result.pdf"))
+
+    fits = ['pol1', 'pol2', 'expo']
+    for i, fit in enumerate(fits):
+      mg.SetTitle("Optimization function: Mean Relative Error on moment and energy({} fit);Epochs;Error".format(fit))  
+      gt.Fit(fit)
+      gt.GetFunction(fit).SetLineColor(color1)
+      gt.GetFunction(fit).SetLineStyle(2)
     
-    gt.Fit("pol1")
-    gt.GetFunction("pol1").SetLineColor(color1)
-    gt.GetFunction("pol1").SetLineStyle(2)
+      ge.Fit(fit)
+      ge.GetFunction(fit).SetLineColor(color2)
+      ge.GetFunction(fit).SetLineStyle(2)
+            
+      gm.Fit(fit)
+      gm.GetFunction(fit).SetLineColor(color3)
+      gm.GetFunction(fit).SetLineStyle(2)
 
-    ge.Fit("pol1")
-    ge.GetFunction("pol1").SetLineColor(color2)
-    ge.GetFunction("pol1").SetLineStyle(2)
-        
-    gp.Fit("pol1")
-    gp.GetFunction("pol1").SetLineColor(color3)
-    gp.GetFunction("pol1").SetLineStyle(2)
-        
-    c1.Update()
-    c1.Print(os.path.join(resultdir, "result_Linfit.pdf"))
-    gt.Fit("pol2")
-    gt.GetFunction("pol2").SetLineColor(color1)
-    gt.GetFunction("pol2").SetLineStyle(2)
-        
-    ge.Fit("pol2")
-    ge.GetFunction("pol2").SetLineColor(color2)
-    ge.GetFunction("pol2").SetLineStyle(2)
-        
-    gp.Fit("pol2")
-    gp.GetFunction("pol2").SetLineColor(color3)
-    gp.GetFunction("pol2").SetLineStyle(2)
+      if i == 0:
+        legend.AddEntry(gt.GetFunction(fit), 'Total fit', "l")
+        legend.AddEntry(ge.GetFunction(fit), 'Energy fit', "l")
+        legend.AddEntry(gm.GetFunction(fit), 'Moment fit', "l")  
 
-    c1.Update()
-    c1.Print(os.path.join(resultdir, "pol2fit.pdf"))
-
-    gt.Fit("expo")
-    gt.GetFunction("expo").SetLineColor(color1)
-    gt.GetFunction("expo").SetLineStyle(2)
-
-    ge.Fit("expo")
-    ge.GetFunction("expo").SetLineColor(color2)
-    ge.GetFunction("expo").SetLineStyle(2)
-
-    gp.Fit("expo")
-    gp.GetFunction("expo").SetLineColor(color3)
-    gp.GetFunction("expo").SetLineStyle(2)
-    c1.Update()
-    c1.Print(os.path.join(resultdir, "expofit.pdf"))
-                                            
+      legend.Draw()
+      c1.Update()
+      c1.Print(os.path.join(resultdir, "result_{}.pdf".format(fit)))
     print ('The plot is saved to {}'.format(resultdir))
 
 def preproc(n, scale=1):
@@ -182,7 +176,8 @@ def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particl
     for i in range(len(gen_weights)):                                                                                            
        print ('The results for ......',gen_weights[i])
        print (" The result for {} = ",)
-       print (len(result[i]) * '{:.4f}'.format(*result[i]))
+       print ('\t'.join(str(r) for r in result[i]))
+       print ('\n')
     file.close
     print ('The results are saved to {}.txt'.format(resultfile))
     return result

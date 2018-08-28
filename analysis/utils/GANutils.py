@@ -20,11 +20,10 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
          ratio = np.polyval(root_fit, sampled_energies)
          return np.multiply(ratio, sampled_energies) * xscale
 
-def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 10000, Fractions=[.25,.75],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
     print ("Found {} files. ".format(len(Files)))
-    Filesused = int(math.ceil(nEvents/EventsperFile))
     FileCount=0
     Samples={}
     for F in Files:
@@ -44,7 +43,7 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 1
         out.append([])
     SampleI=len(Samples.keys())*[int(0)]
     for i,SampleName in enumerate(Samples):
-        Sample=Samples[SampleName][:Filesused]
+        Sample=Samples[SampleName]
         NFiles=len(Sample)
         for j,Frac in enumerate(Fractions):
             EndI=int(SampleI[i]+ round(NFiles*Frac))
@@ -378,7 +377,6 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
        print "Events were loaded in {} seconds".format(sort_time)
     else:
        # Getting Data                                                                                                                                                                                           
-       events_per_file = 10000
        Filesused = int(math.ceil(num_data/events_per_file))
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
        Trainfiles = Trainfiles[: Filesused]

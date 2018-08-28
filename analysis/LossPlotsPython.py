@@ -11,11 +11,11 @@ except ImportError:
 
 def main():
    #pkl file name and plots dir
-   lossfile =  '/nfshome/gkhattak/3Dgan/3dgan-history-1loss-50weight_withoutsqrt_ep57.pkl'
-   outdir = 'results/loss_plots_withoutsqrt'
+   lossfile =  '/nfshome/gkhattak/3Dgan/3dgan-history-1loss-50weight.pkl'
+   outdir = 'results/loss_plots_sqrt'
 
    # limits for plots. Adjust according to current plots
-   ymax = [20, 5, 5, 40, 2.25, 3.25, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
+   ymax = [20, 5, 5, 40, 0.85, 1.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
 
    start_epoch =7 # removing initial epochs to check for overfitting of Generation loss
    

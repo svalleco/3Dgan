@@ -321,7 +321,7 @@ def plot_ecal_flatten_hist(event1, event2, penergy, out_file, energy, labels, p=
    ROOT.gStyle.SetOptStat(11111111)
    if log:
       ROOT.gPad.SetLogy()
-   hd = ROOT.TH1F("Geant4", "", 100, -6, 2)
+   hd = ROOT.TH1F("Geant4", "", 100, -8, 2)
    my.BinLogX(hd)
    my.fill_hist(hd, event1.flatten())
    hd.Sumw2()
@@ -340,7 +340,7 @@ def plot_ecal_flatten_hist(event1, event2, penergy, out_file, energy, labels, p=
    hgs=[]
    pos = 0
    for i, key in enumerate(event2):
-      hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, -6, 2))
+      hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, -8, 2))
       hg = hgs[i]
       hg.Sumw2()
       my.BinLogX(hg)
@@ -1178,7 +1178,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
       plots+=1
       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)],
                x, y, z, os.path.join(actdir, maxfile), os.path.join(gendir, maxfile),
-               os.path.join(comdir, maxfile), energy, labels, p, stest=stest)
+               os.path.join(comdir, maxfile), energy, labels, p=p, stest=stest)
       plots+=1
       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)],
                x, y, z, os.path.join(actdir, maxlfile),

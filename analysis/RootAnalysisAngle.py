@@ -12,17 +12,18 @@ def main():
    #Architectures 
    from AngleArch3dGAN_sqrt import generator, discriminator
    
-   disc_weights="/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_discriminator_epoch_057.hdf5"
-   gen_weights= "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_generator_epoch_057.hdf5"
+   disc_weights="/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_discriminator_epoch_059.hdf5"
+   gen_weights= "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_generator_epoch_059.hdf5"
 
-   plots_dir = "results/sqrt_plots_testing_ep57/"
+   plots_dir = "results/sqrt_plots_testing_ep59_reduced/"
    latent = 256
    num_data = 100000
    num_events = 2000
+   events_per_file = 5000
    m = 2
    nloss= 3
    concat = 1
-   cell=0
+   cell=1
    energies=[0, 110, 150, 190]
    #angles = [-0.5, -0.25, 0, 0.25, 0.5]
    angles = [math.radians(x) for x in [62, 85, 90, 105, 118]]
@@ -61,7 +62,7 @@ def main():
    g = generator(latent)
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
                 aindexes, datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, 
-                ascales, flags, latent, particle, thresh=thresh, angtype=angtype, offset=0.0,
+                ascales, flags, latent, events_per_file, particle, thresh=thresh, angtype=angtype, offset=0.0,
                 nloss=nloss, concat=concat
                 , pre =sqrt, post =square                   
    )
