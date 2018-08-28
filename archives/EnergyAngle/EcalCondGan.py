@@ -24,26 +24,25 @@ def discriminator():
 
     image = Input(shape=(51, 51, 25, 1))
 
-    x = Conv3D(16, 6, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 6, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
-    x = ZeroPadding3D((1, 1, 1))(x)
-    x = Conv3D(8, 6, 6, 6, border_mode='valid')(x)
+    x = ZeroPadding3D((0, 0, 1))(x)
+    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
     #x = AveragePooling3D((2, 2, 2))(x)
-
     #x = ZeroPadding3D((1, 1, 1))(x)
-    x = Conv3D(8, 6, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
@@ -71,19 +70,19 @@ def generator(latent_size=200, return_intermediate=False):
         Dense(2592, input_shape=(2,latent_size)),
         Reshape((9, 9, 8, 8)),
 
-        Conv3D(32, 6, 6, 8, border_mode='same', init='he_uniform'),
+        Conv3D(64, 6, 6, 8, border_mode='same', init='he_uniform'),
         LeakyReLU(),
         BatchNormalization(),
         UpSampling3D(size=(3, 3, 2)),
 
-        ZeroPadding3D((2, 2, 1)),
-        Conv3D(6, 5, 6, 8, init='he_uniform'),
+        ZeroPadding3D((2, 3, 1)),
+        Conv3D(6, 5, 8, 8, init='he_uniform'),
         LeakyReLU(),
         BatchNormalization(),
         UpSampling3D(size=(2, 2, 3)),
 
-        ZeroPadding3D((0,1,0)),
-        Conv3D(6, 3, 3, 8, init='he_uniform'),
+        ZeroPadding3D((0, 2,0)),
+        Conv3D(6, 3, 5, 8, init='he_uniform'),
         LeakyReLU(),
         Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
         Activation('relu')
@@ -94,5 +93,6 @@ def generator(latent_size=200, return_intermediate=False):
     Model(input=[latent], output=fake_image).summary()
     return Model(input=[latent], output=fake_image)
 
-d = discriminator()
-g = generator()
+g= generator()
+d=discriminator()
+
