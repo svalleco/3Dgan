@@ -71,18 +71,75 @@ def ecal_angle(image):
     ang = (math.pi/2.0) - tf.atan(m)# angle correction
     zmask = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
     ang = ang * zmask # place zero where zsum is zero
-    
-    ang = ang * sumz
-    sumz_tot = K.sum(sumz * zmask, axis=1)
-
-    #zunmasked = K.sum(zmask, axis=1)
-    #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
-    ang = K.sum(ang, axis=1)/sumz_tot
+    zunmasked = K.sum(zmask, axis=1)
+    ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place a 4 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
     print(K.int_shape(ang))
     return ang
+
+def ecal_angle2(image):
+    image = K.squeeze(image, axis=4)
+    # size of ecal
+    x_shape= K.int_shape(image)[1]
+    y_shape= K.int_shape(image)[2]
+    z_shape= K.int_shape(image)[3]
+    sumtot = K.sum(image, axis=(1, 2, 3))# sum of events
+
+    # get 1. where event sum is 0 and 0 elsewhere
+    amask = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
+    masked_events = K.sum(amask) # counting zero sum events
+
+    # ref denotes barycenter as that is our reference point
+    x_ref = K.sum(K.sum(image, axis=(2, 3)) * (K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32') + 0.5) , axis=1)# sum for x position * x index
+    y_ref = K.sum(K.sum(image, axis=(1, 3)) * (K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32') + 0.5), axis=1)
+    z_ref = K.sum(K.sum(image, axis=(1, 2)) * (K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32') + 0.5), axis=1)
+    x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) , x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
+    y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref) , y_ref/sumtot)
+    z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref), z_ref/sumtot)
+    #reshape
+    x_ref = K.expand_dims(x_ref, 1)
+    y_ref = K.expand_dims(y_ref, 1)
+    z_ref = K.expand_dims(z_ref, 1)
+                                                                                    
+    sumz = K.sum(image, axis =(1, 2)) # sum for x,y planes going along z
+
+    # Get 0 where sum along z is 0 and 1 elsewhere
+    zmask = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz) , K.ones_like(sumz))
+    #zunmasked = K.sum(zmask, axis=1)
+
+    x = K.expand_dims(K.arange(x_shape), 0) # x indexes
+    x = K.cast(K.expand_dims(x, 2), dtype='float32')
+    y = K.expand_dims(K.arange(y_shape), 0)# y indexes
+    y = K.cast(K.expand_dims(y, 2), dtype='float32')
+
+    #barycenter for each z position
+    x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
+    y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
+    x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
+    y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
+
+    #Angle Calculations
+    z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5)  * K.ones_like(z_ref) # Make an array of z indexes for all events
+    zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis
+    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
+    m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
+    ang = (math.pi/2.0) - tf.atan(m)# angle correction
+    zmask = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
+    ang = ang * zmask # place zero where zsum is zero
+
+    ang = ang * z
+    sumz_tot = K.sum(z * zmask, axis=1)
+
+    #zunmasked = K.sum(zmask, axis=1)
+    #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
+    ang = K.sum(ang, axis=1)/sumz_tot
+    ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place a 4 for measured angle where no energy is deposited in events
+    ang = K.expand_dims(ang, 1)
+    #print(K.int_shape(ang))
+    return ang
+                                                                                                                    
 
 def discriminator():
   
@@ -119,10 +176,12 @@ def discriminator():
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ang = Lambda(ecal_angle)(image)
+    ang = Dense(100, activation='linear', name= 'ang')(dnn_out)
+    ang1 = Dense(1, activation='linear', name='ang1')(ang)
+    ang2 = Lambda(ecal_angle2)(image)
     ecal = Lambda(ecal_sum)(image)
-    Model(input=image, output=[fake, aux, ang, ecal]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal])
+    Model(input=image, output=[fake, aux, ang1, ang2, ecal]).summary()
+    return Model(input=image, output=[fake, aux, ang1, ang2, ecal])
 
 
 def generator(latent_size=200, return_intermediate=False):
