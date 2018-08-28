@@ -1,3 +1,4 @@
+#Training for GAN
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -340,18 +341,19 @@ if __name__ == '__main__':
     #following can be changed if using from command line
         
     #weightdir = params.weightsdir
-    weightdir = 'weights/3Dweights_1loss_50weight' # renamed to keep record
+    weightdir = 'weights/3Dweights_1loss_25weight' # renamed to keep record
     #pklfile = params.pklfile
-    pklfile = '3dgan-history-1loss-50weight.pkl'
+    pklfile = '3dgan-history-1loss-25weight.pkl'
     #xscale = params.xscale
     xscale=1
+    nb_epochs = 120
     
     print(params)
 
     # set for each training
     gen_weight = 3  # weight for generation loss
-    aux_weight=0.1  # weight for primary energy regression loss
-    ang_weight=50   # weight for angle loss
+    aux_weight= 0.1  # weight for primary energy regression loss
+    ang_weight= 25   # weight for angle loss
     ecal_weight = 0.1 # weight for ecal loss
     thresh = 0 # threshold for data
     angtype = 'mtheta'
