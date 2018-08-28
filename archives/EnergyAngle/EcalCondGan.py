@@ -23,37 +23,54 @@ def ecal_sum(image):
     #sum = K.expand_dims(sum)
     return sum
    
+def get_angle_fit2(x, y):
+    #x= K.eval(x)
+    #y = K.eval(y)
+    ang = np.zeros((x.shape[0]))
+    for i in np.arange(x.shape[0]):
+       p = np.polyfit(x[i], y, 1)
+       ang[i] = math.atan(p[0])
+       
+    #ang = tf.convert_to_tensor(ang, dtype=tf.float32)
+    #ang = tf.reshape(tf.concat(1, ang), [1,])
+    return ang
+
+def get_angle_fit(x):
+    b = np.arange(25)  
+    #p = np.polyfit(x, b, 1)
+    #ang = math.atan(p[0])
+    ang = np.sum(x)
+    return ang
+
 def ecal_angle(image):
     a = K.sum(image, axis=(1, 4))
+    print 'event', K.int_shape(a)
     maxa = K.argmax(a, axis=1)
-    b = np.arange(25)
-    p = []
-    ang = []
-    for i in np.arange(image.shape[0]):    
-       p.append( np.polyfit(b, maxa[i], 1))
-       ang.append( math.atan(p[i][0]))
-    ang = tf.convert_to_tensor(ang, dtype=tf.float32)
+    print 'max', K.int_shape(maxa)
+    #b = K.arange(25)
+    #print 'y', K.int_shape(b)
+    #b = K.reshape(b, (None, 1))
+    #ang = get_angle_fit(maxa, b)
+    #ang = K.expand_dims(ang)
+    ang = Lambda(get_angle_fit, output_shape=(None, 1))(maxa)
+    #batch_size = K.int_shape(image)[0]
+    #ang = K.reshape(ang, shape=(batch_size, 1)) 
+    #tf.set_shape(ang, (-1, 1))
+    print 'ang', ang
     return ang
     
 def ecal_angle2(image):
     a = K.sum(image, axis=(1, 4))
-    print 'evenst', K.int_shape(a)
     b = K.argmax(a, axis=1)
-    print 'argmax', K.int_shape(b)
     c = K.cast(b[:,21] - b[:,3], dtype='float32')/18.0
-    print 'tan', K.int_shape(c)
     d = tf.atan(c)
-    d = (3.14158/2.0) - d
-    print 'angle', K.int_shape(d)
-    #d = K.expand_dims(d)
+    #e = (3.14158/2.0) - d
+    d = K.expand_dims(d)
     return d
 
 def tf_ecal_angle(image):
     out = py_func(ecal_angle2, [image], float32)
     return out
-
-def output_of_lambda(input_shape):
-    return (input_shape[0], 1)
 
 def discriminator():
   
@@ -94,7 +111,7 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     #theta = Dense(1, activation='linear', name='theta')(dnn_out)
     #phi = Dense(1, activation='linear', name='phi')(dnn_out)
-    theta = Lambda(ecal_angle2)(image)
+    theta = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
     Model(input=image, output=[fake, aux, theta, ecal]).summary()
     return Model(input=image, output=[fake, aux, theta, ecal])
