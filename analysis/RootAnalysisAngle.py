@@ -1,6 +1,6 @@
-## Plots for variable angle ##
-from utils.GANutils import perform_calculations_angle
-from utils.RootPlotsGAN import get_plots_angle 
+## This script loads weights into architectures for generator and discriminator. Different Physics quantities are then calculated and plotted for a 100-200 GeV events from LCD variable angle dataset##
+from utils.GANutils import perform_calculations_angle  # to calculate different Physics quantities
+from utils.RootPlotsGAN import get_plots_angle         # to make plots with ROOT
 import h5py
 import numpy as np
 import setGPU
@@ -9,41 +9,42 @@ import sys
 sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
 
 def main():
-   #Architectures 
-   from AngleArch3dGAN_sqrt import generator, discriminator
-   
-   disc_weights="/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_discriminator_epoch_059.hdf5"
-   gen_weights= "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight/params_generator_epoch_059.hdf5"
+   #Architecture 
+   from AngleArch3dGAN import generator, discriminator
 
-   plots_dir = "results/sqrt_plots_testing_ep59_reduced/"
-   latent = 256
-   num_data = 100000
+   #Weights
+   disc_weights="../weights/3Dweights_1loss_50weight_withoutsqrt/params_discriminator_epoch_059.hdf5"
+   gen_weights= "../weights/3Dweights_1loss_50weight_withoutsqrt/params_generator_epoch_059.hdf5"
+
+   #Path to store results
+   plots_dir = "results/sqrt_plots_testing_ep59_cell/"
+
+   #Parameters
+   latent = 256 # latent space
+   num_data = 100000 
    num_events = 2000
    events_per_file = 5000
-   m = 2
-   nloss= 3
-   concat = 1
-   cell=1
-   energies=[0, 110, 150, 190]
-   #angles = [-0.5, -0.25, 0, 0.25, 0.5]
-   angles = [math.radians(x) for x in [62, 85, 90, 105, 118]]
-   aindexes = [0, 1, 2, 3, 4]
-   angtype = 'theta'
-   particle='Ele'
-   thresh=0
+   m = 2  # number of moments 
+   nloss= 3 # total number of losses...3 or 4
+   concat = 1 # if concatenting angle to latent space
+   cell=0 # if making plots for cell energies. Exclude for quick plots.
+   energies=[0, 110, 150, 190] # energy bins
+   angles = [math.radians(x) for x in [62, 85, 90, 105, 118]] # angle bins
+   aindexes = [0, 1, 2, 3, 4] # numbers corressponding to different angle bins
+   angtype = 'theta'# the angle data to be read from file
+   particle='Ele'# partcile type
+   thresh=0 # Threshold for ecal energies
    #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
    #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # imperium
-   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
-   sortdir = 'SortedEAngleData'
-   angledir = 'SortedAngleData'
-   gendir = 'AngleGen'  
-   discdir = 'AngleDisc'
-   genangdir = 'AngleGenAngle'
-    
+   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+   sortdir = 'SortedAngleData'  # if saving sorted data
+   gendir = 'AngleGen'  # if saving generated events
+   discdir = 'AngleDisc' # if saving disc outputs
+      
    Test = True # use test data
    stest = False # K and chi2 test
    
-   #following flags are used to save sorted and GAN data and to load from sorted data
+   #following flags are used to save sorted and GAN data and to load from sorted data. These are used while development and should be False for one time analysis
    save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
    read_data = False # True if loading previously sorted data  
    save_gen =  False # True if saving generated data. 
@@ -64,8 +65,9 @@ def main():
                 aindexes, datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, 
                 ascales, flags, latent, events_per_file, particle, thresh=thresh, angtype=angtype, offset=0.0,
                 nloss=nloss, concat=concat
-                , pre =sqrt, post =square                   
+                #, pre =sqrt, post =square  # Adding other preprocessing, Default is simple scaling                 
    )
+   
    get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,  m, len(gweights), ifpdf, stest, nloss=nloss, cell=cell)
 
 def sqrt(n, scale=1):
