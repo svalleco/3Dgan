@@ -21,15 +21,17 @@ import math
 import argparse
 import setGPU #if Caltech
 
-def BitFlip(x, prob=0.05):
+# bit flips for improved regularization
+def BitFlip(x, prob=0.05): 
     """ flips a int array's values with some probability """
     x = np.array(x)
     selection = np.random.uniform(0, 1, x.shape) < prob
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
+# adlkit
+# Returning a list of all files for a particle type in LCD dataset
 def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
-    
     Files =sorted( glob.glob(FileSearch))
     Filesused = int(math.ceil(nEvents/EventsperFile))
     FileCount=0
@@ -64,6 +66,7 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 1
 
     return out
 
+# Reading data from a file with some preprocessing
 def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     #get data for training                                                                                                                             
     print ('Loading Data from .....', datafile)
@@ -74,33 +77,28 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, thresh=1e-6):
     X[X < thresh] = 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    #ang = AngProc(ang, 0.0, angscale)
     ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ang, ecal
 
+# Fit for Ecal/Ep corressponding to Ep
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
     if particle == 'Ele':
-       if mod==0:
-          return np.multiply(2, sampled_energies) #constant
-       elif mod==1: # Ele
+       if mod==0: # Fixed angle
          root_fit = [0.0018, -0.023, 0.11, -0.28, 2.21]
          ratio = np.polyval(root_fit, sampled_energies)
          return np.multiply(ratio, sampled_energies) * xscale
-       elif mod==2:
-         root_fit=[0.4, -4.6, 108.6, 0.8]
-         ecal = np.polyval(root_fit, sampled_energies)
-         return ecal * xscale
-       elif mod==3:
-         root_fit = [0.06, -0.8, 3.94, -11.08, 113.1]# variable energy
+       elif mod==1: # variable angle
+         root_fit = [0.06, -0.8, 3.94, -11.08, 113.1]
          ratio = np.polyval(root_fit, sampled_energies)
          return np.multiply(ratio, sampled_energies) * xscale
-    elif particle == 'Pi0':
-         root_fit = [0.0085, -0.094, 2.051]# pi 0
+    elif particle == 'Pi0': # Fixed angle
+         root_fit = [0.0085, -0.094, 2.051]
          ratio = np.polyval(root_fit, sampled_energies)
          return np.multiply(ratio, sampled_energies) * xscale
     
+# GAN Training
 def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1):
     start_init = time.time()
     verbose = False
@@ -167,8 +165,6 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print('Test Data loaded of shapes:')
     print(X_test.shape)
     print(Y_test.shape)
-    #print(Y_test[:10])
-    print('*************************************************************************************')
     print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
     nb_test = numTest
    
@@ -221,16 +217,11 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
             generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
-            #print(ang2_batch[:5])
-            #disc_out = discriminator.predict(image_batch)
-            #print(len(disc_out))
-            #print(len(disc_out[0]))
-            #print(disc_out[:5][3][:5])
-            #print(disc_out[0])
+
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
-            #print ('real_batch_loss', real_batch_loss)
-            #print ('fake_batch_loss', fake_batch_loss)
+
+            # Early exit if ecal sum loss =100 => cell energies are either zero or undefined
             if fake_batch_loss[4] == 100.0:
                 print("Empty image with Ecal loss equal to 100.0")
                 generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
@@ -304,7 +295,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open('dcgan-history-3d-1loss.pkl', 'wb'))
+    open('3dgan-history.pkl', 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -317,7 +308,7 @@ def get_parser():
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--weightsdir', action='store', type=str, default='angleweights', help='Directory to store weights.')
-    parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
+    parser.add_argument('--mod', action='store', type=int, default=1, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     return parser
@@ -337,33 +328,28 @@ if __name__ == '__main__':
     import tensorflow as tf
     config = tf.ConfigProto(log_device_placement=True)
   
-    #Architectures to import
-    from EcalCondGanAngle_3d_1 import generator, discriminator
+    #Architectures to import should be in same directory
+    from EcalCondGan import generator, discriminator
 
-     #Values to be set by user
+    #Values to be set by user here
     parser = get_parser()
     params = parser.parse_args()
     nb_epochs = params.nbepochs #Total Epochs
-    #nb_epochs = 1
     batch_size = params.batchsize #batch size
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
-    #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Data path on Caltech
-    datapath = params.datapath#Data path 
+    datapath = params.datapath#Data path should be modified to your data location
     EventsperFile = params.nbperfile#Events in a file
-    #nEvents = params.nbEvents#Total events for training
     nEvents = 200000
-    #fitmod = params.mod
-    fitmod = 3
-    #weightdir = params.weightsdir
-    weightdir = '3d_angleweights_1loss'
+    fitmod = 1
+    weightdir = params.weightsdir
     #xscale = params.xscale
-    xscale = 2
-    print(params)
+    xscale = 2 # can be modified here or through command line if not using default
+    print(params) 
  
     # Building discriminator and generator
-
     d=discriminator()
     g=generator(latent_size)
+
     Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=3, aux_weight=0.1, ang_weight=100, ecal_weight=0.1, xscale = xscale, angscale=1)
     
