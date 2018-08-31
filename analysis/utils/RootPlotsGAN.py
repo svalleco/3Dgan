@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 plt.switch_backend('Agg')
 
 import ROOTutils as my # common utility functions for root
-from GANutils import safe_mkdir
+from GANutils import safe_mkdir, get_sums
 
 ##################################### Plots used in detailed analysis ######################################################
 
@@ -1278,7 +1278,6 @@ def PlotEnergyHistGen(events, out_file, energy, thetas, log=0, ifC=False):
    color = 2
    leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
    leg.SetTextSize(0.05)
-   print (len(events))
    hx=[]
    hy=[]
    hz=[]
@@ -1286,7 +1285,7 @@ def PlotEnergyHistGen(events, out_file, energy, thetas, log=0, ifC=False):
    for i, theta in enumerate(thetas):
       event = events[str(theta)]
       num = event.shape[0]
-      sumx, sumy, sumz=gan.get_sums(event)
+      sumx, sumy, sumz=get_sums(event)
       x=sumx.shape[1]
       y=sumy.shape[1]
       z=sumz.shape[1]
@@ -1299,6 +1298,9 @@ def PlotEnergyHistGen(events, out_file, energy, thetas, log=0, ifC=False):
       hx[i].GetXaxis().SetTitle("X axis")
       hy[i].GetXaxis().SetTitle("Y axis")
       hz[i].GetXaxis().SetTitle("Z axis")
+      hx[i].Sumw2()
+      hy[i].Sumw2()
+      hz[i].Sumw2()
       canvas.cd(1)
       if log:
          gPad.SetLogy()
@@ -1308,19 +1310,19 @@ def PlotEnergyHistGen(events, out_file, energy, thetas, log=0, ifC=False):
          canvas.Update()
       else:
          hx[i].DrawNormalized('sames hist')
-         canvas.cd(2)
+      canvas.cd(2)
       if log:
          gPad.SetLogy()
-         my.fill_hist_wt(hy[i], sumy)
+      my.fill_hist_wt(hy[i], sumy)
       if i==0:
          hy[i].DrawNormalized('sames hist')
          canvas.Update()
       else:
          hy[i].DrawNormalized('sames hist')
-         canvas.cd(3)
+      canvas.cd(3)
       if log:
          gPad.SetLogy()
-         my.fill_hist_wt(hz[i], sumz)
+      my.fill_hist_wt(hz[i], sumz)
       if i==0:
          hz[i].DrawNormalized('sames hist')
          canvas.Update()
