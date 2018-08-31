@@ -53,6 +53,30 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 1
             SampleI[i]=EndI
     return out
 
+def GetDataFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 10000, Particles=[], MaxFiles=-1):
+    print ("Searching in :",FileSearch)
+    Files =sorted( glob.glob(FileSearch))
+    print ("Found {} files. ".format(len(Files)))
+    FileCount=0
+    Samples={}
+    for F in Files:
+        FileCount+=1
+        basename=os.path.basename(F)
+        ParticleName=basename.split("_")[0].replace("Escan","")
+        if ParticleName in Particles:
+            try:
+                Samples[ParticleName].append(F)
+            except:
+                Samples[ParticleName]=[(F)]
+                if MaxFiles>0:
+                    if FileCount>MaxFiles:
+                        break
+    SampleI=len(Samples.keys())*[int(0)]
+    for i,SampleName in enumerate(Samples):
+        Sample=Samples[SampleName]
+        NFiles=len(Sample)
+    return Sample
+
 # get data for fixed angle
 def GetData(datafile):
    #get data for training
@@ -73,7 +97,6 @@ def sort(data, bins, flag=False, num_events=1000, tolerance=5):
     if len(data)>2:
         Z = data[2]
     srt = {}
-    print len(Y)
     for b in bins:
         if b == 0 and flag:
             srt["events" + str(b)] = X[:10000] # More events in random bin
@@ -88,6 +111,19 @@ def sort(data, bins, flag=False, num_events=1000, tolerance=5):
                 srt["z" + str(b)] = Z[indexes][:num_events]
         
     return srt
+
+def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
+    for index, datafile in enumerate(datafiles):
+        if index == 0:
+            x, y, theta = GetAngleData(datafile, thresh, angtype)
+        else:
+            while  x.shape[0] < numevents:
+                x_temp, y_temp, theta_temp = GetAngleData(datafile)
+                x = np.concatenate((x, x_temp), axis=0)
+                y = np.concatenate((y, y_temp), axis=0)
+                theta = np.concatenate((theta, theta_temp), axis=0)
+    return x[:numevents], y[:numevents], theta[:numevents] 
+                                                                                   
 
 # sort data for fixed angle
 def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance=5):
@@ -144,8 +180,7 @@ def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
     X = np.expand_dims(X, axis=-1)
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    ecal = np.sum(X, axis=(1, 2, 3))
-    return X, Y, ang, ecal
+    return X, Y, ang 
 
 # Get sorted data for variable angle
 def get_sorted_angle(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.5, Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0):

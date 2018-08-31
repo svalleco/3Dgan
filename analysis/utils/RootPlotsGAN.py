@@ -12,6 +12,9 @@ plt.switch_backend('Agg')
 import ROOTutils as my # common utility functions for root
 from GANutils import safe_mkdir
 
+##################################### Plots used in detailed analysis ######################################################
+
+
 # computes correlation of a set of features and returns Fisher's Transform and names of features
 def get_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hits, ratio):
    x = sumx.shape[1]
@@ -495,7 +498,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
        hp.SetLineColor(color)
        legend.AddEntry(hp,"G4 " + labels[i],"l")
        c1.Update()
-       color+=2
+
      else:
        my.fill_hist(hp, (y - aux1[key]*100)/y)
        hp.Draw('sames')
@@ -952,7 +955,7 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], i
    else:
       c1.Print(out_file + '.C')
 
-
+################################### Angle Plots ########################################################################
 # Plot histogram of predicted angle
 def plot_ang_hist(ang1, ang2, out_file, angle, angtype, labels, p, ifpdf=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
@@ -1083,7 +1086,9 @@ def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True):
         c1.Print(out_file + 'n_'+ str(i) + '.pdf')
       else:
         c1.Print(out_file + 'n_'+ str(i) + '.C')
-                    
+
+##################################### Get plots #####################################################################
+
 def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, nloss=3, cell=0):
    actdir = plots_dir + 'Actual'
    safe_mkdir(actdir)
@@ -1263,3 +1268,270 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
    plot_time= time.time()- start
    print '{} Plots are generated in {} seconds'.format(plots, plot_time)
                  
+################################################# Plots for 2D coloured histograms ########################################################
+
+def PlotEnergyHistGen(events, out_file, energy, thetas, log=0, ifC=False):
+   canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,700 ,500) #make
+   canvas.SetGrid()
+   label = "Weighted Histograms for {} GeV".format(energy)
+   canvas.Divide(2,2)
+   color = 2
+   leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
+   leg.SetTextSize(0.05)
+   print (len(events))
+   hx=[]
+   hy=[]
+   hz=[]
+   thetas = list(reversed(thetas))
+   for i, theta in enumerate(thetas):
+      event = events[str(theta)]
+      num = event.shape[0]
+      sumx, sumy, sumz=gan.get_sums(event)
+      x=sumx.shape[1]
+      y=sumy.shape[1]
+      z=sumz.shape[1]
+      hx.append(ROOT.TH1F('GANx{:d}theta_{:d}GeV'.format(theta, energy), '', x, 0, x))
+      hy.append(ROOT.TH1F('GANy{:d}theta_{:d}GeV'.format(theta, energy), '', y, 0, y))
+      hz.append(ROOT.TH1F('GANz{:d}theta_{:d}GeV'.format(theta, energy), '', z, 0, z))
+      hx[i].SetLineColor(color)
+      hy[i].SetLineColor(color)
+      hz[i].SetLineColor(color)
+      hx[i].GetXaxis().SetTitle("X axis")
+      hy[i].GetXaxis().SetTitle("Y axis")
+      hz[i].GetXaxis().SetTitle("Z axis")
+      canvas.cd(1)
+      if log:
+         gPad.SetLogy()
+      my.fill_hist_wt(hx[i], sumx)
+      if i ==0:
+         hx[i].DrawNormalized('sames hist')
+         canvas.Update()
+      else:
+         hx[i].DrawNormalized('sames hist')
+         canvas.cd(2)
+      if log:
+         gPad.SetLogy()
+         my.fill_hist_wt(hy[i], sumy)
+      if i==0:
+         hy[i].DrawNormalized('sames hist')
+         canvas.Update()
+      else:
+         hy[i].DrawNormalized('sames hist')
+         canvas.cd(3)
+      if log:
+         gPad.SetLogy()
+         my.fill_hist_wt(hz[i], sumz)
+      if i==0:
+         hz[i].DrawNormalized('sames hist')
+         canvas.Update()
+      else:
+         hz[i].DrawNormalized('sames hist')
+
+      canvas.cd(4)
+      leg.AddEntry(hx[i], '{}theta {}events'.format(theta, num),"l")
+      leg.SetHeader(label, 'C')
+      canvas.Update()
+      color+= 1
+   leg.Draw()
+   canvas.Update()
+   canvas.Print(out_file + '.pdf')
+   if ifC:
+      canvas.Print(out_file + '.C')
+
+def MeasPython(image, mod=0):
+   x_shape= image.shape[1]
+   y_shape= image.shape[2]
+   z_shape= image.shape[3]
+
+   sumtot = np.sum(image, axis=(1, 2, 3))# sum of events
+   indexes = np.where(sumtot > 0)
+   amask = np.ones_like(sumtot)
+   amask[indexes] = 0
+   masked_events = np.sum(amask) # counting zero sum events
+
+   x_ref = np.sum(np.sum(image, axis=(2, 3)) * np.expand_dims(np.arange(x_shape) + 0.5, axis=0), axis=1)
+   y_ref = np.sum(np.sum(image, axis=(1, 3)) * np.expand_dims(np.arange(y_shape) + 0.5, axis=0), axis=1)
+   z_ref = np.sum(np.sum(image, axis=(1, 2)) * np.expand_dims(np.arange(z_shape) + 0.5, axis=0), axis=1)
+
+   x_ref[indexes] = x_ref[indexes]/sumtot[indexes]
+   y_ref[indexes] = y_ref[indexes]/sumtot[indexes]
+   z_ref[indexes] = z_ref[indexes]/sumtot[indexes]
+
+   sumz = np.sum(image, axis =(1, 2)) # sum for x,y planes going along z
+
+   x = np.expand_dims(np.arange(x_shape) + 0.5, axis=0)
+   x = np.expand_dims(x, axis=2)
+   y = np.expand_dims(np.arange(y_shape) + 0.5, axis=0)
+   y = np.expand_dims(y, axis=2)
+   x_mid = np.sum(np.sum(image, axis=2) * x, axis=1)
+   y_mid = np.sum(np.sum(image, axis=1) * y, axis=1)
+   indexes = np.where(sumz > 0)
+   zmask = np.zeros_like(sumz)
+   zmask[indexes] = 1
+   zunmasked_events = np.sum(zmask, axis=1)
+
+   x_mid[indexes] = x_mid[indexes]/sumz[indexes]
+   y_mid[indexes] = y_mid[indexes]/sumz[indexes]
+   z = np.arange(z_shape) + 0.5# z indexes
+   x_ref = np.expand_dims(x_ref, 1)
+   y_ref = np.expand_dims(y_ref, 1)
+   z_ref = np.expand_dims(z_ref, 1)
+
+   zproj = np.sqrt((x_mid-x_ref)**2.0  + (z - z_ref)**2.0)
+   m = (y_mid-y_ref)/zproj
+   z = z * np.ones_like(z_ref)
+   indexes = np.where(z<z_ref)
+   m[indexes] = -1 * m[indexes]
+   ang = (math.pi/2.0) - np.arctan(m)
+   ang = ang * zmask
+   if mod==0:
+      ang = np.sum(ang, axis=1)/zunmasked_events
+   if mod==1:
+      wang = ang * sumz
+      sumz_tot = sumz * zmask
+      ang = np.sum(wang, axis=1)/np.sum(sumz_tot, axis=1)
+   if mod==2:
+      wang = ang * z
+      sumz_tot = z * zmask
+      ang = np.sum(wang, axis=1)/np.sum(sumz_tot, axis=1)
+   indexes = np.where(amask>0)
+   ang[indexes] = 100.
+   return ang
+
+def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees'):
+   canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make
+   canvas.Divide(2,2)
+   x = event.shape[0]
+   y = event.shape[1]
+   z = event.shape[2]
+   
+   ang1 = MeasPython(np.moveaxis(event, 3, 0))
+   ang2 = MeasPython(np.moveaxis(event, 3, 0), mod=2)
+   if unit == 'degrees':
+      ang1= np.degrees(ang1)
+      ang2= np.degrees(ang2)
+      theta = np.degrees(theta)
+   leg = ROOT.TLegend(0.1,0.4,0.8,0.9)
+   leg.SetTextSize(0.04)
+   leg.SetHeader("#splitline{Weighted Histograms for energies deposited in}{x, y and z planes}", 'C')
+   hx = ROOT.TH2F('x_{:.2f}GeV_{:.2f}'.format(100 * energy, theta), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('y_{:.2f}GeV_{:.2f}'.format(100 * energy, theta), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('z_{:.2f}GeV_{:.2f}'.format(100 * energy, theta), '', x, 0, x, y, 0, y)
+   ROOT.gPad.SetLogz()
+   ROOT.gStyle.SetPalette(1)
+   event = np.expand_dims(event, axis=0)
+   my.FillHist2D_wt(hx, np.sum(event, axis=1))
+   my.FillHist2D_wt(hy, np.sum(event, axis=2))
+   my.FillHist2D_wt(hz, np.sum(event, axis=3))
+   canvas.cd(1)
+   hx.Draw(opt)
+   hx.GetXaxis().SetTitle("Y axis")
+   hx.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   my.stat_pos(hx)
+   canvas.Update()
+   canvas.cd(2)
+   hy.Draw(opt)
+   hy.GetXaxis().SetTitle("X axis")
+   hy.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   my.stat_pos(hy)
+   canvas.Update()
+   canvas.cd(3)
+   hz.Draw(opt)
+   hz.GetXaxis().SetTitle("X axis")
+   hz.GetYaxis().SetTitle("Y axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   canvas.cd(4)
+   leg.AddEntry(hx, 'Energy Input = {:.2f} GeV'.format(100 * energy),"l")
+   leg.AddEntry(hy, 'Theta Input  = {:.2f} {}'.format(theta, unit),"l")
+   leg.AddEntry(hz, 'Computed Theta (mean)     = {:.2f} {}'.format(ang1[0], unit),"l")
+   leg.AddEntry(hz, 'Computed Theta (weighted) = {:.2f} {}'.format(ang2[0], unit),"l")
+   leg.Draw()
+   my.stat_pos(hz)
+   canvas.Update()
+   canvas.Print(out_file)
+
+def PlotAngleCut(events, ang, out_file, opt=""):
+   canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500)
+   canvas.Divide(2,2)
+   n = events.shape[0]
+   x = events.shape[1]
+   y = events.shape[2]
+   z = events.shape[3]
+   ROOT.gStyle.SetPalette(1)
+   ROOT.gPad.SetLogz()
+   leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
+   leg.SetTextSize(0.05)
+   hx = ROOT.TH2F('X{} Degree'.format(str(ang)), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('Y{} Degree'.format(str(ang)), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('Z{} Degree'.format(str(ang)), '', x, 0, x, y, 0, y)
+   my.FillHist2D_wt(hx, np.sum(events, axis=1))
+   my.FillHist2D_wt(hy, np.sum(events, axis=2))
+   my.FillHist2D_wt(hz, np.sum(events, axis=3))
+   canvas.cd(1)
+   hx.Draw(opt)
+   hx.GetXaxis().SetTitle("Y axis")
+   hx.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   my.stat_pos(hx)
+   canvas.Update()
+   canvas.cd(2)
+   hy.Draw(opt)
+   hy.GetXaxis().SetTitle("X axis")
+   hy.GetYaxis().SetTitle("Z axis")
+   hy.GetYaxis().CenterTitle()
+   canvas.Update()
+   my.stat_pos(hy)
+   canvas.Update()
+   canvas.cd(3)
+   hz.Draw(opt)
+   hz.GetXaxis().SetTitle("X axis")
+   hz.GetYaxis().SetTitle("Y axis")
+   hz.GetYaxis().CenterTitle()
+   canvas.cd(4)
+   leg.SetHeader("#splitline{Weighted Histograms for energies}{deposited in x, y, z planes}", 'C')
+   leg.AddEntry(hx, "{} Theta and {} events".format(ang, n), 'l')
+   leg.Draw()
+   canvas.Update()
+   my.stat_pos(hz)
+   canvas.Update()
+   canvas.Print(out_file)
+                                                                                                                                             
+def PlotPosCut(events, xcut, ycut, zcut, energy, out_file, opt='colz'):
+   canvas = ROOT.TCanvas("canvas" ,"Data 2D Hist" ,200 ,10 ,700 ,500) #make
+   canvas.Divide(2,2)
+   ROOT.gPad.SetLogz()
+   ROOT.gStyle.SetPalette(1)
+   n = events.shape[0]
+   x = events.shape[1]
+   y = events.shape[2]
+   z = events.shape[3]
+            
+   hx = ROOT.TH2F('x_{}GeV_x={}cut'.format(str(energy), str(xcut)), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('y_{}GeV_y={}cut'.format(str(energy), str(ycut)), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('z_{}GeV_z={}cut'.format(str(energy), str(zcut)), '', x, 0, x, y, 0, y)
+   my.FillHist2D_wt(hx, events[:, xcut, :, :])
+   my.FillHist2D_wt(hy, events[:, :, ycut, :])
+   my.FillHist2D_wt(hz, events[:, :, :, zcut])
+   canvas.cd(1)
+   hx.Draw(opt)
+   hx.GetXaxis().SetTitle("Y axis")
+   hx.GetYaxis().SetTitle("Z axis")
+   canvas.Update()
+   canvas.cd(2)
+   hy.Draw(opt)
+   hy.GetXaxis().SetTitle("X axis")
+   hy.GetYaxis().SetTitle("Z axis")
+   canvas.Update()
+   canvas.cd(3)
+   hz.Draw(opt)
+   hz.GetXaxis().SetTitle("X axis")
+   hz.GetYaxis().SetTitle("Y axis")
+   canvas.Update()
+   canvas.Print(out_file)
+                                                                                 
