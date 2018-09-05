@@ -80,7 +80,7 @@ def GetDataFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 
 # get data for fixed angle
 def GetData(datafile):
    #get data for training
-    print 'Loading Data from .....', datafile
+    print( 'Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     y=f.get('target')
     x=np.array(f.get('ECAL'))
@@ -247,7 +247,7 @@ def save_sorted(srt, energies, srtdir, ang=0):
           outfile.create_dataset('Target',data=srt["energy" + str(energy)])
           if ang:
              outfile.create_dataset('Angle',data=srt["angle" + str(energy)])
-       print "Sorted data saved to {}".format(srtfile)
+       print ("Sorted data saved to {}".format(srtfile))
 
 # save generated images       
 def save_generated(events, cond, energy, gendir):
@@ -258,7 +258,7 @@ def save_generated(events, cond, energy, gendir):
        outfile.create_dataset('Target',data=cond[0])
        if len(cond) > 1:
           outfile.create_dataset('Angle',data=cond[1])
-    print "Generated data saved to ", filename
+    print ("Generated data saved to ", filename)
 
 # save discriminator results
 def save_discriminated(disc, energy, discdir, nloss=4, ang=0):
@@ -277,7 +277,7 @@ def save_discriminated(disc, energy, discdir, nloss=4, ang=0):
       if nloss == 5:
           outfile.create_dataset('ANGLE2_ACT',data=disc["angle2_act" + str(energy)])
           outfile.create_dataset('ANGLE2_GAN',data=disc["angle2_gan" + str(energy)])
-    print "Discriminated data saved to ", filename
+    print ("Discriminated data saved to ", filename)
 
 # read D results    
 def get_disc(energy, discdir, nloss=4, ang=0):
@@ -300,7 +300,7 @@ def get_disc(energy, discdir, nloss=4, ang=0):
         angle2_gan = np.array(f.get('ANGLE2_GAN'))
         disc_out.append(angle2_act)
         disc_out.append(angle2_gan)
-    print "Discriminated file ", filename, " is loaded"
+    print ("Discriminated file ", filename, " is loaded")
     return disc_out
 
 # load sorted data
@@ -315,7 +315,7 @@ def load_sorted(sorted_path, energies, ang=0):
           srt["energy" + str(energy)] = np.array(srtfile.get('Target'))
           if ang:
              srt["angle" + str(energy)] = np.array(srtfile.get('Angle'))
-          print "Loaded from file", f
+          print( "Loaded from file", f)
     return srt
 
 # load generated data from file
@@ -323,7 +323,7 @@ def get_gen(energy, gendir):
     filename = os.path.join(gendir, "Gen_{:03d}.hdf5".format(energy))
     f=h5py.File(filename,'r')
     generated_images = np.array(f.get('ECAL'))
-    print "Generated file ", filename, " is loaded"
+    print ("Generated file ", filename, " is loaded")
     return generated_images
 
 # generate images
@@ -356,7 +356,6 @@ def discriminate(d, images):
 # find location of maximum depositions
 def get_max(images):
     index = images.shape[0]
-    print images[0].shape
     x=images.shape[1]
     y=images.shape[2]
     z=images.shape[3]
@@ -426,7 +425,7 @@ def postproc(n, xscale=1):
 
 def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0, nloss=3, concat=1, pre=preproc, post=postproc, tolerance2 = 0.1):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
-    print flags
+    print( flags)
     # assign values to flags that decide if data is to be read from dataset or pre binned data
     # Also if saved generated and discriminated data is to be used
     
@@ -446,7 +445,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
     if read_data: 
        start = time.time()
        var = load_sorted(sortedpath, energies, ang) # returning a dict with sorted data
-       print "Events were loaded in {} seconds".format(time.time()- start)
+       print( "Events were loaded in {} seconds".format(time.time()- start))
 
     # If reading from unsorted data. The data will be read and sorted in bins   
     else:
@@ -454,16 +453,16 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle]) # get test and train files
        Trainfiles = Trainfiles[: Filesused] # The number of files to read is limited by Fileused
        Testfiles = Testfiles[: Filesused]
-       print Trainfiles
-       print Testfiles
+       print (Trainfiles)
+       print (Testfiles)
        if Test:
           data_files = Testfiles  # Test data will be read in test mode
        else:
           data_files = Trainfiles  # else train data will be used
        start = time.time()
        var = get_sorted_angle(data_files, energies, True, num_events1, num_events2, Data=Data, angtype=angtype, thresh=thresh, offset=offset) # returning a dict with sorted data. 
-       print "{} events were loaded in {} seconds".format(num_data, time.time() - start)
-
+       print ("{} events were loaded in {} seconds".format(num_data, time.time() - start))
+       
        # If saving the binned data. This will only run if reading from data directly
        if save_data:
           save_sorted(var, energies, sortdir, ang) # saving sorted data in a directory
@@ -496,12 +495,12 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
          var["sumsz_act"+ str(energy) + "ang_" + str(index)] = var["sumsz_act"+ str(energy)][indexes]
          print ('{} for angle bin {} total events were {}'.format(index, a, var["events_act" + str(energy) + "ang_" + str(index)].shape[0]))
 
-    print "{} events were put in {} bins".format(total, len(energies))
+    print ("{} events were put in {} bins".format(total, len(energies)))
     #### Generate Data table to screen                                                                                                                                                                             
-    print "Actual Data"
-    print "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2"
+    print ("Actual Data")
+    print ("Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
     for energy in energies:
-       print "{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), np.mean(var["max_pos_act" + str(energy)], axis=0), np.mean(var["events_act" + str(energy)]), np.mean(var["momentX_act"+ str(energy)][:, 1]), np.mean(var["momentY_act"+ str(energy)][:, 1]), np.mean(var["momentZ_act"+ str(energy)][:, 1]))
+       print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), np.mean(var["max_pos_act" + str(energy)], axis=0), np.mean(var["events_act" + str(energy)]), np.mean(var["momentX_act"+ str(energy)][:, 1]), np.mean(var["momentY_act"+ str(energy)][:, 1]), np.mean(var["momentZ_act"+ str(energy)][:, 1])))
 
     for energy in energies:
        # creating dicts for all GAN quantities 
@@ -555,7 +554,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              if save_gen:
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], [var["energy" + str(energy)], var["angle"+ str(energy)]], energy, gendir)
              gen_time = time.time() - start
-             print "Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)])
+             print( "Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)]))
           if read_disc:
              disc_out = get_disc(energy, discdir, nloss, ang)
              print(len(disc_out))
@@ -581,7 +580,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
                  var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
                               
              disc_time = time.time() - start
-             print "Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)])
+             print ("Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)]))
 
              if save_disc:
                discout = {}
@@ -589,7 +588,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
                   if key in ["isreal_act" + str(energy), "aux_act" + str(energy), "isreal_gan" + str(energy), "aux_gan" + str(energy), "ecal_act"+ str(energy), "ecal_gan"+ str(energy), "angle2_act"+ str(energy), "angle2_gan"+ str(energy), "angle_act"+ str(energy), "angle_gan"+ str(energy)]:
                      discout[key]=var[key]['n_'+ str(i)]
                save_discriminated(discout, energy, discdir, nloss, ang)
-          print 'Calculations for ....', energy
+          print ('Calculations for ....', energy)
           var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale)
           var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0
           var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze((var["angle_act"+ str(energy)]['n_'+ str(i)]))/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)
@@ -623,5 +622,5 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
       print( "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
 
       for energy in energies:
-         print "{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["max_pos_gan" + str(energy)]['n_'+ str(i)], axis=0), np.mean(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["momentX_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentY_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentZ_gan"+ str(energy)]['n_'+ str(i)][:, 1]))
+         print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["max_pos_gan" + str(energy)]['n_'+ str(i)], axis=0), np.mean(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["momentX_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentY_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentZ_gan"+ str(energy)]['n_'+ str(i)][:, 1])))
     return var

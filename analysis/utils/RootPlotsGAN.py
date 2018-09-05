@@ -77,7 +77,7 @@ def plot_corr_python(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, 
    if compare:
      num_squares = corr.shape[0]*(corr.shape[0]-1)/2
      mse_corr = np.sum(np.square(gprev - corr))/num_squares
-     print 'mse_corr={}'.format(mse_corr)
+     print ('mse_corr={}'.format(mse_corr))
      dlabel='{} mse_corr = {:.4f} '.format(label, mse_corr)
    else:
      dlabel=label
@@ -293,7 +293,7 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
       hg.Draw('sames')
       hg.Draw('sames hist')
       c1.Update()
-      #my.stat_pos(hg, pos)
+      my.stat_pos(hg)
       pos+=1
       c1.Update()
       if energy == 0:
@@ -347,11 +347,13 @@ def plot_ecal_flatten_hist(event1, event2, penergy, out_file, energy, labels, p=
       my.BinLogX(hg)
       my.fill_hist(hg, event2[key].flatten())
       hg =my.normalize(hg)
+      #my.stat_pos(hg)
       hg.SetLineColor(color)
       color+=2
       hg.Draw('sames')
       hg.Draw('sames hist')
       c1.Update()
+      my.stat_pos(hg)
       pos+=1
       c1.Update()
       legend.AddEntry(hg, "GAN {}".format(labels[i]), "l")
@@ -366,7 +368,7 @@ def plot_ecal_flatten_hist(event1, event2, penergy, out_file, energy, labels, p=
 def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
-   thresh = 0.0002 # GeV
+   thresh = 0.002 # GeV
    color = 2
    hd = ROOT.TH1F("Geant4", "", 50, 0, 4000)
    my.fill_hist(hd, my.get_hits(event1, thresh))
@@ -445,7 +447,7 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
        hp.SetTitle("Predicted Primary Energy Histogram for {}-{} GeV".format(p[0], p[1]))
      else:
        hp.SetTitle("Predicted Primary Energy Histogram for {} GeV".format(energy) )
-     #hg.SetStats(0)
+     hg.SetStats(0)
      #my.stat_pos(hg)
      my.fill_hist(hg, 100 *aux2[key])
      hp =my.normalize(hp)
@@ -455,7 +457,7 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
      hg.Draw('sames')
      hg.Draw('sames hist')
      c1.Update()
-     my.stat_pos(hg)
+     #my.stat_pos(hg)
      c1.Update()
      legend.AddEntry(hg, "GAN {}".format(labels[i]), "l")
    legend.Draw()
@@ -498,7 +500,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
        hp.SetLineColor(color)
        legend.AddEntry(hp,"G4 " + labels[i],"l")
        c1.Update()
-
+       color+=2
      else:
        my.fill_hist(hp, (y - aux1[key]*100)/y)
        hp.Draw('sames')
@@ -595,7 +597,6 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    c1.SetGrid()
    color = 2
    c1.Divide(2,2)
-   print array1.shape
    h1x = ROOT.TH1F('G4x' + str(energy), '', x, 0, x)
    h1y = ROOT.TH1F('G4y' + str(energy), '', y, 0, y)
    h1z = ROOT.TH1F('G4z' + str(energy), '', z, 0, z)
@@ -1089,7 +1090,7 @@ def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True):
 
 ##################################### Get plots #####################################################################
 
-def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, nloss=3, cell=0):
+def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, nloss=3, cell=0, corr=0):
    actdir = plots_dir + 'Actual'
    safe_mkdir(actdir)
    discdir = plots_dir + 'disc_outputs'
@@ -1124,7 +1125,6 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
       allauxrelativefile = 'All_aux_relative'#.pdf'
       allerrorfile = 'All_relative_auxerror'#.pdf'
       correlationfile = 'Corr'
-      start = time.time()
       if 0 in energies:
          pmin = np.amin(var["energy" + str(energy)])
          pmax = np.amax(var["energy" + str(energy)])
@@ -1142,8 +1142,8 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
          plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], 
                                    var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels, p, ifpdf=ifpdf)
          plots+=1
-         """                                                                                                                
-         plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)],    
+         if corr:                                                                                                                
+           plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)],    
                            var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)],                                  
                            var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)],                               
                            var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)],                                    
@@ -1152,17 +1152,17 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                            var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)],                                  
                            var["energy" + str(energy)], var["events_act" + str(energy)],                                     
                            var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)    
-         """
+         
       
       plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], 
                      os.path.join(discdir, ecalfile), energy, labels, p, stest=stest, ifpdf=ifpdf)
       plots+=1
       if cell:
          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)], 
-                                os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, log=1, ifpdf=ifpdf)
+                                os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, p=p, log=1, ifpdf=ifpdf)
          plots+=1     
          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)], 
-                                os.path.join(comdir, 'flat' + ecalfile), energy, labels, ifpdf=ifpdf)  
+                                os.path.join(comdir, 'flat' + ecalfile), energy, labels, p=p, ifpdf=ifpdf)  
       plots+=1                                                                                                             
       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)],
                                 os.path.join(comdir, 'hits' + ecalfile), energy, labels, p, ifpdf=ifpdf)
@@ -1264,9 +1264,9 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                                  energy, alabels, p, ifpdf=ifpdf)
          plots+=1
          
-   print 'Plots are saved in ', plots_dir
+   print ('Plots are saved in ', plots_dir)
    plot_time= time.time()- start
-   print '{} Plots are generated in {} seconds'.format(plots, plot_time)
+   print ('{} Plots are generated in {} seconds'.format(plots, plot_time))
                  
 ################################################# Plots for 2D coloured histograms ########################################################
 
@@ -1419,7 +1419,7 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees'):
    hx = ROOT.TH2F('x_{:.2f}GeV_{:.2f}'.format(100 * energy, theta), '', y, 0, y, z, 0, z)
    hy = ROOT.TH2F('y_{:.2f}GeV_{:.2f}'.format(100 * energy, theta), '', x, 0, x, z, 0, z)
    hz = ROOT.TH2F('z_{:.2f}GeV_{:.2f}'.format(100 * energy, theta), '', x, 0, x, y, 0, y)
-   ROOT.gPad.SetLogz()
+   #ROOT.gPad.SetLogz()
    ROOT.gStyle.SetPalette(1)
    event = np.expand_dims(event, axis=0)
    my.FillHist2D_wt(hx, np.sum(event, axis=1))
