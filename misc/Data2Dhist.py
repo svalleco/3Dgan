@@ -25,15 +25,15 @@ def main():
    ycuts = [10, 25, 40]     # cuts along y
    zcuts = [5, 12, 20]      # cuts along z
    num = 5 # single events to plots
-   thresh = 1e-4
+   thresh = 0
    angtype = 'theta'
    opt = 'colz' # drawing option
-   plotsdir = 'results/angle_data_plots'  # results location 
+   plotsdir = 'results/angle_data_plots_sqrt'  # results location 
    gan.safe_mkdir(plotsdir)               # make directory
       
    datafiles = gan.GetDataFiles(datapath, numdata, Particles=['Ele']) # get list of files
    x, y, theta= gan.GetAllDataAngle(datafiles, numdata, thresh, angtype) # get all data
-
+ 
    # The sorted dict contains events as 'events', the quantity to sort as 'y' and if there is a third it is named 'z'
    yvar = gan.sort([x, y, theta], energies, num_events=1000)  # sort according to energy
    thetavar = gan.sort([x, np.degrees(theta), y], thetas, num_events=1000, tolerance=2) # sort according to angle
