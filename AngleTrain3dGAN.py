@@ -21,7 +21,20 @@ import time
 import math
 import argparse
 import setGPU #if Caltech
+#from memory_profiler import profile
+import keras.backend as K
 
+K.set_image_dim_ordering('tf')
+
+from keras.layers import Input
+from keras.models import Model
+from keras.optimizers import Adadelta, Adam, RMSprop
+from keras.utils.generic_utils import Progbar
+from sklearn.cross_validation import train_test_split
+
+import tensorflow as tf
+config = tf.ConfigProto(log_device_placement=True)
+                                
 def BitFlip(x, prob=0.05):
     """ flips a int array's values with some probability """
     x = np.array(x)
@@ -93,7 +106,7 @@ def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, angtype='theta',
 
 def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4):
     start_init = time.time()
-    
+    verbose = False    
     particle='Ele'
     f = [0.9, 0.1]
 
@@ -306,21 +319,7 @@ def get_parser():
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
     return parser
 
-if __name__ == '__main__':
-
-    import keras.backend as K
-
-    K.set_image_dim_ordering('tf')
-
-    from keras.layers import Input
-    from keras.models import Model
-    from keras.optimizers import Adadelta, Adam, RMSprop
-    from keras.utils.generic_utils import Progbar
-    from sklearn.cross_validation import train_test_split
-
-    import tensorflow as tf
-    config = tf.ConfigProto(log_device_placement=True)
-  
+def main():
     #Architectures to import
     from AngleArch3dGAN import generator, discriminator
 
@@ -343,10 +342,10 @@ if __name__ == '__main__':
     #weightdir = params.weightsdir
     weightdir = 'weights/3Dweights_1loss_25weight' # renamed to keep record
     #pklfile = params.pklfile
-    pklfile = '3dgan-history-1loss-25weight.pkl'
+    pklfile = '3dgan-history-testing.pkl'
     #xscale = params.xscale
     xscale=1
-    nb_epochs = 120
+    nb_epochs = 1
     
     print(params)
 
@@ -366,3 +365,5 @@ if __name__ == '__main__':
                     latent_size=latent_size, gen_weight=gen_weight, aux_weight=aux_weight, ang_weight=ang_weight, ecal_weight=ecal_weight,
                     xscale = xscale, angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype)
     
+if __name__ == '__main__':
+    main()

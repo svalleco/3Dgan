@@ -91,28 +91,28 @@ def discriminator():
   
     image=Input(shape=(51, 51, 25, 1))
 
-    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, 6, 8, 6, border_mode='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, 6, 8, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, 8, 8, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, 8, 8, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, 8, 8, 8, border_mode='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
@@ -167,5 +167,5 @@ def generator(latent_size=200, return_intermediate=False):
     Model(input=[latent], output=fake_image).summary()
     return Model(input=[latent], output=fake_image)
 
-g= generator()
-d=discriminator()
+#g= generator()
+#d=discriminator()
