@@ -17,25 +17,37 @@ import setGPU
 
 def main():
    datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
-   genweight = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_049.hdf5"
+   genweight1 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_000.hdf5"
+   genweight2 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_010.hdf5"
+   genweight3 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_020.hdf5"
+   genweight4 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_040.hdf5"
+      
    # generator model
    from AngleArch3dGAN_sqrt import generator
 
    numdata = 1000
-   outdir = 'epoch_50'
+   outdir = 'sqrt_cell'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
    x, y, ang=GetAngleData(datapath, numdata)
    
    latent = 256 # latent space for generator
    g=generator(latent) # build generator
-   g.load_weights(genweight) # load weights        
-   x_gen = gan.generate(g, numdata, [y/100, ang], latent)
+   g.load_weights(genweight1) # load weights        
+   x_gen1 = gan.generate(g, numdata, [y/100, ang], latent)
 
-   labels = ['sqrt G4', 'sqrt GAN', 'G4', 'square GAN']
-   plot_ecal_flatten_hist([np.sqrt(x), x_gen, x, np.square(x_gen)], outfile, y, labels)
-   plot_ecal_flatten_hist([np.sqrt(x), x_gen, x, np.square(x_gen)],  outfile + '_log', y, labels, logy=1)
-   plot_ecal_flatten_hist([np.sqrt(x), x_gen, x, np.square(x_gen)], outfile + '_log_norm', y, labels, logy=1, norm=1)
+   g.load_weights(genweight2) # load weights
+   x_gen2 = gan.generate(g, numdata, [y/100, ang], latent)
+
+   g.load_weights(genweight3) # load weights
+   x_gen3 = gan.generate(g, numdata, [y/100, ang], latent)
+      
+   g.load_weights(genweight4) # load weights
+   x_gen4 = gan.generate(g, numdata, [y/100, ang], latent)
+      
+   labels = ['sqrt G4', 'GAN epoch 0', 'GAN epoch 10', 'GAN epoch 20', 'GAN epoch 40']
+   plot_ecal_flatten_hist([np.sqrt(x), x_gen1, x_gen2, x_gen3, x_gen4], outfile, y, labels, norm=1)
+   plot_ecal_flatten_hist([np.sqrt(x), x_gen1, x_gen2, x_gen3, x_gen4], outfile + '_log', y, labels, logy=1, norm=1)
    print('Histogram is saved in ', outfile)
        
 
@@ -76,9 +88,11 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, ifp
         hd.GetYaxis().SetTitle("Count")
         hd.GetYaxis().CenterTitle()
         hd.Draw()
+        hd.Draw('sames hist')
         color+=2
       else:
         hd.Draw('sames')
+        hd.Draw('sames hist')
         color+=1
       legend.AddEntry(hd,label ,"l")
       c1.Modified()
