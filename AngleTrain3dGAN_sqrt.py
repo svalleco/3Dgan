@@ -78,6 +78,7 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 1
 def sqrt(x):
     epsilon= np.finfo(float).eps
     x[x < epsilon] = 0
+    
     return np.sqrt(x)
             
 def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
@@ -104,7 +105,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print('[INFO] Building discriminator')
     #discriminator.summary()
     discriminator.compile(
-        optimizer=RMSprop(),
+        optimizer=Adam(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
     )
@@ -113,7 +114,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print('[INFO] Building generator')
     #generator.summary()
     generator.compile(
-        optimizer=RMSprop(),
+        optimizer=Adam(),
         loss='binary_crossentropy'
     )
  
@@ -129,7 +130,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(),
+        optimizer=Adam(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
     )
@@ -159,7 +160,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print(X_test.shape)
     print(Y_test.shape)
     print('*************************************************************************************')
-    print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
+    print('Cell energies vary from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test), np.mean(X_test)))
     nb_test = numTest
    
     train_history = defaultdict(list)
@@ -210,6 +211,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
             generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
+
+            print("For batch {} the Data energies go from {} to {}".format(index, np.amin(image_batch[image_batch > 0]), np.amax(image_batch)))
+
+            print("For batch {} the GAN energies go from {} to {}".format(index, np.amin(generated_images[generated_images > 0]), np.amax(generated_images)))
   
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
