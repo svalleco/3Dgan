@@ -17,46 +17,61 @@ import setGPU
 
 def main():
    datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
-   genweight1 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_000.hdf5"
-   genweight2 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_010.hdf5"
-   genweight3 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_020.hdf5"
-   genweight4 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_040.hdf5"
+   genweight1 = "/nfshome/gkhattak/3Dgan/weights/params_generator_epoch_032.hdf5"
+   #genweight2 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_010.hdf5"
+   #genweight3 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_020.hdf5"
+   genweight4 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight/params_generator_epoch_040.hdf5"
       
    # generator model
-   from AngleArch3dGAN_sqrt import generator
+   from AngleArch3dGAN_sqrt import generator as g1
+   from AngleArch3dGAN import generator as g2
 
    numdata = 1000
-   outdir = 'sqrt_cell'
+   scale=10
+   outdir = 'sqrt_scale10_5'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
    x, y, ang=GetAngleData(datapath, numdata)
    
    latent = 256 # latent space for generator
-   g=generator(latent) # build generator
+   g=g1(latent) # build generator
    g.load_weights(genweight1) # load weights        
    x_gen1 = gan.generate(g, numdata, [y/100, ang], latent)
+   x_gen2 = postproc(x_gen1 , np.square, 10)
 
-   g.load_weights(genweight2) # load weights
-   x_gen2 = gan.generate(g, numdata, [y/100, ang], latent)
-
+   g = g2(latent)
+   g.load_weights(genweight4) # load weights
+   x_gen3 = gan.generate(g, numdata, [y/100, ang], latent)
+   """
    g.load_weights(genweight3) # load weights
    x_gen3 = gan.generate(g, numdata, [y/100, ang], latent)
       
    g.load_weights(genweight4) # load weights
    x_gen4 = gan.generate(g, numdata, [y/100, ang], latent)
-      
-   labels = ['sqrt G4', 'GAN epoch 0', 'GAN epoch 10', 'GAN epoch 20', 'GAN epoch 40']
-   plot_ecal_flatten_hist([np.sqrt(x), x_gen1, x_gen2, x_gen3, x_gen4], outfile, y, labels, norm=1)
-   plot_ecal_flatten_hist([np.sqrt(x), x_gen1, x_gen2, x_gen3, x_gen4], outfile + '_log', y, labels, logy=1, norm=1)
+   """   
+   labels = ['G4 ', 'GAN sqrt', 'GAN sqrt(square)', 'GAN without sqrt'] #, 'GAN epoch 10', 'GAN epoch 20', 'GAN epoch 40']
+   plot_ecal_flatten_hist([x, x_gen1, x_gen2, x_gen3], outfile, y, labels, norm=1)
+   plot_ecal_flatten_hist([x, x_gen1, x_gen2, x_gen3], outfile + '_log', y, labels, logy=1, norm=1)
    print('Histogram is saved in ', outfile)
        
+def postproc(event, f, scale):
+   return f(event)/scale
 
-def GetAngleData(datafile, numevents, angtype='theta'):
+def sqrt(x):
+   epsilon= np.finfo(float).eps
+   indexes = np.where(x>0)
+   x[indexes] = np.sqrt(x[indexes])
+   return x
+                
+
+def GetAngleData(datafile, numevents, ftn=0, scale=1, angtype='theta'):
    #get data for training
    print 'Loading Data from .....', datafile
    f=h5py.File(datafile,'r')
    y=np.array(f.get('energy')[:numevents])
-   x=np.array(f.get('ECAL')[:numevents])
+   x=np.array(f.get('ECAL')[:numevents]) * scale
+   if ftn!=0:
+      x = ftn(x)
    ang = np.array(f.get(angtype)[:numevents])
    return x, y, ang
 
