@@ -154,5 +154,11 @@ def generator(latent_size=200, return_intermediate=False):
     Model(input=[latent], output=fake_image).summary()
     return Model(input=[latent], output=fake_image)
 
-g= generator()
-d=discriminator()
+def main():
+    g= generator()
+    d=discriminator()
+
+if __name__ == "__main__":
+    main()
+
+                
