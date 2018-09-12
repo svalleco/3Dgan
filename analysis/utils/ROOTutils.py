@@ -20,6 +20,11 @@ def BinLogX(h):
 def fill_hist(hist, array):
    [hist.Fill(_) for _ in array]
 
+def fill_graph(graph, x, y):
+   n = x.shape[0]
+   for i in np.arange(n):
+      graph.SetPoint(i, x[i], y[i])
+
 # normalize in different modes
 def normalize(hist, mod=0):
    if mod==0:
