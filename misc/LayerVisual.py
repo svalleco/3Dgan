@@ -37,34 +37,34 @@ def main():
 
    d = discriminator()
    d.load_weights(disc_weight)
-         
+
+   # input for generator
    sampled_energies =np.random.uniform(pmin, pmax, num_images)
    sampled_thetas = np.random.uniform(thetamin, thetamax, num_images)
-
    noise = np.random.normal(0, 1, (num_images, latent-1))
    noise = sampled_energies.reshape(-1, 1) * noise
    gen_in = np.concatenate((sampled_thetas.reshape(-1, 1), noise), axis=1)
-   out = {}
+   
+   out = {} # dict for layer outputs
    plot=0
    for i, layer in enumerate(g.layers[1].layers):
-     func = K.function([g.layers[1].layers[0].input, K.learning_phase()], [g.layers[1].layers[i].output])
+     func = K.function([g.layers[1].layers[0].input, K.learning_phase()], [g.layers[1].layers[i].output])# function to get output of particular layer
      name = g.layers[1].layers[i].name
-     out[name] = func([gen_in, 0])[0]
-     print(i, layer, name, out[name].shape, out[name].ndim)
+     out[name] = func([gen_in, 0])[0] # apply function to store output in dict
      layerdir = os.path.join(plotsdir + 'layer_{}'.format(name))
-     gan.safe_mkdir(layerdir)
-            
-     if out[name].ndim==5:
+     gan.safe_mkdir(layerdir)# make dir for each layer
+     if out[name].ndim==5: # if output is 3d
        filt= out[name].shape[4]
        for f in np.arange(filt):
          convlayer_to_visualize(np.mean(out[name], axis=0), name, f, os.path.join(layerdir, 'layer{}_filt{}.pdf'.format(name, f)))
          plot+=1
-     elif out[name].ndim==2:
+     elif out[name].ndim==2: # if output is 1d
        denselayer_to_visualize(np.mean(out[name], axis=0), name, os.path.join(layerdir, 'layer{}.pdf'.format(name)))
        plot+=1
      
    print('{} plots were saved in {} directory'.format(plot, plotsdir))
 
+# Plot dense layer output as graph
 def denselayer_to_visualize(layer_out, layer_name, out_file):
    canvas = ROOT.TCanvas("canvas" ,"Visual" ,200 ,10 ,700 ,500) #make
    layer_out= np.squeeze(layer_out)
@@ -79,7 +79,7 @@ def denselayer_to_visualize(layer_out, layer_name, out_file):
    canvas.Update()
    canvas.Print(out_file)
       
-   
+# Plot conv output to 2D histograms   
 def convlayer_to_visualize(layer_out, layer_name, filt, out_file):
    layer_out = layer_out[:, :, :, filt]
    canvas = ROOT.TCanvas("canvas" ,"Visual" ,200 ,10 ,700 ,500) #make
