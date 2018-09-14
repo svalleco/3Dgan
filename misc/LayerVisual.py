@@ -14,7 +14,7 @@ import ROOT
 
 def main():
    #Architecture
-   from AngleArch3dGAN_sqrt_vis import generator, discriminator
+   from AngleArch3dGAN_sqrt import generator, discriminator
 
    #Weights
    disc_weight="../weights/params_discriminator_epoch_005.hdf5"
@@ -44,23 +44,28 @@ def main():
    noise = np.random.normal(0, 1, (num_images, latent-1))
    noise = sampled_energies.reshape(-1, 1) * noise
    gen_in = np.concatenate((sampled_thetas.reshape(-1, 1), noise), axis=1)
-   
-   out = {} # dict for layer outputs
+   images = g.predict(gen_in)
+   networks = [g, d]
+   net_names = ['generator', 'discriminator']
+   inputs = [gen_in, images]
    plot=0
-   for i, layer in enumerate(g.layers[1].layers):
-     func = K.function([g.layers[1].layers[0].input, K.learning_phase()], [g.layers[1].layers[i].output])# function to get output of particular layer
-     name = g.layers[1].layers[i].name
-     out[name] = func([gen_in, 0])[0] # apply function to store output in dict
-     layerdir = os.path.join(plotsdir + 'layer_{}'.format(name))
-     gan.safe_mkdir(layerdir)# make dir for each layer
-     if out[name].ndim==5: # if output is 3d
-       filt= out[name].shape[4]
-       for f in np.arange(filt):
-         convlayer_to_visualize(np.mean(out[name], axis=0), name, f, os.path.join(layerdir, 'layer{}_filt{}.pdf'.format(name, f)))
-         plot+=1
-     elif out[name].ndim==2: # if output is 1d
-       denselayer_to_visualize(np.mean(out[name], axis=0), name, os.path.join(layerdir, 'layer{}.pdf'.format(name)))
-       plot+=1
+   for n, net in enumerate(networks):
+      out = {} # dict for layer outputs
+      netdir = os.path.join(plotsdir , 'net_{}'.format(net_names[n]))
+      for i, layer in enumerate(net.layers[1].layers):
+         func = K.function([net.layers[1].layers[0].input, K.learning_phase()], [net.layers[1].layers[i].output])# function to get output of particular layer
+         layer_name = net.layers[1].layers[i].name
+         out[layer_name] = func([inputs[n], 0])[0] # apply function to store output in dict
+         layerdir = os.path.join(netdir , 'layer_{}'.format(layer_name))
+         gan.safe_mkdir(layerdir)# make dir for each layer
+         if out[layer_name].ndim==5: # if output is 3d
+             filt= out[layer_name].shape[4]
+             for f in np.arange(filt):
+               convlayer_to_visualize(np.mean(out[layer_name], axis=0), layer_name, f, os.path.join(layerdir, '{}_layer{}_filt{}.pdf'.format(net_names[n], layer_name, f)))
+               plot+=1
+         elif out[layer_name].ndim==2: # if output is 1d
+             denselayer_to_visualize(np.mean(out[layer_name], axis=0), layer_name, os.path.join(layerdir, '{}_layer{}.pdf'.format(net_names[n], layer_name)))
+             plot+=1
      
    print('{} plots were saved in {} directory'.format(plot, plotsdir))
 
