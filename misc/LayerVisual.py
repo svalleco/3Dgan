@@ -1,3 +1,4 @@
+# This code helps visualizing the outputs of layers for networks. It can only be used with 3dGAN architecture
 import h5py
 import numpy as np
 import setGPU
@@ -17,11 +18,11 @@ def main():
    from AngleArch3dGAN_sqrt import generator, discriminator
 
    #Weights
-   disc_weight="../weights/params_discriminator_epoch_005.hdf5"
-   gen_weight= "../weights/params_generator_epoch_005.hdf5"
+   disc_weight="../weights/3Dweights_1loss_50weight_sqrt/params_discriminator_epoch_040.hdf5"
+   gen_weight= "../weights/3Dweights_1loss_50weight_sqrt/params_generator_epoch_040.hdf5"
 
    #Path to store results
-   plotsdir = "results/sqrt_scale10_ep5_visualization/"
+   plotsdir = "results/sqrt_ep40_visualization/"
    gan.safe_mkdir(plotsdir)
    #Parameters
    latent = 256 # latent space     
@@ -46,25 +47,26 @@ def main():
    gen_in = np.concatenate((sampled_thetas.reshape(-1, 1), noise), axis=1)
    images = g.predict(gen_in)
    networks = [g, d]
-   net_names = ['generator', 'discriminator']
-   inputs = [gen_in, images]
+   net_names = ['generator', 'discriminator'] # networks to visualize
+   inputs = [gen_in, images] # inputs to both networks
+   event_to_visualize = 1 # The event to visualize. 
    plot=0
-   for n, net in enumerate(networks):
+   for n, net in enumerate(networks): # loop on nets
       out = {} # dict for layer outputs
       netdir = os.path.join(plotsdir , 'net_{}'.format(net_names[n]))
-      for i, layer in enumerate(net.layers[1].layers):
+      for i, layer in enumerate(net.layers[1].layers): # loop on layers
          func = K.function([net.layers[1].layers[0].input, K.learning_phase()], [net.layers[1].layers[i].output])# function to get output of particular layer
-         layer_name = net.layers[1].layers[i].name
+         layer_name = net.layers[1].layers[i].name # get names
          out[layer_name] = func([inputs[n], 0])[0] # apply function to store output in dict
          layerdir = os.path.join(netdir , 'layer_{}'.format(layer_name))
          gan.safe_mkdir(layerdir)# make dir for each layer
-         if out[layer_name].ndim==5: # if output is 3d
+         if out[layer_name].ndim==5: # if output is 3d e.g in conv layers
              filt= out[layer_name].shape[4]
              for f in np.arange(filt):
-               convlayer_to_visualize(np.mean(out[layer_name], axis=0), layer_name, f, os.path.join(layerdir, '{}_layer{}_filt{}.pdf'.format(net_names[n], layer_name, f)))
+               convlayer_to_visualize(out[layer_name][event_to_visualize], layer_name, f, os.path.join(layerdir, '{}_layer{}_filt{}.pdf'.format(net_names[n], layer_name, f)))
                plot+=1
-         elif out[layer_name].ndim==2: # if output is 1d
-             denselayer_to_visualize(np.mean(out[layer_name], axis=0), layer_name, os.path.join(layerdir, '{}_layer{}.pdf'.format(net_names[n], layer_name)))
+         elif out[layer_name].ndim==2: # if output is 1d e.g dense layers
+             denselayer_to_visualize(out[layer_name][event_to_visualize], layer_name, os.path.join(layerdir, '{}_layer{}.pdf'.format(net_names[n], layer_name)))
              plot+=1
      
    print('{} plots were saved in {} directory'.format(plot, plotsdir))
@@ -93,7 +95,7 @@ def convlayer_to_visualize(layer_out, layer_name, filt, out_file):
    y = layer_out.shape[1]
    z = layer_out.shape[2]
    opt='colz'
-   leg = ROOT.TLegend(0.1,0.4,0.8,0.9)
+   leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
    hx = ROOT.TH2F('x_{}_{}'.format(layer_name, filt), '', y, 0, y, z, 0, z)
    hy = ROOT.TH2F('y_{}_{}'.format(layer_name, filt), '', x, 0, x, z, 0, z)
    hz = ROOT.TH2F('z_{}_{}'.format(layer_name, filt), '', x, 0, x, y, 0, y)
@@ -136,6 +138,7 @@ def convlayer_to_visualize(layer_out, layer_name, filt, out_file):
    canvas.Update()
    canvas.cd(4)
    leg.SetHeader("Visualization of layer {} for filter {}".format(layer_name, filt), 'C')
+   leg.SetTextSize(0.05)
    leg.Draw()
    canvas.Update()
    canvas.Print(out_file)
