@@ -53,6 +53,15 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 1
             SampleI[i]=EndI
     return out
 
+# flips a int array's values with some probability
+def BitFlip(x, prob=0.05):
+    x = np.array(x)
+    selection = np.random.uniform(0, 1, x.shape) < prob
+    x[selection] = 1 * np.logical_not(x[selection])
+    return x
+                    
+
+# Get all files
 def GetDataFiles(FileSearch="/data/LCD/*/*.h5", nEvents=800000, EventsperFile = 10000, Particles=[], MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
@@ -91,6 +100,7 @@ def GetData(datafile):
     y = y.astype(np.float32)
     return x, y
 
+# sort data by first variable
 def sort(data, bins, flag=False, num_events=1000, tolerance=5):
     X = data[0]
     Y = data[1]
@@ -109,9 +119,165 @@ def sort(data, bins, flag=False, num_events=1000, tolerance=5):
             srt["y" + str(b)] = Y[indexes][:num_events]
             if len(data)>2:
                 srt["z" + str(b)] = Z[indexes][:num_events]
-        
     return srt
 
+# sort data by energy for variable angle data
+def sortEnergy(x, y, angle, ecal, energies):
+    var={}
+    tolerance =5
+    for energy in energies:
+        if energy==0:
+            var["events_act" + str(energy)]=x[:5000]
+            var["energy" + str(energy)]=y[:5000]
+            var["angle_act" + str(energy)]=angle[:5000]
+            var["ecal_act" + str(energy)]=ecal[:5000]
+            var["index" + str(energy)] = var["events_act" + str(energy)].shape[0]
+        else:
+            var["indexes" + str(energy)] = np.where((y > (energy - tolerance)/100. ) & ( y < (energy + tolerance)/100.))
+            var["events_act" + str(energy)]=x[var["indexes" + str(energy)]]
+            var["energy" + str(energy)]=y[var["indexes" + str(energy)]]
+            var["angle_act" + str(energy)]=angle[var["indexes" + str(energy)]]
+            var["ecal_act" + str(energy)]=ecal[var["indexes" + str(energy)]]
+            var["index" + str(energy)] = var["events_act" + str(energy)].shape[0]
+    return var
+
+#Optimization metric
+def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
+    metricp = 0
+    metrice = 0
+    metrica = 0
+    for energy in energies:
+        #Relative error on mean moment value for each moment and each axis
+        x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
+        x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
+        x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
+        y_act= np.mean(var["momentY_act"+ str(energy)], axis=0)
+        y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
+        z_act= np.mean(var["momentZ_act"+ str(energy)], axis=0)
+        z_gan= np.mean(var["momentZ_gan"+ str(energy)], axis=0)
+        var["posx_error"+ str(energy)]= (x_act - x_gan)/x_act
+        var["posy_error"+ str(energy)]= (y_act - y_gan)/y_act
+        var["posz_error"+ str(energy)]= (z_act - z_gan)/z_act
+        #Taking absolute of errors and adding for each axis then scaling by 3
+        var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)])+ np.absolute(var["posz_error"+ str(energy)]))/3
+        #Summing over moments and dividing for number of moments
+        var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
+        metricp += var["pos_total"+ str(energy)]
+        #Take profile along each axis and find mean along events
+        sumxact, sumyact, sumzact = np.mean(var["sumsx_act" + str(energy)], axis=0), np.mean(var["sumsy_act" + str(energy)], axis=0), np.mean(var["sumsz_act" + str(energy)], axis=0)
+        sumxgan, sumygan, sumzgan = np.mean(var["sumsx_gan" + str(energy)], axis=0), np.mean(var["sumsy_gan" + str(energy)], axis=0), np.mean(var["sumsz_gan" + str(energy)], axis=0)
+        var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
+        var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
+        var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
+        #Take absolute of error and mean for all events                                                           
+        var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
+        #Summing over moments and dividing for number of moments
+        var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
+        metricp += var["pos_total"+ str(energy)]
+        #Take profile along each axis and find mean along events
+        sumxact, sumyact, sumzact = np.mean(var["sumsx_act" + str(energy)], axis=0), np.mean(var["sumsy_act" + str(energy)], axis= 0), np.mean(var["sumsz_act" + str(energy)], axis=0)
+        sumxgan, sumygan, sumzgan = np.mean(var["sumsx_gan" + str(energy)], axis=0), np.mean(var["sumsy_gan" + str(energy)], axis=0), np.mean(var["sumsz_gan" + str(energy)], axis=0)
+        var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
+        var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
+        var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
+        #Take absolute of error and mean for all events
+        var["eprofilex_total"+ str(energy)]= np.sum(np.absolute(var["eprofilex_error"+ str(energy)]))/x
+        var["eprofiley_total"+ str(energy)]= np.sum(np.absolute(var["eprofiley_error"+ str(energy)]))/y
+        var["eprofilez_total"+ str(energy)]= np.sum(np.absolute(var["eprofilez_error"+ str(energy)]))/z
+
+        var["eprofile_total"+ str(energy)]= (var["eprofilex_total"+ str(energy)] + var["eprofiley_total"+ str(energy)] + var["eprofilez_total"+ str(energy)])/3
+        metrice += var["eprofile_total"+ str(energy)]
+        if ang:
+            var["angle_error"+ str(energy)] = np.mean(np.absolute((var[angtype + "_act" + str(energy)] - var[angtype + "_gan" + str(energy)])/var[angtype + "_act" + str(energy)]))
+            metrica += var["angle_error"+ str(energy)]
+    metricp = metricp/len(energies)
+    metrice = metrice/len(energies)
+    if ang:metrica = metrica/len(energies)
+    tot = metricp + metrice
+    if ang:tot = tot +metrica
+    result = [tot, metricp, metrice]
+    if ang: result.append(metrica)
+    return result
+
+# Measuring 3D angle from image
+def measPython(image): # Working version:p1 and p2 are not used. 3D angle with barycenter as reference point
+    image = np.squeeze(image)
+    x_shape= image.shape[1]
+    y_shape= image.shape[2]
+    z_shape= image.shape[3]
+
+    sumtot = np.sum(image, axis=(1, 2, 3))# sum of events
+    indexes = np.where(sumtot > 0)
+    amask = np.ones_like(sumtot)
+    amask[indexes] = 0
+
+    masked_events = np.sum(amask) # counting zero sum events
+
+    x_ref = np.sum(np.sum(image, axis=(2, 3)) * np.expand_dims(np.arange(x_shape) + 0.5, axis=0), axis=1)
+    y_ref = np.sum(np.sum(image, axis=(1, 3)) * np.expand_dims(np.arange(y_shape) + 0.5, axis=0), axis=1)
+    z_ref = np.sum(np.sum(image, axis=(1, 2)) * np.expand_dims(np.arange(z_shape) + 0.5, axis=0), axis=1)
+
+    x_ref[indexes] = x_ref[indexes]/sumtot[indexes]
+    y_ref[indexes] = y_ref[indexes]/sumtot[indexes]
+    z_ref[indexes] = z_ref[indexes]/sumtot[indexes]
+
+    sumz = np.sum(image, axis =(1, 2)) # sum for x,y planes going along z
+
+    x = np.expand_dims(np.arange(x_shape) + 0.5, axis=0)
+    x = np.expand_dims(x, axis=2)
+    y = np.expand_dims(np.arange(y_shape) + 0.5, axis=0)
+    y = np.expand_dims(y, axis=2)
+    x_mid = np.sum(np.sum(image, axis=2) * x, axis=1)
+    y_mid = np.sum(np.sum(image, axis=1) * y, axis=1)
+    indexes = np.where(sumz > 0)
+
+    zmask = np.zeros_like(sumz)
+    zmask[indexes] = 1
+    zunmasked_events = np.sum(zmask, axis=1)
+
+    x_mid[indexes] = x_mid[indexes]/sumz[indexes]
+    y_mid[indexes] = y_mid[indexes]/sumz[indexes]
+    z = np.arange(z_shape) + 0.5# z indexes
+    x_ref = np.expand_dims(x_ref, 1)
+    y_ref = np.expand_dims(y_ref, 1)
+    z_ref = np.expand_dims(z_ref, 1)
+
+    zproj = np.sqrt((x_mid-x_ref)**2.0  + (z - z_ref)**2.0)
+    m = (y_mid-y_ref)/zproj
+    z = z * np.ones_like(z_ref)
+    indexes = np.where(z<z_ref)
+    m[indexes] = -1 * m[indexes]
+    ang = (math.pi/2.0) - np.arctan(m)
+    ang = ang * zmask
+
+    #ang = np.sum(ang, axis=1)/zunmasked_events #mean
+    ang = ang * z # weighted by position
+    sumz_tot = z * zmask
+    ang = np.sum(ang, axis=1)/np.sum(sumz_tot, axis=1)
+
+    indexes = np.where(amask>0)
+    ang[indexes] = 100.
+    return ang
+
+# short version of analysis                                                                                                                      
+def OptAnalysisShort(var, generated_images, energies):
+    m=2
+    x = generated_images.shape[1]
+    y = generated_images.shape[2]
+    z = generated_images.shape[3]
+    for energy in energies:
+      if energy==0:
+         var["events_gan" + str(energy)]=generated_images[:5000]
+      else:
+         var["events_gan" + str(energy)]=generated_images[var["indexes" + str(energy)]]
+      var["ecal_gan"+ str(energy)] = np.sum(var["events_gan" + str(energy)], axis = (1, 2, 3))
+      var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
+      var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)] = get_sums(var["events_gan" + str(energy)])
+      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
+      var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m)
+      var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
+    return metric(var, energies, m, angtype='angle', x=x, y=y, z=z)
+                                                                                                     
 def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
     for index, datafile in enumerate(datafiles):
         if index == 0:
@@ -329,7 +495,7 @@ def get_gen(energy, gendir):
 # generate images
 def generate(g, index, cond, latent=256, concat=1):
     energy_labels=np.expand_dims(cond[0], axis=1)
-    if len(cond)> 0: # that means we also have angle
+    if len(cond)> 1: # that means we also have angle
       angle_labels = cond[1]
       if concat:
         noise = np.random.normal(0, 1, (index, latent-1))  
@@ -342,8 +508,8 @@ def generate(g, index, cond, latent=256, concat=1):
         gen_in = np.expand_dims(gen_in, axis=2)
         gen_in = gen_in * noise
     else:
-      noise = np.random.normal(0, 1, (index, latent))
-      energy_labels=np.expand_dims(energy_labels, axis=1)
+      noise = np.random.normal(0, 1, (latent))
+      #energy_labels=np.expand_dims(energy_labels, axis=1)
       gen_in = energy_labels * noise
     generated_images = g.predict(gen_in, verbose=False, batch_size=50)
     return generated_images
@@ -609,6 +775,8 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              var["isreal_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["isreal_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["aux_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["aux_act" + str(energy)]['n_'+ str(i)][indexes]
              var["aux_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
+             var["ecal_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["aux_act" + str(energy)]['n_'+ str(i)][indexes]
+             var["ecal_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle_act" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle_gan" + str(energy)]['n_'+ str(i)][indexes]
              if nloss==5:
