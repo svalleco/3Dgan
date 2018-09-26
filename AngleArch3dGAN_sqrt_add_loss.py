@@ -22,7 +22,9 @@ def ecal_sum(image):
     image = K.square(image)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
-   
+
+
+
 def ecal_angle(image):
     image = K.squeeze(image, axis=4)
     image = K.square(image)
@@ -124,8 +126,10 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     ang = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
-    Model(input=image, output=[fake, aux, ang, ecal]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal])
+    mean = Lambda(lambda x: K.mean(x, axis=(1, 2, 3)))(image)
+    std = Lambda(lambda x: K.std(x, axis=(1, 2, 3)))(image)
+    Model(input=image, output=[fake, aux, ang, ecal, mean, std]).summary()
+    return Model(input=image, output=[fake, aux, ang, ecal, mean, std])
 
 
 def generator(latent_size=200, return_intermediate=False):
