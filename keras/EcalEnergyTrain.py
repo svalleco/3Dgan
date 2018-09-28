@@ -20,54 +20,11 @@ import time
 import math
 import argparse
 import setGPU #if Caltech
-
-def BitFlip(x, prob=0.05):
-    """ flips a int array's values with some probability """
-    x = np.array(x)
-    selection = np.random.uniform(0, 1, x.shape) < prob
-    x[selection] = 1 * np.logical_not(x[selection])
-    return x
-
-def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
-    
-    Files =sorted( glob.glob(FileSearch))
-    Filesused = int(math.ceil(nEvents/EventsperFile))
-    FileCount=0
-   
-    Samples={}
-    for F in Files:
-        FileCount+=1
-        basename=os.path.basename(F)
-        ParticleName=basename.split("_")[0].replace("Escan","")
-
-        if ParticleName in Particles:
-            try:
-                Samples[ParticleName].append(F)
-            except:
-                Samples[ParticleName]=[(F)]
-
-        if MaxFiles>0:
-            if FileCount>MaxFiles:
-                break
-    out=[]
-    for j in range(len(Fractions)):
-        out.append([])
-
-    SampleI=len(Samples.keys())*[int(0)]
-
-    for i,SampleName in enumerate(Samples):
-        Sample=Samples[SampleName]
-        NFiles=len(Sample)
-
-        for j,Frac in enumerate(Fractions):
-            EndI=int(SampleI[i]+ round(NFiles*Frac))
-            out[j]+=Sample[SampleI[i]:EndI]
-            SampleI[i]=EndI
-    return out
+import analysis.utils.GANutils as gan # some common functions for gan
 
 # This functions loads data from a file and also does any pre processing
 def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
-    #get data for training                                                                                                                             
+    #get data for training
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     Y=f.get('target')
@@ -82,21 +39,7 @@ def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ecal
 
-def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
-    if mod==0:
-       return np.multiply(2, sampled_energies)
-    elif mod==1:
-       if particle == 'Ele':
-         root_fit = [0.0018, -0.023, 0.11, -0.28, 2.21]
-         ratio = np.polyval(root_fit, sampled_energies)
-         return np.multiply(ratio, sampled_energies) * xscale
-       elif particle == 'Pi0':
-         root_fit = [0.0085, -0.094, 2.051]
-         ratio = np.polyval(root_fit, sampled_energies)
-         return np.multiply(ratio, sampled_energies) * xscale
-
-
-def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1):
+def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, analysis=False, energies=[]):
     start_init = time.time()
     verbose = False
     particle = 'Ele'
@@ -135,11 +78,10 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
     )
 
     # Getting Data
-    Trainfiles, Testfiles = DivideFiles(datapath, nEvents=nEvents, EventsperFile = EventsperFile, datasetnames=["ECAL"], Particles =[particle])
- 
-    print(Trainfiles)
-    print(Testfiles)
+    Trainfiles, Testfiles = gan.DivideFiles(datapath, nEvents=nEvents, EventsperFile = EventsperFile, datasetnames=["ECAL"], Particles =[particle])
+    print('The total data was divided in {} Train files and {} Test files'.format(len(Trainfiles), len(Testfiles)))
     nb_test = int(nEvents * f[1])
+    
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
@@ -151,25 +93,22 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
               Y_test = np.concatenate((Y_test, Y_temp))
               ecal_test = np.concatenate((ecal_test, ecal_temp))
     X_test, Y_test, ecal_test = X_test[:nb_test], Y_test[:nb_test], ecal_test[:nb_test]
-    print('Test Data loaded of shapes:')
-    print(X_test.shape)
-    print(Y_test.shape)
-    print(Y_test[:10])
-    print('*************************************************************************************')
 
-    nb_train = (nEvents * f[0]) #
+    nb_train = int(nEvents * f[0]) #
     total_batches = int(nb_train / batch_size)
-    print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
+    print('In this experiment {} events will be used for training as {}batches'.format(nb_train, total_batches))
+    print('{} events will be used for Testing'.format(nb_test))
 
     train_history = defaultdict(list)
     test_history = defaultdict(list)
+    analysis_history = defaultdict(list)
+    
     init_time = time.time()- start_init
     print('Initialization time is {} seconds'.format(init_time))
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         X_train, Y_train, ecal_train = GetprocData(Trainfiles[0], xscale=xscale)
-        print(Y_train[:10])
         nb_file=1
         nb_batches = int(X_train.shape[0] / batch_size)
         if verbose:
@@ -179,7 +118,7 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
         epoch_disc_loss = []
         file_index = 0
                 
-        for index in range(total_batches):
+        for index in np.arange(total_batches):
             if verbose:
                 progress_bar.update(index)
             else:
@@ -210,34 +149,35 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
             generator_ip = np.multiply(sampled_energies, noise)
       
             #ecal sum from fit
-            ecal_ip = GetEcalFit(sampled_energies, particle,mod, xscale)
+            ecal_ip = gan.GetEcalFit(sampled_energies, particle,mod, xscale)
             generated_images = generator.predict(generator_ip, verbose=0)        
-            real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
+            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
             epoch_disc_loss.append([
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
 
             trick = np.ones(batch_size)
             gen_losses = []
-            for _ in range(2):
+            for _ in np.arange(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size))
                 sampled_energies = np.random.uniform(0.1, 5, ( batch_size,1 ))
                 generator_ip = np.multiply(sampled_energies, noise)
-                ecal_ip = GetEcalFit(sampled_energies, particle, mod, xscale)
+                ecal_ip = gan.GetEcalFit(sampled_energies, particle, mod, xscale)
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, sampled_energies.reshape((-1, 1)), ecal_ip]))
             epoch_gen_loss.append([
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
-
+        print('The training took {} seconds.'.format(time.time()-epoch_start))
         print('\nTesting for epoch {}:'.format(epoch + 1))
+        test_start=time.time()
         noise = np.random.normal(0.1, 1, (nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
-        generated_images = generator.predict(generator_ip, verbose=False)
-        ecal_ip = GetEcalFit(sampled_energies, particle, mod, xscale)
+        generated_images = generator.predict(generator_ip, verbose=False, batch_size=batch_size)
+        ecal_ip = gan.GetEcalFit(sampled_energies, particle, mod, xscale)
         sampled_energies = np.squeeze(sampled_energies, axis=(1,))
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
@@ -250,10 +190,10 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
         noise = np.random.normal(0.1, 1, (2 * nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (2 * nb_test, 1))
         generator_ip = np.multiply(sampled_energies, noise)
-        ecal_ip = GetEcalFit(sampled_energies, particle, mod, xscale)
+        ecal_ip = gan.GetEcalFit(sampled_energies, particle, mod, xscale)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
-                                                [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
+                            [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
@@ -279,11 +219,19 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
                                overwrite=True)
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
-
-        epoch_time = time.time()-epoch_start
-        print("The {} epoch took {} seconds".format(epoch, epoch_time))
+        print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, time.time()-test_start, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-    open(pklfile, 'wb'))
+        open(pklfile, 'wb'))
+        if analysis:
+            var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
+            result = gan.OptAnalysisShort(var, generated_images, energies, ang=0)
+            print('Analysing............')
+            # All of the results correspond to mean relative errors on different quantities
+            analysis_history['total'].append(result[0]) 
+            analysis_history['energy'].append(result[1])
+            analysis_history['moment'].append(result[2])
+            print('Result = ', result)
+            pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -295,11 +243,11 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='veganweights2', help='Directory to store weights.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dganWeights', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
-    parser.add_argument('--pklfile', action='store', type=str, default='dcgan-history2.pkl', help='File to save losses.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='File to save losses.')
     return parser
 
 if __name__ == '__main__':
@@ -336,9 +284,13 @@ if __name__ == '__main__':
     xscale = params.xscale
     pklfile = params.pklfile
     print(params)
- 
+    gan.safe_mkdir(weightdir)
+    
+    analysis=True
+    energies =[100, 200, 300, 400]
+    
     # Building discriminator and generator
     d=discriminator()
     g=generator(latent_size)
-    Gan3DTrain(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , gen_weight=2, aux_weight=0.1, ecal_weight=0.1, xscale = xscale)
+    Gan3DTrain(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , gen_weight=2, aux_weight=0.1, ecal_weight=0.1, xscale = xscale, analysis=analysis, energies=energies)
     
