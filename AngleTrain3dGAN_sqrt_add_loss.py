@@ -72,14 +72,34 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 1
             EndI=int(SampleI[i]+ round(NFiles*Frac))
             out[j]+=Sample[SampleI[i]:EndI]
             SampleI[i]=EndI
-
     return out
 
 def sqrt(x):
-    epsilon= np.finfo(float).eps
-    x[x < epsilon] = 0
-    
     return np.sqrt(x)
+
+def safe_log(x):
+    indexes = np.where(x>0)
+    x[indexes] = np.log(x[indexes])
+    return x, indexes
+        
+def mean_log(x):
+    x, indexes = safe_log(x)
+    return x/np.count_nonzero(x, axis=(1, 2, 3))
+
+def std_log(x):
+    x, indexes = safe_log(x)
+    print(x.shape)
+    mean = np.sum(x, axis=(1, 2, 3))/np.count_nonzero(x, axis=(1, 2, 3))
+    mask = np.zeros_like(x)
+    mask[indexes] = 1
+    print(mask.shape)
+    x = np.subtract(x, mean) 
+    print(x.shape)
+    x = np.square(x * mask)
+    print(x.shape)
+    std = np.sqrt(np.sum(x, axis=(1, 2, 3))/np.count_nonzero(x, axis=(1, 2, 3)))
+    return std
+   
             
 def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     #get data for training                                                                                                                             
@@ -160,7 +180,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print(X_test.shape)
     print(Y_test.shape)
     print('*************************************************************************************')
-    print('Cell energies vary from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test), np.mean(X_test)))
+    print('Cell energies vary from {} to {} with mean {} and std {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0]), np.std(X_test[X_test>0])))
     nb_test = numTest
    
     train_history = defaultdict(list)
@@ -206,8 +226,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            mean_batch = np.mean(image_batch, axis=(1, 2, 3))
-            std_batch = np.std(image_batch, axis=(1, 2, 3))
+            mean_batch = mean_log(image_batch)
+            
+            std_batch = std_log(image_batch)
+            print('mean= {} and std ={}'.format(mean_batch.shape, std_batch.shape))
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
@@ -221,8 +243,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, mean_batch, std_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, mean_batch, std_batch])
 
-            #print ('real_batch_loss', real_batch_loss)
-            #print ('fake_batch_loss', fake_batch_loss)
+            print ('real_batch_loss', real_batch_loss)
+            print ('fake_batch_loss', fake_batch_loss)
             
             # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0:
@@ -262,7 +284,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         ecal = np.concatenate((ecal_test, ecal_test))
         aux_y = np.concatenate((Y_test, Y_test), axis=0)
                 
-        discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, np.mean(X, axis=(1, 2, 3)), np.std(X, axis=(1, 2, 3))], verbose=False, batch_size=batch_size)
+        discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, mean_log(X), std_log(X)], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         noise = np.random.normal(0, 1, (2 * nb_test, latent_size - 1))
@@ -270,7 +292,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         generator_ip = np.concatenate((ang.reshape(-1, 1), noise), axis=1)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
-                [trick, aux_y, ang, ecal, np.mean(X, axis=(1, 2, 3)), np.std(X, axis=(1, 2, 3))], verbose=False, batch_size=batch_size)
+                [trick, aux_y, ang, ecal, mean_log(X), mean_std(X)], verbose=False, batch_size=batch_size)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
@@ -366,6 +388,8 @@ if __name__ == '__main__':
     aux_weight= 0.1  # weight for primary energy regression loss
     ang_weight= 25   # weight for angle loss
     ecal_weight = 0.1 # weight for ecal loss
+    mean_weight = 0.1
+    std_weight = 0.1
     thresh = 0 # threshold for data
     angtype = 'mtheta'
  
@@ -375,5 +399,5 @@ if __name__ == '__main__':
     g=generator(latent_size)
     Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, gen_weight=gen_weight, aux_weight=aux_weight, ang_weight=ang_weight, ecal_weight=ecal_weight,
-                    xscale = xscale, angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype)
+                    mean_weight=mean_weight, std_weight=std_weight, xscale = xscale, angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype)
     

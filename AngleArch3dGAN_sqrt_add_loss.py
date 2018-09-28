@@ -23,7 +23,24 @@ def ecal_sum(image):
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
 
+def mean_log(image):
+    image, count = safe_log(image)
+    mean = K.sum(image, axis=(1, 2, 3))/count
+    return mean
 
+def std_log(image):
+    image, count = safe_log(image)
+    mean = K.sum(image, axis=(1, 2, 3))/count
+    image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), image-mean)
+    std = K.sum(K.square(image), axis=(1, 2, 3))/count
+    std = K.sqrt(std)
+    return std
+            
+def safe_log(image):
+    image_mask = K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.ones_like(image))
+    count = K.sum(image_mask, axis=(1, 2, 3))
+    image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.log(image))
+    return image, count
 
 def ecal_angle(image):
     image = K.squeeze(image, axis=4)
@@ -126,8 +143,8 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     ang = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
-    mean = Lambda(lambda x: K.mean(x, axis=(1, 2, 3)))(image)
-    std = Lambda(lambda x: K.std(x, axis=(1, 2, 3)))(image)
+    mean = Lambda(mean_log)(image)
+    std = Lambda(std_log)(image)
     Model(input=image, output=[fake, aux, ang, ecal, mean, std]).summary()
     return Model(input=image, output=[fake, aux, ang, ecal, mean, std])
 
