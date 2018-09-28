@@ -81,7 +81,6 @@ def ecal_angle(image):
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
-    print(K.int_shape(ang))
     return ang
 
 def discriminator():
@@ -121,8 +120,8 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     ang = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
-    Model(input=image, output=[fake, aux, ang, ecal]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal])
+    Model(input=[image], output=[fake, aux, ang, ecal]).summary()
+    return Model(input=[image], output=[fake, aux, ang, ecal])
 
 
 def generator(latent_size=200, return_intermediate=False):
@@ -145,14 +144,14 @@ def generator(latent_size=200, return_intermediate=False):
         ZeroPadding3D((0, 2,0)),
         Conv3D(6, 3, 5, 8, init='he_uniform'),
         LeakyReLU(),
-        Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
+        Conv3D(1, 2, 2, 2, init='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
     fake_image = loc(latent)
     loc.summary()
-    Model(input=[latent], output=fake_image).summary()
-    return Model(input=[latent], output=fake_image)
+    Model(input=[latent], output=[fake_image]).summary()
+    return Model(input=[latent], output=[fake_image])
 
 def main():
     g= generator()

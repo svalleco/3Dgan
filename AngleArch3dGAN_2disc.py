@@ -19,14 +19,11 @@ import tensorflow as tf
 K.set_image_dim_ordering('tf')
 
 def ecal_sum(image):
-    image = K.square(image)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
 def ecal_angle(image):
     image = K.squeeze(image, axis=4)
-    image = K.square(image)
-    
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
@@ -84,14 +81,14 @@ def ecal_angle(image):
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
-    print(K.int_shape(ang))
     return ang
 
-def discriminator():
+def discriminator2():
   
     image=Input(shape=(51, 51, 25, 1))
+    x = Lambda(lambda x: K.sqrt(x))(image)    
 
-    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, 5, 6, 6, border_mode='same')(x)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
@@ -124,8 +121,8 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     ang = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
-    Model(input=image, output=[fake, aux, ang, ecal]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal])
+    Model(input=[image], output=[fake, aux, ang, ecal]).summary()
+    return Model(input=[image], output=[fake, aux, ang, ecal])
 
 
 def generator(latent_size=200, return_intermediate=False):
@@ -148,19 +145,20 @@ def generator(latent_size=200, return_intermediate=False):
         ZeroPadding3D((0, 2,0)),
         Conv3D(6, 3, 5, 8, init='he_uniform'),
         LeakyReLU(),
-        Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
+        Conv3D(1, 2, 2, 2, init='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
     fake_image = loc(latent)
     loc.summary()
-    Model(input=[latent], output=fake_image).summary()
-    return Model(input=[latent], output=fake_image)
+    Model(input=[latent], output=[fake_image]).summary()
+    return Model(input=[latent], output=[fake_image])
 
 def main():
-  g= generator()
-  d=discriminator()
+    g= generator()
+    d=discriminator()
 
 if __name__ == "__main__":
     main()
-        
+
+                

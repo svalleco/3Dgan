@@ -18,7 +18,7 @@ sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
 
 def main():
    # path to generator weights
-   genweight = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_049.hdf5"
+   genweight = "/nfshome/gkhattak/3Dgan/weights/params_generator_epoch_073.hdf5"
    # generator model
    from AngleArch3dGAN_sqrt import generator
 
@@ -36,7 +36,7 @@ def main():
    xscale = 1 # scaling of images
    post = square # post processing: It can be either scale (without sqrt) or square(sqrt)
    thresh = 0 # if using threshold
-   plotsdir = 'results/genplots_5layer_4epoch' # name of folder to save results
+   plotsdir = 'results/genplots_sqrt_lr_p0001' # name of folder to save results
    gan.safe_mkdir(plotsdir) # make plot directory
    opt="colz" # option for 2D hist
    events = {} # initialize list

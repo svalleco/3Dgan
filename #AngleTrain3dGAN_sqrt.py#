@@ -109,7 +109,6 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
     )
-
     # build the generator
     print('[INFO] Building generator')
     #generator.summary()

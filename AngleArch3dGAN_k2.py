@@ -16,17 +16,14 @@ import math
 from tensorflow import py_func, float32, Tensor
 import tensorflow as tf
 
-K.set_image_dim_ordering('tf')
+K.set_image_data_format('channels_last')
 
 def ecal_sum(image):
-    image = K.square(image)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
 def ecal_angle(image):
     image = K.squeeze(image, axis=4)
-    image = K.square(image)
-    
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
@@ -84,30 +81,29 @@ def ecal_angle(image):
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
-    print(K.int_shape(ang))
     return ang
 
 def discriminator():
   
     image=Input(shape=(51, 51, 25, 1))
 
-    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, (5, 6, 6), padding='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
@@ -124,8 +120,8 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     ang = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
-    Model(input=image, output=[fake, aux, ang, ecal]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal])
+    Model(inputs=[image], outputs=[fake, aux, ang, ecal]).summary()
+    return Model(inputs=[image], outputs=[fake, aux, ang, ecal])
 
 
 def generator(latent_size=200, return_intermediate=False):
@@ -134,33 +130,34 @@ def generator(latent_size=200, return_intermediate=False):
         Dense(5184, input_shape=(latent_size,)),
         Reshape((9, 9, 8, 8)),
 
-        Conv3D(64, 6, 6, 8, border_mode='same', init='he_uniform'),
+        Conv3D(64, (6, 6, 8), padding='same', kernel_initializer='he_uniform'),
         LeakyReLU(),
         BatchNormalization(),
         UpSampling3D(size=(3, 3, 2)),
 
         ZeroPadding3D((2, 3, 1)),
-        Conv3D(6, 5, 8, 8, init='he_uniform'),
+        Conv3D(6, (5, 8, 8), kernel_initializer='he_uniform'),
         LeakyReLU(),
         BatchNormalization(),
         UpSampling3D(size=(2, 2, 3)),
 
         ZeroPadding3D((0, 2,0)),
-        Conv3D(6, 3, 5, 8, init='he_uniform'),
+        Conv3D(6, (3, 5, 8), kernel_initializer='he_uniform'),
         LeakyReLU(),
-        Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
+        Conv3D(1, (2, 2, 2), kernel_initializer='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
     fake_image = loc(latent)
     loc.summary()
-    Model(input=[latent], output=fake_image).summary()
-    return Model(input=[latent], output=fake_image)
+    Model(inputs=[latent], outputs=[fake_image]).summary()
+    return Model(inputs=[latent], outputs=[fake_image])
 
 def main():
-  g= generator()
-  d=discriminator()
+    g= generator()
+    d=discriminator()
 
 if __name__ == "__main__":
     main()
-        
+
+                

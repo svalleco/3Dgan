@@ -1,3 +1,4 @@
+#Training for GAN
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -20,69 +21,26 @@ import time
 import math
 import argparse
 import setGPU #if Caltech
+#from memory_profiler import profile
+import keras.backend as K
+import analysis.utils.GANutils as gan
+#K.set_image_dim_ordering('tf')
 
-def BitFlip(x, prob=0.05):
-    """ flips a int array's values with some probability """
-    x = np.array(x)
-    selection = np.random.uniform(0, 1, x.shape) < prob
-    x[selection] = 1 * np.logical_not(x[selection])
-    return x
+from keras.layers import Input
+from keras.models import Model
+from keras.optimizers import Adadelta, Adam, RMSprop
+from keras.utils.generic_utils import Progbar
+#config = tf.ConfigProto(log_device_placement=True)
 
-def safe_mkdir(path):
-    #Safe mkdir (i.e., don't create if already exists,and no violation of race conditions)
-    from os import makedirs
-    from errno import EEXIST
-    try:
-      makedirs(path)
-      print('{} is created to store weights'.format(path))
-    except OSError as exception:
-      if exception.errno != EEXIST:
-          raise exception
+# printing versions of software used
+print('keras version:', keras.__version__)
+print('python version:', sys.version)
+import tensorflow as tf
+print('tensorflow version', tf.__version__)
+print('numpy version', np.version.version)
 
-def DivideFiles(FileSearch="/data/LCD/*/*.h4", nEvents=800000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
-    
-    Files =sorted( glob.glob(FileSearch))
-    Filesused = int(math.ceil(nEvents/EventsperFile))
-    FileCount=0
-    Samples={}
-    for F in Files:
-        FileCount+=1
-        basename=os.path.basename(F)
-        ParticleName=basename.split("_")[0].replace("Escan","")
-
-        if ParticleName in Particles:
-            try:
-                Samples[ParticleName].append(F)
-            except:
-                Samples[ParticleName]=[(F)]
-
-        if MaxFiles>0:
-            if FileCount>MaxFiles:
-                break
-    out=[]
-    for j in range(len(Fractions)):
-        out.append([])
-
-    SampleI=len(Samples.keys())*[int(0)]
-
-    for i,SampleName in enumerate(Samples):
-        Sample=Samples[SampleName]
-        NFiles=len(Sample)
-        for j,Frac in enumerate(Fractions):
-            EndI=int(SampleI[i]+ round(NFiles*Frac))
-            out[j]+=Sample[SampleI[i]:EndI]
-            SampleI[i]=EndI
-
-    return out
-
-def sqrt(x):
-    epsilon= np.finfo(float).eps
-    x[x < epsilon] = 0
-    
-    return np.sqrt(x)
-            
-def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
-    #get data for training                                                                                                                             
+#get data for training
+def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     ang = np.array(f.get(angtype))
@@ -94,18 +52,26 @@ def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, an
     ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
     ecal = np.sum(X, axis=(1, 2, 3))
-    return preproc(X), Y, ang, ecal
+    return X, Y, ang, ecal
 
-def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4):
+def Gan3DTrainAngle(discriminator1, discriminator2, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[]):
     start_init = time.time()
-    
+    verbose = False    
     particle='Ele'
     f = [0.9, 0.1]
 
-    print('[INFO] Building discriminator')
+    print('[INFO] Building discriminator1')
     #discriminator.summary()
-    discriminator.compile(
-        optimizer=RMSprop(lr=0.0005),
+    discriminator1.compile(
+        optimizer=RMSprop(),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
+        loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
+    )
+
+    print('[INFO] Building discriminator2')
+    #discriminator.summary()
+    discriminator2.compile(
+        optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
     )
@@ -114,29 +80,45 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     print('[INFO] Building generator')
     #generator.summary()
     generator.compile(
-        optimizer=RMSprop(lr=0.0002),
+        optimizer=RMSprop(),
         loss='binary_crossentropy'
     )
  
     # build combined Model
     latent = Input(shape=(latent_size, ), name='combined_z')   
     fake_image = generator( latent)
-    discriminator.trainable = False
-    fake, aux, ang, ecal= discriminator(fake_image)
-    combined = Model(
+    discriminator1.trainable = False
+    fake, aux, ang, ecal= discriminator1(fake_image)
+    combined1 = Model(
         input=[latent],
         output=[fake, aux, ang, ecal],
         name='combined_model'
     )
-    combined.compile(
+    combined1.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(lr=0.0002),
+        optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
     )
 
+    # build combined Model
+    latent = Input(shape=(latent_size, ), name='combined_z')
+    fake_image = generator( latent)
+    discriminator2.trainable = False
+    fake, aux, ang, ecal= discriminator2(fake_image)
+    combined2 = Model(
+        input=[latent],
+        output=[fake, aux, ang, ecal],
+        name='combined_model'
+    )
+    combined2.compile(
+        optimizer=RMSprop(),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
+        loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
+    )
+                            
     # Getting Data
-    Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
+    Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
  
     print(Trainfiles)
     print(Testfiles)
@@ -158,15 +140,20 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         numTest = X_test.shape[0]
     print('Test Data loaded of shapes:')
     print(X_test.shape)
-    print(Y_test.shape)
+    print(Y_test[:10])
     print('*************************************************************************************')
-    print('Cell energies vary from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test), np.mean(X_test)))
+    print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
     nb_test = numTest
-   
+    if analyse:
+      var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
     train_history = defaultdict(list)
     test_history = defaultdict(list)
     init_time = time.time()- start_init
+    analysis_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
+    discriminator = discriminator1
+    combined = combined1
+    
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
@@ -178,7 +165,11 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         index = 0
         total_batches = 0
         file_index=0
-     
+
+        if epoch==1:
+            discriminator = discriminator2
+            combined = combined2
+            
         while nb_file < len(Trainfiles):
             if verbose:
                 progress_bar.update(index)
@@ -211,20 +202,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
             generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
-
-            #print("For batch {} the Data energies go from {} to {}".format(index, np.amin(image_batch[image_batch > 0]), np.amax(image_batch)))
-
-            #print("For batch {} the GAN energies go from {} to {}".format(index, np.amin(generated_images[generated_images > 0]), np.amax(generated_images)))
   
-            real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
+            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch])
 
-            #print ('real_batch_loss', real_batch_loss)
-            #print ('fake_batch_loss', fake_batch_loss)
-            
             # if ecal sum has 100% loss then end the training
-            if fake_batch_loss[4] == 100.0:
-                print("Empty image with Ecal loss equal to 100.0")
+            if fake_batch_loss[4] == 100.0 and index >10:
+                print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
                 generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
                 discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
                 print ('real_batch_loss', real_batch_loss)
@@ -274,6 +258,17 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         train_history['discriminator'].append(discriminator_train_loss)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
+
+        if analyse:
+            result = gan.OptAnalysisShort(var, generated_images, energies)
+            print('Analysing............')
+            analysis_history['total'].append(result[0])
+            analysis_history['energy'].append(result[1])
+            analysis_history['moment'].append(result[2])
+            analysis_history['angle'].append(result[3])
+            print('Result = ', result)
+            pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
+
         print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
@@ -295,8 +290,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
-        pickle.dump({'train': train_history, 'test': test_history},
-    open(pklfile, 'wb'))
+        pickle.dump({'train': train_history, 'test': test_history}, open(pklfile, 'wb'))
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -315,24 +309,11 @@ def get_parser():
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
     return parser
 
-if __name__ == '__main__':
-
-    import keras.backend as K
-
-    K.set_image_dim_ordering('tf')
-
-    from keras.layers import Input
-    from keras.models import Model
-    from keras.optimizers import Adadelta, Adam, RMSprop
-    from keras.utils.generic_utils import Progbar
-    from sklearn.cross_validation import train_test_split
-
-    import tensorflow as tf
-    config = tf.ConfigProto(log_device_placement=True)
-  
+def main():
     #Architectures to import
-    from AngleArch3dGAN_sqrt import generator, discriminator
-
+    from AngleArch3dGAN import generator, discriminator
+    from AngleArch3dGAN_2disc import discriminator2
+    
     #Values to be set by user
     parser = get_parser()
     params = parser.parse_args()
@@ -348,17 +329,20 @@ if __name__ == '__main__':
     yscale = params.yscale
 
     #following can be changed if using from command line
-        
     #weightdir = params.weightsdir
-    weightdir = 'weights/3Dweights_sqrt_gp0002_dp0005' # renamed to keep record
+    weightdir = 'weights/3Dweights_2disc' # renamed to keep record
     #pklfile = params.pklfile
-    pklfile = 'results/3dgan_history_adam_sqrt_gp0002_dp0005.pkl'
+    pklfile = '3dgan_history_2disc.pkl' # loss history
+    resultfile = 'analysis_result.pkl' # optimization metric history
     #xscale = params.xscale
     xscale=1
-    nb_epochs = 120
-    
-    print(params)
+    nb_epochs = 50
 
+    print(params)
+    # if analysis is to be performed
+    analyse = False
+    energies =[0, 110, 150, 190]
+    
     # set for each training
     gen_weight = 3  # weight for generation loss
     aux_weight= 0.1  # weight for primary energy regression loss
@@ -368,10 +352,14 @@ if __name__ == '__main__':
     angtype = 'mtheta'
  
     # Building discriminator and generator
-    safe_mkdir(weightdir)
-    d=discriminator()
+    gan.safe_mkdir(weightdir)
+    d1=discriminator()
+    d2=discriminator2()
     g=generator(latent_size)
-    Gan3DTrainAngle(d, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size,
+    Gan3DTrainAngle(d1, d2, g, datapath, EventsperFile, nEvents, weightdir, pklfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, gen_weight=gen_weight, aux_weight=aux_weight, ang_weight=ang_weight, ecal_weight=ecal_weight,
-                    xscale = xscale, angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype)
+                    xscale = xscale, angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
+                    energies=energies)
     
+if __name__ == '__main__':
+    main()

@@ -21,7 +21,7 @@ def main():
    #datapath2 = "/data/shared/LCDLargeWindow/fixedangle/EleEscan/EleEscan_1_1.h5"
    #datapath3 = '/bigdata/shared/LCD/NewV1/EleEscan/EleEscan_1_1.h5'
    genweight = "/nfshome/gkhattak/3Dgan/weights/params_generator_epoch_013.hdf5"
-   #genweight2 = "/nfshome/gkhattak/keras/weights/scaled100_2p1p1_weights/params_generator_epoch_042.hdf5"
+   genweight2 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_042.hdf5"
    #genweight3 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_025.hdf5"
    # generator model
    from AngleArch3dGAN_sqrt import generator
@@ -30,7 +30,7 @@ def main():
 
    numdata = 1000
    scale=1
-   outdir = 'results/var_woutaux_ep13'
+   outdir = 'results/withaux42_woutaux_ep13'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
    x, y, ang=GetAngleData(datapath, numdata)
@@ -44,22 +44,22 @@ def main():
    g=generator(latent) # build generator
    g.load_weights(genweight) # load weights        
    x_gen1 = gan.generate(g, numdata, [y/100, ang], latent)
-   #x_gen2 = x_gen1/scale
+   x_gen2 = postproc(x_gen1, np.square, scale)
    
    """
    latent = 200 # latent space for generator
    g2.load_weights(genweight2) # load weights
    x_gen3 = gan.generate(g2, numdata, [y/100], latent)
    x_gen4 = x_gen3/100
-   
-   g.load_weights(genweight3) # load weights
+   """
+   g.load_weights(genweight2) # load weights
    x_gen3 = gan.generate(g, numdata, [y/100, ang], latent)
    x_gen4 = postproc(x_gen3 , np.square, scale)
-   """
-   labels = ['G4', 'GAN without Aux']
+
+   labels = ['G4', 'GAN without Aux(raw)', 'GAN without Aux(sq)', 'GAN (raw)', 'GAN (sq)']
    #plot_ecal_flatten_hist([x, x2, x_gen1, x_gen2, x_gen3, x_gen4], outfile, y, labels, norm=1)
    #plot_ecal_flatten_hist([x, x2, x_gen1, x_gen2, x_gen3, x_gen4], outfile + '_log', y, labels, logy=1, norm=1)
-   plot_ecal_flatten_hist([x, x_gen1], outfile + '_log', y, labels, logy=1, norm=2)
+   plot_ecal_flatten_hist([x, x_gen1, x_gen2, x_gen3, x_gen4], outfile + '_log', y, labels, logy=1, norm=2)
    print('Histogram is saved in ', outfile)
        
 def postproc(event, f, scale):
@@ -131,7 +131,8 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, ifp
         hd.Draw('sames')
         hd.Draw('sames hist')
         color+=1
-      legend.AddEntry(hd,label ,"l")
+      entropy = get_cross_entropy(events[0], event)
+      legend.AddEntry(hd,label+ " CE={}".format(entropy) ,"l")
       c1.Modified()
       c1.Update()
       
@@ -142,6 +143,13 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, ifp
    else:
      c1.Print(out_file + '.C')
 
+def get_cross_entropy(event1, event2):
+   return np.sum(-1 * (event1.flatten()) * log_ftn(event2.flatten()))
+
+def log_ftn(x):
+   indexes=np.where(x>0)
+   x[indexes] = np.log(x[indexes])
+   return x
 
 if __name__ == "__main__":
    main()

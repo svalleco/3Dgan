@@ -13,24 +13,22 @@ def main():
    from AngleArch3dGAN_sqrt import generator, discriminator
 
    #Weights
-   disc_weight1="../weights/3Dweights_1loss_50weight_sqrt/params_discriminator_epoch_059.hdf5"
-   gen_weight1= "../weights/3Dweights_1loss_50weight_sqrt/params_generator_epoch_059.hdf5"
-
-   disc_weight2="../weights/3Dweights_1loss_50weight_sqrt/params_discriminator_epoch_040.hdf5"
-   gen_weight2= "../weights/3Dweights_1loss_50weight_sqrt/params_generator_epoch_040.hdf5"
+   disc_weight1="../weights/params_discriminator_epoch_073.hdf5"
+   gen_weight1= "../weights/params_generator_epoch_073.hdf5"
       
    #Path to store results
-   plots_dir = "results/sqrt_ep59_ep40/"
+   plots_dir = "results/lrp0001/"
 
    #Parameters
    latent = 256 # latent space
    num_data = 100000 
    num_events = 2000
    events_per_file = 5000
-   m = 2  # number of moments 
+   m = 3  # number of moments 
    nloss= 4 # total number of losses...4 or 5
    concat = 1 # if concatenting angle to latent space
-   cell=0 # if making plots for cell energies. Exclude for quick plots.
+   cell=1 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
+   corr=0 # if making correlation plots
    energies=[0, 110, 150, 190] # energy bins
    angles = [math.radians(x) for x in [62, 85, 90, 105, 118]] # angle bins
    aindexes = [0, 1, 2, 3, 4] # numbers corressponding to different angle bins
@@ -48,20 +46,20 @@ def main():
    stest = False # K and chi2 test
    
    #following flags are used to save sorted and GAN data and to load from sorted data. These are used while development and should be False for one time analysis
-   save_data = True # True if the sorted data is to be saved. It only saves when read_data is false
-   read_data = True # True if loading previously sorted data  
-   save_gen =  True # True if saving generated data. 
-   read_gen = True # True if generated data is already saved and can be loaded
-   save_disc = True # True if discriminiator data is to be saved
-   read_disc =  True # True if discriminated data is to be loaded from previously saved file
+   save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
+   read_data = False # True if loading previously sorted data  
+   save_gen =  False # True if saving generated data. 
+   read_gen = False # True if generated data is already saved and can be loaded
+   save_disc = False # True if discriminiator data is to be saved
+   read_disc =  False # True if discriminated data is to be loaded from previously saved file
    ifpdf = True # True if pdf are required. If false .C files will be generated
  
    flags =[Test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
-   dweights = [disc_weight1, disc_weight2]
-   gweights = [gen_weight1, gen_weight2]
-   xscales = [1, 1]
-   ascales = [1, 1]
-   labels = ['epoch 59', 'epoch 40']
+   dweights = [disc_weight1]#, disc_weight2]
+   gweights = [gen_weight1]#, gen_weight2]
+   xscales = [1]#, 1]
+   ascales = [1]#, 1]
+   labels = ['']#, 'epoch 40']
    d = discriminator()
    g = generator(latent)
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
@@ -71,7 +69,7 @@ def main():
                 , pre =sqrt, post =square  # Adding other preprocessing, Default is simple scaling                 
    )
    
-   get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,  m, len(gweights), ifpdf, stest, nloss=nloss, cell=cell)
+   get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,  m, len(gweights), ifpdf, stest, nloss=nloss, cell=cell, corr=corr)
 
 def sqrt(n, scale=1):
    return np.sqrt(n * scale)
