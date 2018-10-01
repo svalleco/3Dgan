@@ -21,35 +21,33 @@ sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
 
 def main():
     # All of the following needs to be adjusted
-    from AngleArch3dGAN import generator # architecture
+    from AngleArch3dGAN_sqrt import generator # architecture
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
-    genpath = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_50weight_withoutsqrt/params_generator*.hdf5"# path to weights
+    genpath = "/nfshome/gkhattak/3Dgan/weights/3Dweights_adam_sqrt_p0005/params_generator*.hdf5"# path to weights
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/angle_optimization_without_sqrt' # plot directory
+    plotsdir = 'results/angle_optimization_adam_p0001' # plot directory
     particle = "Ele" 
-    scale = 2
-    threshold = 1e-4
+    scale = 1
+    threshold = 0
     ang = 1
     g= generator(latent_size=256)
-    start = 0
+    start = 5
+    stop = 60
     gen_weights=[]
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    #gen_weights=gen_weights[:3]
+    #gen_weights=gen_weights[:stop]
     epoch = []
     for i in np.arange(len(gen_weights)):
       name = os.path.basename(gen_weights[i])
-      print( name)
       num = int(filter(str.isdigit, name)[:-1])
-      print(num)
       epoch.append(num)
     print("{} weights are found".format(len(gen_weights)))
-    print(epoch)
     result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle, scale, thresh=threshold, ang=ang
-                        #, preproc = sqrt, postproc=square
+                        , preproc = sqrt, postproc=square
                         )
     PlotResultsRoot(result, plotsdir, start, epoch, fits, ang=ang)
 
@@ -63,7 +61,8 @@ def square(n, scale=1):
 def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     c1.SetGrid ()
-    legend = ROOT.TLegend(.6, .6, .9, .9)
+    legend = ROOT.TLegend(.5, .6, .9, .9)
+    legend.SetTextSize(0.028)
     mg=ROOT.TMultiGraph()
     color1 = 2
     color2 = 8
@@ -249,9 +248,9 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    start = time.time()
    for energy in energies:
      if ang:
-        var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, var["angle" + str(energy)] * ascale, latent=latent)
+        var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100, var["angle" + str(energy)] * ascale], latent=latent)
      else:
-        var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], var["energy" + str(energy)]/100, latent=latent, ang=ang) 
+        var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100], latent=latent, ang=ang) 
      var["events_gan" + str(energy)] = postproc(var["events_gan" + str(energy)], xscale)
    gen_time = time.time() - start
    print ("{} events were generated in {} seconds".format(total, gen_time))
@@ -272,7 +271,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
         calc["mtheta_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
    return optimizer(calc, energies, m, x, y, z, ang=ang)                                        
  
-def metric(var, energies, m, x=25, y=25, z=25, ang=1):
+def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
    metricp = 0
    metrice = 0
    metrica = 0
@@ -307,18 +306,16 @@ def metric(var, energies, m, x=25, y=25, z=25, ang=1):
      var["eprofile_total"+ str(energy)]= (var["eprofilex_total"+ str(energy)] + var["eprofiley_total"+ str(energy)] + var["eprofilez_total"+ str(energy)])/3
      metrice += var["eprofile_total"+ str(energy)]
      if ang:
-        var["angle_error"+ str(energy)] = np.mean(np.absolute((var["mtheta_act" + str(energy)] - var["mtheta_gan" + str(energy)])/var["mtheta_act" + str(energy)]))
+        var["angle_error"+ str(energy)] = np.mean(np.absolute((var["mtheta_act" + str(energy)] - var[ "mtheta_gan" + str(energy)])/var["mtheta_act" + str(energy)]))
         metrica += var["angle_error"+ str(energy)]
    metricp = metricp/len(energies)
    metrice = metrice/len(energies)
    if ang:metrica = metrica/len(energies)
    tot = metricp + metrice
    if ang:tot = tot +metrica
-   print(" Total Position Error = %.4f\t Total Energy Profile Error =   %.4f" %(metricp, metrice),)
-   if ang:print(" Total Angle Error = %.4f"%(metrica))
-   print(" Total Error =  %.4f" %(tot))
    result = [tot, metricp, metrice]
    if ang: result.append(metrica)
+   print("Result =", result)
    return result
 
 def measPython(image): # Working version:p1 and p2 are not used. 3D angle with barycenter as reference point

@@ -11,21 +11,21 @@ except ImportError:
 
 def main():
    #pkl file name and plots dir
-   lossfile =  '/nfshome/gkhattak/3Dgan/3dgan-history-1loss-50weight.pkl'
-   outdir = 'results/loss_plots_sqrt'
+   lossfile =  '/nfshome/gkhattak/3Dgan/3dgan_history_adam_sqrt_p0005.pkl'
+   outdir = 'results/loss_plots_adam_p0005'
 
    # limits for plots. Adjust according to current plots
-   ymax = [20, 5, 5, 40, 0.85, 1.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
+   ymax = [20, 5, 5, 40, 1, 3.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
 
-   start_epoch =7 # removing initial epochs to check for overfitting of Generation loss
-   
+   start_epoch =0 # removing initial epochs to check for overfitting of Generation loss
+   fit_order = 3
    num_ang_losses = 1 # number of angle losses
 
    safe_mkdir(outdir)
-   plot_loss(lossfile, ymax, outdir, start_epoch, num_ang_losses)
+   plot_loss(lossfile, ymax, outdir, start_epoch, num_ang_losses, order=fit_order)
    print('Loss Plots are saved in {}'.format(outdir))
    
-def plot_loss(lossfile, ymax, lossdir, start_epoch, num_ang_losses, fig=1):
+def plot_loss(lossfile, ymax, lossdir, start_epoch, num_ang_losses, fig=1, order=3):
    #Getting losses in arrays
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
@@ -115,7 +115,6 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, num_ang_losses, fig=1):
    plt.title('{} losses for Generator'.format(losstype[1]))
    epochs = np.arange(start_epoch, gen_train.shape[0])
    plt.plot(epochs, gen_train[start_epoch:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
-   order = 3
    fit = np.polyfit(epochs, gen_train[start_epoch:,1], order)
    plt.plot(epochs, np.polyval(fit, epochs), label='Gen fit ({} degree polynomial)'.format(order), linestyle='--')
    plt.legend()
