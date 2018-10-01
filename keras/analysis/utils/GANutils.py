@@ -121,22 +121,22 @@ def sort(data, bins, flag=False, num_events=1000, tolerance=5):
                 srt["z" + str(b)] = Z[indexes][:num_events]
     return srt
 
-# sort data by energy for variable angle data
-def sortEnergy(x, y, angle, ecal, energies):
+# sort data by energy input is in the form of arrays
+def sortEnergy(data, ecal, energies, ang=1):
     var={}
     tolerance =5
     for energy in energies:
         if energy==0:
-            var["events_act" + str(energy)]=x[:5000]
-            var["energy" + str(energy)]=y[:5000]
-            var["angle_act" + str(energy)]=angle[:5000]
+            var["events_act" + str(energy)]=data[0][:5000]
+            var["energy" + str(energy)]=data[1][:5000]
+            if ang: var["angle_act" + str(energy)]=data[2][:5000]
             var["ecal_act" + str(energy)]=ecal[:5000]
             var["index" + str(energy)] = var["events_act" + str(energy)].shape[0]
         else:
-            var["indexes" + str(energy)] = np.where((y > (energy - tolerance)/100. ) & ( y < (energy + tolerance)/100.))
-            var["events_act" + str(energy)]=x[var["indexes" + str(energy)]]
-            var["energy" + str(energy)]=y[var["indexes" + str(energy)]]
-            var["angle_act" + str(energy)]=angle[var["indexes" + str(energy)]]
+            var["indexes" + str(energy)] = np.where((data[1] > (energy - tolerance)/100. ) & ( data[1] < (energy + tolerance)/100.))
+            var["events_act" + str(energy)]=data[0][var["indexes" + str(energy)]]
+            var["energy" + str(energy)]=data[1][var["indexes" + str(energy)]]
+            if ang:  var["angle_act" + str(energy)]=data[2][var["indexes" + str(energy)]]
             var["ecal_act" + str(energy)]=ecal[var["indexes" + str(energy)]]
             var["index" + str(energy)] = var["events_act" + str(energy)].shape[0]
     return var
@@ -260,7 +260,7 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     return ang
 
 # short version of analysis                                                                                                                      
-def OptAnalysisShort(var, generated_images, energies):
+def OptAnalysisShort(var, generated_images, energies, ang=1):
     m=2
     x = generated_images.shape[1]
     y = generated_images.shape[2]
@@ -273,10 +273,10 @@ def OptAnalysisShort(var, generated_images, energies):
       var["ecal_gan"+ str(energy)] = np.sum(var["events_gan" + str(energy)], axis = (1, 2, 3))
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
       var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)] = get_sums(var["events_gan" + str(energy)])
-      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
-      var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m)
-      var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
-    return metric(var, energies, m, angtype='angle', x=x, y=y, z=z)
+      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m, x=x, y=y, z=z)
+      var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m, x=x, y=y, z=z)
+      if ang: var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
+    return metric(var, energies, m, angtype='angle', x=x, y=y, z=z, ang=ang)
                                                                                                      
 def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
     for index, datafile in enumerate(datafiles):
