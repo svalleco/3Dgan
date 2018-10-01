@@ -74,7 +74,7 @@ def main():
    if thresh>0:
       events = applythresh(events, thresh)
    for n in np.arange(num):
-     pl.PlotEvent(events[n], sampled_energies[n], sampled_thetas[n], os.path.join(plotsdir, 'Event{}.pdf'.format(n)), n, opt=opt)
+     pl.PlotEvent(events[n], 100*sampled_energies[n], sampled_thetas[n], os.path.join(plotsdir, 'Event{}.pdf'.format(n)), n, opt=opt)
    print('Plots are saved in {}'.format(plotsdir))
 
 def square(n, xscale):
