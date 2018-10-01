@@ -2,6 +2,7 @@
 import numpy as np
 import ROOT
                                                                                                   
+# creating log bins
 def BinLogX(h):
    axis = h.GetXaxis()
    bins = axis.GetNbins()
@@ -15,10 +16,16 @@ def BinLogX(h):
    axis.Set(bins, new_bins)
    new_bins=None
 
-#Fill a histogram from 1D numpy array                                                                                                                                                                              
+#Fill a histogram from 1D numpy array
 def fill_hist(hist, array):
    [hist.Fill(_) for _ in array]
 
+def fill_graph(graph, x, y):
+   n = x.shape[0]
+   for i in np.arange(n):
+      graph.SetPoint(i, x[i], y[i])
+
+# normalize in different modes
 def normalize(hist, mod=0):
    if mod==0:
       norm = hist.GetEntries()
@@ -36,6 +43,7 @@ def fill_hist_wt(hist, weight):
      for j in np.arange(weight.shape[0]):
         hist.Fill(i, weight[j, i])
 
+#2D weighted histogram        
 def FillHist2D_wt(hist, array):
    array= np.squeeze(array, axis=3)
    dim1 = array.shape[0]
@@ -57,6 +65,7 @@ def get_hits(events, thresh=0.0002):
    hits = np.sum(hit_array, axis=(1, 2, 3))
    return hits
 
+# making ratio of first layer to total
 def ratio1_total(events):
    mid= int(events.shape[3]/2)
    print 'mid={}'.format(mid)
@@ -74,10 +83,8 @@ def stat_pos(a, pos=0):
   # Upper right                                                                                                                                                                                                    
   if pos==1:
    sb1=a.GetListOfFunctions().FindObject("stats")
-   sb1.SetX1NDC(.7)
-   sb1.SetX2NDC(.9)
-   sb1.SetY1NDC(.7)
-   sb1.SetY2NDC(.9)
+   sb1.SetY1NDC(.3)
+   sb1.SetY2NDC(.4)
   # Lower right                                                                                                                                                                                                    
   if pos==2:
    sb1=a.GetListOfFunctions().FindObject("stats")
@@ -108,7 +115,7 @@ def stat_pos(a, pos=0):
    sb1.SetY2NDC(.3)
   return sb1
 
-# Fill root profile                                                                                                                                                                                                
+# Fill root profile
 def fill_profile(prof, x, y):
   for i in range(len(y)):
       prof.Fill(y[i], x[i])
