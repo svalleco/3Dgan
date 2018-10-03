@@ -36,7 +36,16 @@ if __name__ == '__main__':
     from sklearn.cross_validation import train_test_split
 
     import tensorflow as tf
-    config = tf.ConfigProto(log_device_placement=True)
+    tf.flags.DEFINE_string("d", "./Ele_v1_1_2.h5", "data file")
+    tf.flags.DEFINE_integer("bs", 128, "inference batch size")
+    tf.flags.DEFINE_integer("num_inter_threads", 1, "number of inter_threads")
+    tf.flags.DEFINE_integer("num_intra_threads", 56, "number of intra_threads")
+    tf.flags.DEFINE_integer("num_epochs", 2, "number of epochs")
+    FLAGS = tf.flags.FLAGS
+
+    session_config = tf.ConfigProto(log_device_placement=True, inter_op_parallelism_threads=FLAGS.num_inter_threads, intra_op_parallelism_threads=FLAGS.num_intra_threads)
+    session = tf.Session(config=session_config)
+    K.set_session(session)
   
     from EcalEnergyGan import generator, discriminator
     #from EcalEnergyGan_16f import generator, discriminator
@@ -46,6 +55,7 @@ if __name__ == '__main__':
     keras_dformat = 'channels_first'
     nb_epochs = 1
     batch_size = 128
+
     latent_size = 200
     verbose = 'false'
     
@@ -56,7 +66,6 @@ if __name__ == '__main__':
     print (tf.__version__)
     print('[INFO] Building discriminator')
     discriminator.summary()
-    #discriminator.load_weights('veganweights/params_discriminator_epoch_019.hdf5')
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
@@ -68,7 +77,6 @@ if __name__ == '__main__':
     # build the generator
     print('[INFO] Building generator')
     generator.summary()
-    #generator.load_weights('veganweights/params_generator_epoch_019.hdf5')
     generator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
@@ -94,7 +102,7 @@ if __name__ == '__main__':
     )
 
 
-    d=h5py.File("/data/svalleco/Ele_v1_1_2.h5",'r')
+    d=h5py.File(FLAGS.d,'r')
     e=d.get('target')
     X=np.array(d.get('ECAL'))
     y=(np.array(e[:,1]))
@@ -267,10 +275,10 @@ if __name__ == '__main__':
                              *test_history['discriminator'][-1]))
 
         # save weights every epoch
-        generator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(g_weights, epoch),
+        generator.save_weights('{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
-        discriminator.save_weights('veganweights/{0}{1:03d}.hdf5'.format(d_weights, epoch),
+        discriminator.save_weights('{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
 
         pickle.dump({'train': train_history, 'test': test_history},
-open('dcgan-history.pkl', 'wb'))
+open('3dgan-history.pkl', 'wb'))
