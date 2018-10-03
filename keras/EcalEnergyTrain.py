@@ -39,20 +39,21 @@ if __name__ == '__main__':
     config = tf.ConfigProto(log_device_placement=True)
   
     from EcalEnergyGan import generator, discriminator
+    #from EcalEnergyGan_16f import generator, discriminator
 
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
-
-    nb_epochs = 2
+    keras_dformat = 'channels_first'
+    nb_epochs = 1
     batch_size = 128
     latent_size = 200
     verbose = 'false'
     
-    generator=generator(latent_size)
-    discriminator=discriminator()
+    generator=generator(latent_size,keras_dformat=keras_dformat)
+    discriminator=discriminator(keras_dformat=keras_dformat)
 
     nb_classes = 2
-
+    print (tf.__version__)
     print('[INFO] Building discriminator')
     discriminator.summary()
     #discriminator.load_weights('veganweights/params_discriminator_epoch_019.hdf5')
@@ -110,14 +111,16 @@ if __name__ == '__main__':
    # remove unphysical values
     X[X < 1e-6] = 0
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.05, test_size=0.05)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9, test_size=0.1)
 
     # tensorflow ordering
     X_train =np.expand_dims(X_train, axis=-1)
     X_test = np.expand_dims(X_test, axis=-1)
+  
     print(X_train.shape)
-    X_train =np.moveaxis(X_train, -1, 1)
-    X_test = np.moveaxis(X_test, -1,1)
+    if keras_dformat !='channels_last':
+       X_train =np.moveaxis(X_train, -1, 1)
+       X_test = np.moveaxis(X_test, -1,1)
 
     y_train= y_train/100
     y_test=y_test/100
@@ -134,8 +137,12 @@ if __name__ == '__main__':
     X_test = X_test.astype(np.float32)
     y_train = y_train.astype(np.float32)
     y_test = y_test.astype(np.float32)
-    ecal_train = np.sum(X_train, axis=(2, 3, 4))
-    ecal_test = np.sum(X_test, axis=(2, 3, 4))
+    if keras_dformat =='channels_last':
+        ecal_train = np.sum(X_train, axis=(1, 2, 3))
+        ecal_test = np.sum(X_test, axis=(1, 2, 3))
+    else:
+        ecal_train = np.sum(X_train, axis=(2, 3, 4))
+        ecal_test = np.sum(X_test, axis=(2, 3, 4))
 
     print(X_train.shape)
     print(X_test.shape)
