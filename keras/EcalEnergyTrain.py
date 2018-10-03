@@ -25,7 +25,7 @@ def bit_flip(x, prob=0.05):
 
 if __name__ == '__main__':
 
-    #import keras.backend as K
+    import keras.backend as K
 
     #K.set_image_dim_ordering('channels_first')
 
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     from sklearn.cross_validation import train_test_split
 
     import tensorflow as tf
-    tf.flags.DEFINE_string("d", "./Ele_v1_1_2.h5", "data file")
+    tf.flags.DEFINE_string("d", "/data/svalleco/Ele_v1_1_2.h5", "data file")
     tf.flags.DEFINE_integer("bs", 128, "inference batch size")
     tf.flags.DEFINE_integer("num_inter_threads", 1, "number of inter_threads")
     tf.flags.DEFINE_integer("num_intra_threads", 56, "number of intra_threads")
