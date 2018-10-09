@@ -45,7 +45,7 @@ def BitFlip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
-def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 10000, Fractions=[.01,.0],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     
     Files =sorted( glob.glob(FileSearch))
     Filesused = int(math.ceil(nEvents/EventsperFile))
@@ -80,11 +80,10 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 1
             EndI=int(SampleI[i]+ round(NFiles*Frac))
             out[j]+=Sample[SampleI[i]:EndI]
             SampleI[i]=EndI
-
     return out
 
 # This functions loads data from a file and also does any pre processing
-def GetData(datafile, xscale =1, yscale = 100, dimensions = 3):
+def GetData(datafile, xscale =1, yscale = 100, dimensions = 3, keras_dformat="channels_last"):
     #get data for training                                                                                         
     if hvd.rank()==0:
         print('Loading Data from .....', datafile)                              
@@ -101,15 +100,16 @@ def GetData(datafile, xscale =1, yscale = 100, dimensions = 3):
     if dimensions == 2:
         X = np.sum(X, axis=(1))
         X = xscale * X
-    X = np.moveaxis(X, -1, 1)
 
     Y = np.expand_dims(Y, axis=-1)
     Y = Y.astype(np.float32)
     Y = Y/yscale
-    Y = np.moveaxis(Y, -1, 1)
-
-    ecal = np.sum(X, axis=(2, 3, 4))
-    
+    if keras_dformat !='channels_last':
+       X =np.moveaxis(X, -1, 1)
+       Y = np.moveaxis(Y, -1,1)
+       ecal = np.sum(X, axis=(2, 3, 4))
+    else:
+       ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ecal
 
 
@@ -139,7 +139,7 @@ def randomize(a, b, c):
     return shuffled_a, shuffled_b, shuffled_c
 
 
-def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True):
+def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat = 'channels_last'):
     start_init = time.time()
     # verbose = False
     if hvd.rank()==0:
@@ -222,18 +222,18 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
-           X_test, Y_test, ecal_test = GetData(dtest)
+           X_test, Y_test, ecal_test = GetData(dtest, keras_dformat)
        else:
-           X_temp, Y_temp, ecal_temp = GetData(dtest)
+           X_temp, Y_temp, ecal_temp = GetData(dtest, keras_dformat)
            X_test = np.concatenate((X_test, X_temp))
            Y_test = np.concatenate((Y_test, Y_temp))
            ecal_test = np.concatenate((ecal_test, ecal_temp))
     
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
-            X_train, Y_train, ecal_train = GetData(dtrain)
+            X_train, Y_train, ecal_train = GetData(dtrain, keras_dformat)
         else:
-            X_temp, Y_temp, ecal_temp = GetData(dtrain)
+            X_temp, Y_temp, ecal_temp = GetData(dtrain, keras_dformat)
             X_train = np.concatenate((X_train, X_temp))
             Y_train = np.concatenate((Y_train, Y_temp))
             ecal_train = np.concatenate((ecal_train, ecal_temp))
@@ -318,7 +318,8 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
             epoch_time = time.time()-epoch_start
             print("The {} epoch took {} seconds".format(epoch, epoch_time))
             # pickle.dump({'train': train_history, 'test': test_history}, open(WeightsDir + 'dcgan2D-history.pkl', 'wb'))
-            if analysis:
+            #if analysis:
+            if (1):
                var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
                result = gan.OptAnalysisShort(var, generated_images, energies, ang=0)
                print('Analysing............')
@@ -349,6 +350,7 @@ def get_parser():
     parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
     parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
+    parser.add_argument('--channel_format', action='store', type=str, default="channels_last", help='NCHW vs NHWC')
     return parser
 
 
@@ -356,7 +358,6 @@ if __name__ == '__main__':
 
     import keras.backend as K
 
-    K.set_image_dim_ordering('tf')
 
     from keras.layers import Input
     from keras.models import Model
@@ -372,6 +373,13 @@ if __name__ == '__main__':
     params = parser.parse_args()
     print(params)
 
+    d_format = params.channel_format
+    print(d_format)
+ 
+    if d_format == 'channels_first':
+        K.set_image_dim_ordering('th')
+    else:
+        K.set_image_dim_ordering('tf')
     config = tf.ConfigProto()#(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
@@ -407,10 +415,9 @@ if __name__ == '__main__':
     opt = getattr(keras.optimizers, params.optimizer)
     opt = opt(params.learningRate * hvd.size())
     opt = hvd.DistributedOptimizer(opt)
-
     # Building discriminator and generator
-    d=discriminator()
-    g=generator(latent_size)
+    d=discriminator(keras_dformat=d_format)
+    g=generator(latent_size,keras_dformat=d_format)
     
-    GanTrain(d, g, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale, verbose=verbose)
-    
+    GanTrain(d, g, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale, verbose=verbose, keras_dformat=d_format)
+ 

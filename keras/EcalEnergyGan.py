@@ -20,28 +20,36 @@ def ecal_sum(image):
     return sum
    
 
-def discriminator():
+def discriminator(keras_dformat='channels_last'):
 
-    image = Input(shape=(25, 25, 25, 1))
+    print (keras_dformat)
+    if keras_dformat =='channels_last':
+        dshape=(25, 25, 25,1)
+        daxis=(1,2,3)
+    else:
+        dshape=(1, 25, 25, 25)
+        daxis=(2,3,4)
 
-    x = Conv3D(32, 5, 5,5, border_mode='same')(image)
+    image = Input(shape=dshape)
+
+    x = Conv3D(32, (5, 5,5), data_format=keras_dformat, padding='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((2, 2,2))(x)
-    x = Conv3D(8, 5, 5, 5, border_mode='valid')(x)
+    x = Conv3D(8, 5, 5, 5, data_format=keras_dformat,  padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((2, 2, 2))(x)
-    x = Conv3D(8, 5, 5,5, border_mode='valid')(x)
+    x = Conv3D(8, 5, 5,5, data_format=keras_dformat, padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((1, 1, 1))(x)
-    x = Conv3D(8, 5, 5, 5, border_mode='valid')(x)
+    x = Conv3D(8, 5, 5, 5, data_format=keras_dformat, padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
@@ -51,38 +59,42 @@ def discriminator():
 
     dnn = Model(image, h)
 
-    image = Input(shape=(25, 25, 25, 1))
-
     dnn_out = dnn(image)
 
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ecal = Lambda(lambda x: K.sum(x, axis=(1, 2, 3)))(image)
+    ecal = Lambda(lambda x: K.sum(x, axis=daxis))(image)
     Model(input=image, output=[fake, aux, ecal]).summary()
     return Model(input=image, output=[fake, aux, ecal])
 
-def generator(latent_size=1024, return_intermediate=False):
+def generator(latent_size=1024, return_intermediate=False,keras_dformat='channels_last') :
+    print(keras_dformat)
+    if keras_dformat =='channels_first':
+        dim = (8,7,7,8)
+    else:
+        dim = (7, 7, 8,8)
+    print (dim)
 
     loc = Sequential([
         Dense(64 * 7* 7, input_dim=latent_size),
-        Reshape((7, 7,8, 8)),
+        Reshape(dim),
 
-        Conv3D(64, 6, 6, 8, border_mode='same', init='he_uniform'),
+        Conv3D(64, (6, 6, 8), data_format=keras_dformat, padding='same', init='he_uniform'),
         LeakyReLU(),
         BatchNormalization(),
         UpSampling3D(size=(2, 2, 2)),
 
         ZeroPadding3D((2, 2, 0)),
-        Conv3D(6, 6, 5, 8, init='he_uniform'),
+        Conv3D(6, (6, 5, 8), data_format=keras_dformat, init='he_uniform'),
         LeakyReLU(),
         BatchNormalization(),
         UpSampling3D(size=(2, 2, 3)),
 
         ZeroPadding3D((1,0,3)),
-        Conv3D(6, 3, 3, 8, init='he_uniform'),
+        Conv3D(6, (3, 3, 8), data_format=keras_dformat, init='he_uniform'),
         LeakyReLU(),
-        Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
+        Conv3D(1, (2, 2, 2), bias=False, data_format=keras_dformat,  init='glorot_normal'),
         Activation('relu')
     ])
    
