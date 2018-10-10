@@ -13,7 +13,6 @@ from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
 
 from keras.models import Model, Sequential
 
-K.set_image_dim_ordering('tf')
 
 def ecal_sum(image):
     sum = K.sum(image, axis=(1, 2, 3))
@@ -22,7 +21,6 @@ def ecal_sum(image):
 
 def discriminator(keras_dformat='channels_last'):
 
-    print (keras_dformat)
     if keras_dformat =='channels_last':
         dshape=(25, 25, 25,1)
         daxis=(1,2,3)
@@ -68,39 +66,40 @@ def discriminator(keras_dformat='channels_last'):
     Model(input=image, output=[fake, aux, ecal]).summary()
     return Model(input=image, output=[fake, aux, ecal])
 
-def generator(latent_size=1024, return_intermediate=False,keras_dformat='channels_last') :
-    print(keras_dformat)
-    if keras_dformat =='channels_first':
-        dim = (8,7,7,8)
-    else:
-        dim = (7, 7, 8,8)
-    print (dim)
 
-    loc = Sequential([
-        Dense(64 * 7* 7, input_dim=latent_size),
-        Reshape(dim),
+def generator(latent_size=200, return_intermediate=False, keras_dformat='channels_last'):
 
-        Conv3D(64, (6, 6, 8), data_format=keras_dformat, padding='same', init='he_uniform'),
-        LeakyReLU(),
-        BatchNormalization(),
-        UpSampling3D(size=(2, 2, 2)),
+     if keras_dformat =='channels_last':
+        dim = (7,7,8,8)
+     else:
+        dim = (8, 7, 7,8)
 
-        ZeroPadding3D((2, 2, 0)),
-        Conv3D(6, (6, 5, 8), data_format=keras_dformat, init='he_uniform'),
-        LeakyReLU(),
-        BatchNormalization(),
-        UpSampling3D(size=(2, 2, 3)),
+     loc = Sequential([
+         Dense(64 * 7* 7, input_dim=latent_size),
+         Reshape(dim),
+         Conv3D(64, (6, 6, 8), data_format=keras_dformat, padding='same', kernel_initializer='he_uniform'),
+         LeakyReLU(),
+         BatchNormalization(),
+         UpSampling3D(size=(2, 2, 2)),
 
-        ZeroPadding3D((1,0,3)),
-        Conv3D(6, (3, 3, 8), data_format=keras_dformat, init='he_uniform'),
-        LeakyReLU(),
-        Conv3D(1, (2, 2, 2), bias=False, data_format=keras_dformat,  init='glorot_normal'),
-        Activation('relu')
-    ])
-   
-    latent = Input(shape=(latent_size, ))
-     
-    fake_image = loc(latent)
+         ZeroPadding3D((2, 2, 0)),
+         Conv3D(6, (6, 5, 8), data_format=keras_dformat, kernel_initializer='he_uniform'),
+         LeakyReLU(),
+         BatchNormalization(),
+         UpSampling3D(size=(2, 2, 3)),
 
-    Model(input=[latent], output=fake_image).summary()
-    return Model(input=[latent], output=fake_image)
+         ZeroPadding3D((1,0,3)),
+         Conv3D(6, (3, 3, 8), data_format=keras_dformat, kernel_initializer='he_uniform'),
+         LeakyReLU(),
+         Conv3D(1, (2, 2, 2), data_format=keras_dformat, use_bias=False, kernel_initializer='glorot_normal'),
+         Activation('relu')
+
+     ])
+
+     latent = Input(shape=(latent_size, ))
+
+     fake_image = loc(latent)
+
+     Model(input=[latent], output=fake_image).summary()
+     return Model(input=[latent], output=fake_image)
+

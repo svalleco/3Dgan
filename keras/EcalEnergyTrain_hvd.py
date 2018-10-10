@@ -139,7 +139,7 @@ def randomize(a, b, c):
     return shuffled_a, shuffled_b, shuffled_c
 
 
-def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat = 'channels_last'):
+def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last'):
     start_init = time.time()
     # verbose = False
     if hvd.rank()==0:
@@ -222,18 +222,18 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
-           X_test, Y_test, ecal_test = GetData(dtest, keras_dformat)
+           X_test, Y_test, ecal_test = GetData(dtest, keras_dformat=keras_dformat)
        else:
-           X_temp, Y_temp, ecal_temp = GetData(dtest, keras_dformat)
+           X_temp, Y_temp, ecal_temp = GetData(dtest, keras_dformat=keras_dformat)
            X_test = np.concatenate((X_test, X_temp))
            Y_test = np.concatenate((Y_test, Y_temp))
            ecal_test = np.concatenate((ecal_test, ecal_temp))
     
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
-            X_train, Y_train, ecal_train = GetData(dtrain, keras_dformat)
+            X_train, Y_train, ecal_train = GetData(dtrain, keras_dformat=keras_dformat)
         else:
-            X_temp, Y_temp, ecal_temp = GetData(dtrain, keras_dformat)
+            X_temp, Y_temp, ecal_temp = GetData(dtrain, keras_dformat=keras_dformat)
             X_train = np.concatenate((X_train, X_temp))
             Y_train = np.concatenate((Y_train, Y_temp))
             ecal_train = np.concatenate((ecal_train, ecal_temp))
@@ -350,7 +350,7 @@ def get_parser():
     parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
     parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
-    parser.add_argument('--channel_format', action='store', type=str, default="channels_last", help='NCHW vs NHWC')
+    parser.add_argument('--channel_format', action='store', type=str, default='channels_last', help='NCHW vs NHWC')
     return parser
 
 
@@ -374,11 +374,12 @@ if __name__ == '__main__':
     print(params)
 
     d_format = params.channel_format
-    print(d_format)
  
     if d_format == 'channels_first':
+        print('Setting th channel ordering (NCHW)')
         K.set_image_dim_ordering('th')
     else:
+        print('Setting tf channel ordering (NHWC)')
         K.set_image_dim_ordering('tf')
     config = tf.ConfigProto()#(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
