@@ -139,7 +139,7 @@ def randomize(a, b, c):
     return shuffled_a, shuffled_b, shuffled_c
 
 
-def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last'):
+def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=False):
     start_init = time.time()
     # verbose = False
     if hvd.rank()==0:
@@ -351,6 +351,7 @@ def get_parser():
     parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
     parser.add_argument('--channel_format', action='store', type=str, default='channels_last', help='NCHW vs NHWC')
+    parser.add_argument('--analysis', action='store', type=bool, default=False, help='Calculate optimisation function')
     return parser
 
 
@@ -400,6 +401,11 @@ if __name__ == '__main__':
 
     nb_epochs = params.nbepochs #Total Epochs
     batch_size = params.batchsize #batch size
+        # Analysis
+    analysis=params.analysis # if analysing
+    energies =[100, 200, 300, 400] # Bins
+    resultfile = '3dgan_analysis.pkl' # analysis result
+
     global_batch_size = batch_size * hvd.size()
     print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
     latent_size = params.latentsize #latent vector size
@@ -420,5 +426,5 @@ if __name__ == '__main__':
     d=discriminator(keras_dformat=d_format)
     g=generator(latent_size,keras_dformat=d_format)
     
-    GanTrain(d, g, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, weightdir, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale, verbose=verbose, keras_dformat=d_format)
+    GanTrain(d, g, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, weightdir, resultfile, energies, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale, verbose=verbose, keras_dformat=d_format, analysis=analysis)
  
