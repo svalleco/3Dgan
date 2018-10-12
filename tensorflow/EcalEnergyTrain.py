@@ -24,6 +24,15 @@ def bit_flip(x, prob=0.05):
     x[selection] = 1 * np.logical_not(x[selection])
     return x
 
+def safe_mkdir(path):
+    #Safe mkdir (i.e., don't create if already exists,and no violation of race conditions)
+    from os import makedirs
+    from errno import EEXIST
+    try:
+        makedirs(path)
+    except OSError as exception:
+        if exception.errno != EEXIST:
+            raise exception
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -39,12 +48,14 @@ if __name__ == '__main__':
     from tensorflow.python.keras.layers import Input
     from tensorflow.python.keras.models import Model
     from tensorflow.python.keras.optimizers import Adadelta, Adam, RMSprop
+    from tensorflow.python.keras.utils import multi_gpu_model
     from sklearn.model_selection import train_test_split
 
     parser = get_parser()
     params = parser.parse_args()
     datapath = params.datapath #Data path on EOS CERN
-    weightdir = params.weightsdir
+    weightsdir = params.weightsdir
+    safe_mkdir(weightsdir)
 
     # tf.flags.DEFINE_string("d", 'test', "data file")
     # tf.flags.DEFINE_integer("bs", 128, "inference batch size")
@@ -69,6 +80,10 @@ if __name__ == '__main__':
     
     generator=generator(latent_size,keras_dformat=keras_dformat)
     discriminator=discriminator(keras_dformat=keras_dformat)
+
+    # Enable multi-GPU training
+    generator = multi_gpu_model(generator, gpus=4)
+    discriminator = multi_gpu_model(discriminator, gpus=4)
 
     nb_classes = 2
     print (tf.__version__)
