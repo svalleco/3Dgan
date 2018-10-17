@@ -139,7 +139,7 @@ def randomize(a, b, c):
     return shuffled_a, shuffled_b, shuffled_c
 
 
-def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=False):
+def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=True):
     start_init = time.time()
     # verbose = False
     if hvd.rank()==0:
@@ -318,8 +318,10 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
             epoch_time = time.time()-epoch_start
             print("The {} epoch took {} seconds".format(epoch, epoch_time))
             # pickle.dump({'train': train_history, 'test': test_history}, open(WeightsDir + 'dcgan2D-history.pkl', 'wb'))
-            #if analysis:
-            if (1):
+            if analysis:
+              if keras_dformat !='channels_last':
+                 generated_images = np.swapaxes(generated_images, -1, 1)
+                 X_test =  np.swapaxes(X_test, -1, 1)
                var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
                result = gan.OptAnalysisShort(var, generated_images, energies, ang=0)
                print('Analysing............')
