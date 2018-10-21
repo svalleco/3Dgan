@@ -135,7 +135,6 @@ def sortEnergy(data, ecal, energies, ang=1):
         else:
             var["indexes" + str(energy)] = np.where((data[1] > (energy - tolerance)/100. ) & ( data[1] < (energy + tolerance)/100.))
             var["events_act" + str(energy)]=data[0][var["indexes" + str(energy)]]
-            print('in sortEnergy', var["events_act" + str(energy)].shape)
             var["energy" + str(energy)]=data[1][var["indexes" + str(energy)]]
             if ang:  var["angle_act" + str(energy)]=data[2][var["indexes" + str(energy)]]
             var["ecal_act" + str(energy)]=ecal[var["indexes" + str(energy)]]
@@ -150,7 +149,6 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
     for energy in energies:
         #Relative error on mean moment value for each moment and each axis
         x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
-        x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
         x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
         y_act= np.mean(var["momentY_act"+ str(energy)], axis=0)
         y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
@@ -170,17 +168,6 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
         var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
         var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
         var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
-        #Take absolute of error and mean for all events                                                           
-        var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
-        #Summing over moments and dividing for number of moments
-        var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
-        metricp += var["pos_total"+ str(energy)]
-        #Take profile along each axis and find mean along events
-        sumxact, sumyact, sumzact = np.mean(var["sumsx_act" + str(energy)], axis=0), np.mean(var["sumsy_act" + str(energy)], axis= 0), np.mean(var["sumsz_act" + str(energy)], axis=0)
-        sumxgan, sumygan, sumzgan = np.mean(var["sumsx_gan" + str(energy)], axis=0), np.mean(var["sumsy_gan" + str(energy)], axis=0), np.mean(var["sumsz_gan" + str(energy)], axis=0)
-        var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
-        var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
-        var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
         #Take absolute of error and mean for all events
         var["eprofilex_total"+ str(energy)]= np.sum(np.absolute(var["eprofilex_error"+ str(energy)]))/x
         var["eprofiley_total"+ str(energy)]= np.sum(np.absolute(var["eprofiley_error"+ str(energy)]))/y
@@ -193,11 +180,12 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
             metrica += var["angle_error"+ str(energy)]
     metricp = metricp/len(energies)
     metrice = metrice/len(energies)
-    if ang:metrica = metrica/len(energies)
     tot = metricp + metrice
-    if ang:tot = tot +metrica
     result = [tot, metricp, metrice]
-    if ang: result.append(metrica)
+    if ang:
+        metrica = metrica/len(energies)
+        tot = tot +metrica
+        result.append(metrica)
     return result
 
 # Measuring 3D angle from image
@@ -546,8 +534,6 @@ def get_moments(sumsx, sumsy, sumsz, totalE, m, x=51, y=51, z=25):
     old_err_state = np.seterr(divide='raise')
     ignored_states = np.seterr(**old_err_state)
     totalE = np.squeeze(totalE)
-    print ('totalE',totalE)
-    print('sumx,sumy,sumz,',sumsx.shape,sumsy.shape,sumsz.shape)
     index = sumsx.shape[0]
     momentX = np.zeros((index, m))
     momentY = np.zeros((index, m))

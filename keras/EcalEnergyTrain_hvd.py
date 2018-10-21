@@ -101,12 +101,10 @@ def GetData(datafile, xscale =1, yscale = 100, dimensions = 3, keras_dformat="ch
         X = np.sum(X, axis=(1))
         X = xscale * X
 
-    Y = np.expand_dims(Y, axis=-1)
     Y = Y.astype(np.float32)
     Y = Y/yscale
     if keras_dformat !='channels_last':
        X =np.moveaxis(X, -1, 1)
-       Y = np.moveaxis(Y, -1,1)
        ecal = np.sum(X, axis=(2, 3, 4))
     else:
        ecal = np.sum(X, axis=(1, 2, 3))
@@ -319,18 +317,23 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
             print("The {} epoch took {} seconds".format(epoch, epoch_time))
             # pickle.dump({'train': train_history, 'test': test_history}, open(WeightsDir + 'dcgan2D-history.pkl', 'wb'))
             if analysis:
+              analysis_history = defaultdict(list)
+              noise_test = np.random.normal(0., 1., (nb_test, latent_size))
+              ep_test = np.expand_dims(Y_test, axis=-1)
+              generator_ip_test = np.multiply(ep_test, noise_test)
+              generated_images_test = g.predict(generator_ip_test, verbose=0)
               if keras_dformat !='channels_last':
-                 generated_images = np.swapaxes(generated_images, -1, 1)
+                 generated_images_test = np.swapaxes(generated_images_test, -1, 1)
                  X_test =  np.swapaxes(X_test, -1, 1)
-               var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
-               result = gan.OptAnalysisShort(var, generated_images, energies, ang=0)
-               print('Analysing............')
-               # All of the results correspond to mean relative errors on different quantities
-               analysis_history['total'].append(result[0]) 
-               analysis_history['energy'].append(result[1])
-               analysis_history['moment'].append(result[2])
-               print('Result = ', result)
-               pickle.dump({'results': analysis_history}, open(resultfile, 'wb')) 
+              var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
+              print('Analysing............')
+              result = gan.OptAnalysisShort(var, generated_images_test, energies, ang=0)
+              # All of the results correspond to mean relative errors on different quantities
+              analysis_history['total'].append(result[0]) 
+              analysis_history['energy'].append(result[1])
+              analysis_history['moment'].append(result[2])
+              print('Result = ', result)
+              pickle.dump({'results': analysis_history}, open(resultfile, 'wb')) 
 
 
 def get_parser():
@@ -420,7 +423,7 @@ if __name__ == '__main__':
     weightdir = params.weightsdir
     xscale = params.xscale
     warmup_epochs = params.warmupepochs
-
+    mod=0
     opt = getattr(keras.optimizers, params.optimizer)
     opt = opt(params.learningRate * hvd.size())
     opt = hvd.DistributedOptimizer(opt)
