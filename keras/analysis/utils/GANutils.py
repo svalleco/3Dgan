@@ -135,6 +135,7 @@ def sortEnergy(data, ecal, energies, ang=1):
         else:
             var["indexes" + str(energy)] = np.where((data[1] > (energy - tolerance)/100. ) & ( data[1] < (energy + tolerance)/100.))
             var["events_act" + str(energy)]=data[0][var["indexes" + str(energy)]]
+            print('in sortEnergy', var["events_act" + str(energy)].shape)
             var["energy" + str(energy)]=data[1][var["indexes" + str(energy)]]
             if ang:  var["angle_act" + str(energy)]=data[2][var["indexes" + str(energy)]]
             var["ecal_act" + str(energy)]=ecal[var["indexes" + str(energy)]]
@@ -534,6 +535,7 @@ def get_max(images):
 
 # get sums along different axis
 def get_sums(images):
+    print ('get_sums',images.shape)
     sumsx = np.squeeze(np.sum(images, axis=(2,3)))
     sumsy = np.squeeze(np.sum(images, axis=(1,3)))
     sumsz = np.squeeze(np.sum(images, axis=(1,2)))
@@ -544,6 +546,8 @@ def get_moments(sumsx, sumsy, sumsz, totalE, m, x=51, y=51, z=25):
     old_err_state = np.seterr(divide='raise')
     ignored_states = np.seterr(**old_err_state)
     totalE = np.squeeze(totalE)
+    print ('totalE',totalE)
+    print('sumx,sumy,sumz,',sumsx.shape,sumsy.shape,sumsz.shape)
     index = sumsx.shape[0]
     momentX = np.zeros((index, m))
     momentY = np.zeros((index, m))
@@ -564,6 +568,7 @@ def get_moments(sumsx, sumsy, sumsz, totalE, m, x=51, y=51, z=25):
       if i==0: ECAL_midY = ECAL_momentY.transpose()
       momentY[:,i]= ECAL_momentY
     for i in range(m):
+      print ('zmom index ',i)
       relativeIndices = np.tile(np.arange(z), (index,1))
       moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
       ECAL_momentZ = np.divide(umath.inner1d(sumsz, moments), totalE)
