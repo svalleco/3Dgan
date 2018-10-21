@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from GANutils import safe_mkdir
+from utils.GANutils import safe_mkdir
 plt.switch_backend('Agg')
 try:
     import cPickle as pickle

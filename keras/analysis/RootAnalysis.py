@@ -8,7 +8,7 @@ import math
 import time
 import glob
 import numpy.core.umath_tests as umath
-from GANutils import perform_calculations_multi, safe_mkdir #Common functions from GANutils.py
+from utils.GANutils import perform_calculations_multi, safe_mkdir #Common functions from GANutils.py
 import ROOTutils as my
 import matplotlib
 import matplotlib.pyplot as plt
