@@ -269,6 +269,10 @@ def Gan3DTrain(discriminator, generator, datapath, EventsperFile, nEvents, Weigh
         open(pklfile, 'wb'))
         if analysis:
             var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
+            noise = np.random.normal(0.1, 1, (nb_test, latent_size))
+            generator_ip = np.multiply(Y_test.reshape((-1, 1)), noise)
+            generated_images = generator.predict(generator_ip, verbose=False, batch_size=batch_size)
+                                    
             result = gan.OptAnalysisShort(var, generated_images, energies, ang=0)
             print('Analysing............')
             # All of the results correspond to mean relative errors on different quantities
