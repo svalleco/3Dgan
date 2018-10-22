@@ -150,7 +150,6 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
         #Relative error on mean moment value for each moment and each axis
         x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
         x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
-        x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
         y_act= np.mean(var["momentY_act"+ str(energy)], axis=0)
         y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
         z_act= np.mean(var["momentZ_act"+ str(energy)], axis=0)
