@@ -308,7 +308,7 @@ def main():
 
     print(params)
     # if analysis is to be performed
-    analyse = False
+    analyse = True
     energies =[0, 110, 150, 190]
     
     # set for each training
