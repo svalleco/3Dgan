@@ -541,6 +541,7 @@ def get_moments(sumsx, sumsy, sumsz, totalE, m, x=51, y=51, z=25):
     ECAL_midX = np.zeros(index)
     ECAL_midY = np.zeros(index)
     ECAL_midZ = np.zeros(index)
+    if (totalE==0).any(): return momentX, momentY, momentZ
     for i in range(m):
       relativeIndices = np.tile(np.arange(x), (index,1))
       moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
