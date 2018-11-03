@@ -21,7 +21,7 @@ def main():
     datafile = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
     numevents= 1000
     thresh = 0
-    dirname = 'results/ecal_flat_rd_range_fit'
+    dirname = 'results/ecal_flat_rd_range_fit_nonzero'
     gan.safe_mkdir(dirname)
     fits = ['landau','gaus', 'expon']
     #log= False #take log of data
@@ -52,15 +52,15 @@ def plot_ecal_flatten_fit(event, out_dir, fits, label, logy=0, norm=0, ifpdf=Tru
     ROOT.gStyle.SetOptFit(1011)
     inv_pois = ROOT.TF1("inv_pois", "-1 *[0]*TMath::Poisson(x,[1])", -12, 3)
     pois = ROOT.TF1("pois", "[0]*TMath::Poisson(x,[1])", -12, 3)
-    expon = ROOT.TF1("pois", "[0]*TMath::Power(x,[1]) + [3]")    
+    expon = ROOT.TF1("expon", "[0]*TMath::Power(x,[1]) + [3]")    
     title = "Cell energy deposits for 100-200 GeV"
     if logy:
         ROOT.gPad.SetLogy()
         title = title + " (logy) "
-    hd= ROOT.TH1F(label, "", 100, -8, -2)
+    hd= ROOT.TH1F(label, "", 100, -5, -2)
     r.BinLogX(hd)
     
-    data = event.flatten()
+    data = event[np.where(event>0)].flatten()
     print('The mean of data is {} and std is {}'.format(np.mean(data), np.std(data)))
     #indexes = np.where(data>0)
     #data = data[indexes]
@@ -84,6 +84,7 @@ def plot_ecal_flatten_fit(event, out_dir, fits, label, logy=0, norm=0, ifpdf=Tru
     for fit in fits:
       hd.SetTitle(title + ' {} fit'.format(fit))
       hd.Fit(fit)
+      r.stat_pos(hd)
       c1.Update()
       c1.Modified()
       c1.Update()
