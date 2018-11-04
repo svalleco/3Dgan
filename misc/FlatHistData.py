@@ -20,20 +20,20 @@ def main():
    datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
    #datapath2 = "/data/shared/LCDLargeWindow/fixedangle/EleEscan/EleEscan_1_1.h5"
    #datapath3 = '/bigdata/shared/LCD/NewV1/EleEscan/EleEscan_1_1.h5'
-   genweight = "/nfshome/gkhattak/3Dgan/weights/params_generator_epoch_013.hdf5"
+   genweight = "/nfshome/gkhattak/3Dgan/weights/3Dweights_sqrt_add_loss/params_generator_epoch_003.hdf5"
    #genweight2 = "/nfshome/gkhattak/keras/weights/scaled100_2p1p1_weights/params_generator_epoch_042.hdf5"
    #genweight3 = "/nfshome/gkhattak/3Dgan/weights/3Dweights_1loss_25weight_sqrt/params_generator_epoch_025.hdf5"
    # generator model
-   from AngleArch3dGAN_sqrt import generator
+   from AngleArch3dGAN_sqrt_add_loss2 import generator
    #from EcalEnergyGan import generator as generator2
    #from AngleArch3dGAN import generator3
 
    numdata = 1000
    scale=1
-   outdir = 'results/var_woutaux_ep13'
+   outdir = 'results/var_addloss_ep3'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
-   x, y, ang=GetAngleData(datapath, numdata)
+   x, y, ang=GetAngleData(datapath, numdata, ftn=np.sqrt)
    print('The angle data varies from {} to {}'.format(np.amin(x[x>0]), np.amax(x)))
    #x2, y2=GetData(datapath2, numdata, thresh=0)
    #print('The fixed data varies from {} to {}'.format(np.amin(x2[x2>0]), np.amax(x2)))
@@ -56,7 +56,7 @@ def main():
    x_gen3 = gan.generate(g, numdata, [y/100, ang], latent)
    x_gen4 = postproc(x_gen3 , np.square, scale)
    """
-   labels = ['G4', 'GAN without Aux']
+   labels = ['G4', 'GAN hist loss']
    #plot_ecal_flatten_hist([x, x2, x_gen1, x_gen2, x_gen3, x_gen4], outfile, y, labels, norm=1)
    #plot_ecal_flatten_hist([x, x2, x_gen1, x_gen2, x_gen3, x_gen4], outfile + '_log', y, labels, logy=1, norm=1)
    plot_ecal_flatten_hist([x, x_gen1], outfile + '_log', y, labels, logy=1, norm=2)
