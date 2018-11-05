@@ -27,7 +27,7 @@ def safe_log(image):
     image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.log(image))
     return image
 
-def hist_log(image):
+def count(image):
     #image =safe_log(image)
     bin1 = K.sum(K.tf.where(image > 0.1, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
     bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.1, image > 0.01), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
@@ -137,9 +137,9 @@ def discriminator():
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     ang = Lambda(ecal_angle)(image)
     ecal = Lambda(ecal_sum)(image)
-    hist= Lambda(hist_log)(image)
-    Model(input=image, output=[fake, aux, ang, ecal, hist]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal, hist])
+    hist_count= Lambda(count)(image)
+    Model(input=image, output=[fake, aux, ang, ecal, hist_count]).summary()
+    return Model(input=image, output=[fake, aux, ang, ecal, hist_count])
 
 
 def generator(latent_size=200, return_intermediate=False):

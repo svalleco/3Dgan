@@ -81,7 +81,7 @@ def safe_log(x):
     x[np.where(x>0)] = np.log(x[np.where(x>0)])
     return x
         
-def hist_log(x):
+def hist_count(x):
     #xl = safe_log(x)
     bin1 = np.sum(np.where(x> 0.1, 1, 0), axis=(1, 2, 3))
     bin2 = np.sum(np.where((x<0.1) & (x>0.01) , 1, 0), axis=(1, 2, 3))
@@ -216,7 +216,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            hist_batch = hist_log(image_batch)
+            hist_batch = hist_count(image_batch)
             
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
@@ -268,7 +268,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         noise = np.multiply(Y_test.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang_test.reshape(-1, 1), noise), axis=1)
         generated_images = generator.predict(generator_ip, verbose=False)
-        hist_test = hist_log(X_test)
+        hist_test = hist_count(X_test)
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
         ang = np.concatenate((ang_test, ang_test))
