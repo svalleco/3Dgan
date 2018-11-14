@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#L30#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -84,9 +84,9 @@ def safe_log(x):
 def hist_count(x):
     #xl = safe_log(x)
     bin1 = np.sum(np.where(x> 0.1, 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<0.1) & (x>0.01) , 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<0.01) & (x>0.001), 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<0.001) & (x>0), 1, 0), axis=(1, 2, 3))
+    bin2 = np.sum(np.where((x<0.1) & (x>0.05) , 1, 0), axis=(1, 2, 3))
+    bin3 = np.sum(np.where((x<0.05) & (x>0.01), 1, 0), axis=(1, 2, 3))
+    bin4 = np.sum(np.where((x<0.01) & (x>0), 1, 0), axis=(1, 2, 3))
     bin5 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
     return np.concatenate([bin1, bin2, bin3, bin4, bin5], axis=1)
    
@@ -107,8 +107,13 @@ def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, an
     return preproc(X), Y, ang, ecal
 
 def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, WeightsDir, pklfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, hist_weight=0.1,  ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4):
+    def entropy_loss(y_true, y_pred):
+        y_true = y_true/K.sum(y_true, axis=(1, 2))
+        y_pred = y_pred/K.sum(y_pred, axis=(1, 2))
+        return - K.sum(y_true * K.log(y_pred), axis=(1, 2))
+        #return K.categorical_crossentropy(y_true, y_pred, from_logits=False)
     start_init = time.time()
-    
+
     particle='Ele'
     f = [0.9, 0.1]
 
@@ -116,7 +121,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     #discriminator.summary()
     discriminator.compile(
         optimizer=RMSprop(),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', entropy_loss],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight, hist_weight]
     )
 
@@ -140,8 +145,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(lr=0.0002),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        optimizer=RMSprop(),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', entropy_loss],
         loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight, hist_weight]
     )
 
@@ -216,7 +221,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            hist_batch = hist_count(image_batch)
+            hist_batch = np.expand_dims(hist_count(image_batch), axis=-1)
             
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
@@ -231,10 +236,11 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, hist_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, hist_batch])
             
-            #disc_out= discriminator.predict(image_batch)
+            #disc_out= discriminator.predict(generated_images)
             #print('disc_out',disc_out[4][:5])
             #print('hist batch', hist_batch[:5])
-     
+            #print('real_batch_loss', real_batch_loss)
+            #print('fake_batch_loss', fake_batch_loss)
          
             # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0:
@@ -275,7 +281,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         ecal = np.concatenate((ecal_test, ecal_test))
         aux_y = np.concatenate((Y_test, Y_test), axis=0)
         hist= np.concatenate((hist_test, hist_test), axis=0)        
-        discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, hist_log(X)], verbose=False, batch_size=batch_size)
+        discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, hist_count(X)], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         noise = np.random.normal(0, 1, (2 * nb_test, latent_size - 1))
@@ -283,7 +289,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
         generator_ip = np.concatenate((ang.reshape(-1, 1), noise), axis=1)
         trick = np.ones(2 * nb_test)
         generator_test_loss = combined.evaluate(generator_ip,
-                [trick, aux_y, ang, ecal, hist_log(X)], verbose=False, batch_size=batch_size)
+                [trick, aux_y, ang, ecal, hist_count(X)], verbose=False, batch_size=batch_size)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
