@@ -30,11 +30,11 @@ def safe_log(image):
 def count(image):
     #image =safe_log(image)
     bin1 = K.sum(K.tf.where(image > 0.1, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.1, image > 0.01), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.01, image > 0.001), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.001, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.1, image > 0.05), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05, image > 0.01), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.01, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
     bin5 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    return K.concatenate([bin1, bin2, bin3, bin4, bin5], axis=1)
+    return K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5], axis=1), -1)
 
 def ecal_angle(image):
     image = K.squeeze(image, axis=4)
