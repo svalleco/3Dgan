@@ -294,9 +294,9 @@ if __name__ == '__main__':
     #following can be changed if using from command line
         
     #weightdir = params.weightsdir
-    weightdir = 'weights/3Dweights_p75_gp0002_dp0005' # renamed to keep record
+    weightdir = 'weights/3Dweights_p75' # renamed to keep record
     #pklfile = params.pklfile
-    pklfile = 'results/3dgan_history_p75_gp0002_dp0005.pkl'
+    pklfile = 'results/3dgan_history_p75.pkl'
     #xscale = params.xscale
     xscale=1
     nb_epochs = 120
