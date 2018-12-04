@@ -78,26 +78,26 @@ def sqrt(x):
     return np.sqrt(x)
 
 def safe_log(x):
-    indexes = np.where(x>0)
-    x[indexes] = np.log(x[indexes])
-    return x, indexes
+    x[np.where(x>0)] = np.log(x[np.where(x>0)])
+    return x
         
 def mean_log(x):
-    x, indexes = safe_log(x)
-    return x/np.count_nonzero(x, axis=(1, 2, 3))
+    x = safe_log(x)
+    count = np.sum(np.where(x!=0, 1, 0), axis=(1, 2, 3))
+    print ('nonzero', count.shape)
+    mean = np.sum(x, axis=(1, 2, 3))/count
+    return mean
 
 def std_log(x):
-    x, indexes = safe_log(x)
-    print(x.shape)
-    mean = np.sum(x, axis=(1, 2, 3))/np.count_nonzero(x, axis=(1, 2, 3))
-    mask = np.zeros_like(x)
-    mask[indexes] = 1
-    print(mask.shape)
-    x = np.subtract(x, mean) 
-    print(x.shape)
-    x = np.square(x * mask)
-    print(x.shape)
-    std = np.sqrt(np.sum(x, axis=(1, 2, 3))/np.count_nonzero(x, axis=(1, 2, 3)))
+    x = safe_log(x)
+    count = np.sum(np.where(x!=0, 1, 0), axis=(1, 2, 3))
+    mean = np.sum(x, axis=(1, 2, 3))/count
+    std = np.square(np.transpose(np.transpose(x)-np.transpose(mean)))
+    print(std.shape)
+    std[np.where(x==0)] = 0
+    print(std.shape)
+    std = np.sum(std, axis=(1, 2, 3))/count
+    std = np.sqrt(std)
     return std
    
             
@@ -229,7 +229,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             mean_batch = mean_log(image_batch)
             
             std_batch = std_log(image_batch)
-            print('mean= {} and std ={}'.format(mean_batch.shape, std_batch.shape))
+            print('mean= {} and std ={}'.format(np.mean(np.log(image_batch[np.where(image_batch > 0)])), np.std(np.log(image_batch[np.where(image_batch > 0)]))))
+            print('mean= {} and std ={}'.format(np.mean(mean_batch), np.mean(std_batch)))
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4

@@ -31,14 +31,14 @@ def mean_log(image):
 def std_log(image):
     image, count = safe_log(image)
     mean = K.sum(image, axis=(1, 2, 3))/count
-    image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), image-mean)
+    image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.transpose(K.transpose(image)-K.transpose(mean)))
     std = K.sum(K.square(image), axis=(1, 2, 3))/count
     std = K.sqrt(std)
     return std
             
 def safe_log(image):
-    image_mask = K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.ones_like(image))
-    count = K.sum(image_mask, axis=(1, 2, 3))
+    nonzero = K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.ones_like(image))
+    count = K.sum(nonzero, axis=(1, 2, 3))
     image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.log(image))
     return image, count
 
@@ -103,7 +103,7 @@ def ecal_angle(image):
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
-    print(K.int_shape(ang))
+    #print(K.int_shape(ang))
     return ang
 
 def discriminator():
@@ -150,7 +150,7 @@ def discriminator():
 
 
 def generator(latent_size=200, return_intermediate=False):
-    
+   
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
         Reshape((9, 9, 8, 8)),
