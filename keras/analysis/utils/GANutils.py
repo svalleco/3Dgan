@@ -23,7 +23,6 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
 
 #Divide files in train and test lists     
 def DivideFiles(FileSearch="/data/LCD/*/*.h5",
-                #nEvents=800000, EventsperFile = 10000,
                 Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
@@ -65,7 +64,6 @@ def BitFlip(x, prob=0.05):
 
 # Get all files Without Dividing into Test and Train
 def GetDataFiles(FileSearch="/data/LCD/*/*.h5",
-                 #nEvents=800000, EventsperFile = 10000,
                  Particles=[], MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
