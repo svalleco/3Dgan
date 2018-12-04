@@ -134,7 +134,7 @@ def plot_corr_root(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hi
    return gact
 
 # PLot ecal ratio
-def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[100, 200], ifpdf=True):
+def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf=True, ang=1):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color = 2
@@ -145,8 +145,13 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[100, 200], ifp
    Eprof.SetTitle("Ratio of Ecal and Ep for {}-{} GeV".format(p[0], p[1]))
    my.fill_profile(Eprof, ecal1["n_0"]/y, y)
    Eprof.GetXaxis().SetTitle("Ep GeV")
-   Eprof.GetYaxis().SetTitle("50 x Ecal/Ep")
-   Eprof.GetYaxis().SetRangeUser(0.5, 1.5)
+   # Since the Angle Data has energies multiplied by 50 for ecal depositions
+   if ang:
+     Eprof.GetYaxis().SetTitle("50 x Ecal/Ep")
+     Eprof.GetYaxis().SetRangeUser(0.5, 1.5)
+   else:
+     Eprof.GetYaxis().SetTitle("Ecal/Ep")
+     Eprof.GetYaxis().SetRangeUser(0., 0.03)
    Eprof.Draw()
    Eprof.SetLineColor(color)
    color+=1
@@ -259,11 +264,16 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], ifpdf
    else:
       c1.Print(out_file + '.C')
 
-def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=True, stest=True):
+def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=True, stest=True, ang=0):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color=2
-   hd = ROOT.TH1F("Geant4", "", 100, 0, 2.5 * p[1])
+   if ang:
+     hd = ROOT.TH1F("Geant4", "", 100, 0, 2.5 * p[1])
+     hd.GetXaxis().SetTitle("Ecal Sum GeV/50")
+   else:
+     hd = ROOT.TH1F("Geant4", "", 100, 0, 2.5 * p[1]/50)# energies for fixed angle has this rough relation to ecal sum
+     hd.GetXaxis().SetTitle("Ecal Sum GeV") 
    my.fill_hist(hd, ecal1['n_0'])
    hd.Sumw2()
    hd = my.normalize(hd)              
@@ -271,7 +281,6 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
       hd.SetTitle("Ecal Sum Histogram for {}-{} GeV".format(p[0], p[1]))
    else:
       hd.SetTitle("Ecal Sum Histogram (Ep ={} GeV)".format(energy) )
-   hd.GetXaxis().SetTitle("Ecal Sum GeV/50")
    hd.GetYaxis().SetTitle("Count")
    hd.Draw()
    hd.Draw("sames hist")
@@ -282,7 +291,10 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
    hgs=[]
    pos =0
    for i, key in enumerate(ecal2):
-      hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, 0, 2 * p[1]))
+      if ang:
+         hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, 0, 2 * p[1]))
+      else:
+         hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, 0, 2 * p[1]/50))
       hg= hgs[i]
       hg.Sumw2()
       hg.SetLineColor(color)
@@ -365,10 +377,9 @@ def plot_ecal_flatten_hist(event1, event2, penergy, out_file, energy, labels, p=
    else:
       c1.Print(out_file + '.C')
 
-def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True):
+def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True, thresh=0.002):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
-   thresh = 0.002 # GeV
    color = 2
    hd = ROOT.TH1F("Geant4", "", 50, 0, 4000)
    my.fill_hist(hd, my.get_hits(event1, thresh))
@@ -1088,7 +1099,87 @@ def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True):
       else:
         c1.Print(out_file + 'n_'+ str(i) + '.C')
 
-##################################### Get plots #####################################################################
+##################################### Get plots for Fixed angle #####################################################################
+
+def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=True, cell=0):
+
+    actdir = plots_dir + 'Actual'
+    safe_mkdir(actdir)
+    discdir = plots_dir + 'disc_outputs'
+    safe_mkdir(discdir)
+    gendir = plots_dir + 'Generated'
+    safe_mkdir(gendir)
+    comdir = plots_dir + 'Combined'
+    safe_mkdir(comdir)
+    mdir = plots_dir + 'Moments'
+    safe_mkdir(mdir)
+    start = time.time()
+    plots = 0
+    ang = 0 # there is no angle data                                                                                                                                                                                                                                                      
+    for energy in energies:
+       x=var["events_act" + str(energy)].shape[1]
+       y=var["events_act" + str(energy)].shape[2]
+       z=var["events_act" + str(energy)].shape[3]
+       maxfile = "Position_of_max_" + str(energy)# + ".pdf"                                                                                                                                                                                                                   
+       maxlfile = "Position_of_max_" + str(energy)# + "_log.pdf"                                                                                                                                                                                                                          
+       histfile = "hist_" + str(energy)# + ".pdf"                                                                                                                                                                                                                                         
+       histlfile = "hist_log" + str(energy)# + ".pdf"                                                                                                                                                                                                                                     
+       ecalfile = "ecal_" + str(energy)# + ".pdf"                                                                                                                                                                                                                                         
+       energyfile = "energy_" + str(energy)# + ".pdf"                                                                                                                                                                                                                                     
+       realfile = "realfake_" + str(energy)# + ".pdf"                                                                                                                                                                                                                                     
+       momentfile = "moment" + str(energy)# + ".pdf"                                                                                                                                                                                                                                      
+       auxfile = "Auxilliary_"+ str(energy)# + ".pdf"                                                                                                                                                                                                                                     
+       ecalerrorfile = "ecal_error" + str(energy)# + ".pdf"                                                                                                                                                                                                                               
+       allfile = 'All_energies'#.pdf'                                                                                                                                                                                                                                                     
+       allecalfile = 'All_ecal'#.pdf'                                                                                                                                                                                                                                                     
+       allecalrelativefile = 'All_ecal_relative'#.pdf'                                                                                                                                                                                                                                    
+       allauxrelativefile = 'All_aux_relative'#.pdf'                                                                                                                                                                                                                                      
+       allerrorfile = 'All_relative_auxerror'#.pdf'                                                                                                                                                                                                                                       
+       correlationfile = 'Corr'
+       start = time.time()
+       if energy==0:
+          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), ang=ang)
+          plots+=1
+          plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
+          plots+=1
+          #plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)                                                                                                                                                                                                                           
+       plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy, labels, stest=stest, ang=ang)
+       plots+=1
+       if cell:
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, stest=stest)                                                                                                                  
+          plots+=1                                                                                                                                                                                                                                                                        
+       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy, labels, thresh = 0.0002)
+       plots+=1
+       plot_aux_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)] , os.path.join(discdir, energyfile), energy, labels)
+       plots+=1
+       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxfile), os.path.join(gendir, maxfile), os.path.join(comdir, maxfile), energy, labels, stest=stest)
+       plots+=1
+       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxlfile), os.path.join(gendir, maxlfile), os.path.join(comdir, 'log' + maxlfile), energy, labels, log=1, stest=stest)
+       plots+=1
+       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histfile), os.path.join(gendir,histfile), os.path.join(comdir, histfile), energy, labels, stest=stest)
+       plots+=1
+       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, labels, log=1, stest=stest)
+       plots+=1
+       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, labels, log=1, stest=stest)
+       plots+=1
+       plot_realfake_hist(var["isreal_act" + str(energy)], var["isreal_gan" + str(energy)], os.path.join(discdir, realfile), energy, labels)
+       plots+=1
+       plot_primary_error_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)], var["energy" + str(energy)], os.path.join(discdir, 'error_' + energyfile), energy, labels)
+       plots+=1
+       for mmt in range(m):
+          plot_moment(var["momentX_act" + str(energy)], var["momentX_gan" + str(energy)], os.path.join(mdir, 'x' + str(mmt + 1) + momentfile), 'x', energy, mmt, labels)
+          plots+=1
+          plot_moment(var["momentY_act" + str(energy)], var["momentY_gan" + str(energy)], os.path.join(mdir, 'y' + str(mmt + 1) + momentfile), 'y', energy, mmt, labels)
+          plots+=1
+          plot_moment(var["momentZ_act" + str(energy)], var["momentZ_gan" + str(energy)], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt, labels)
+          plots+=1
+
+    print 'Plots are saved in ', plots_dir
+    plot_time= time.time()- start
+    print '{} Plots are generated in {} seconds'.format(plots, plot_time)
+
+
+##################################### Get plots for variable angle #####################################################################
 
 def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, nloss=3, cell=0, corr=0):
    actdir = plots_dir + 'Actual'
