@@ -812,7 +812,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
        start = time.time()
        var = load_sorted(sortedpath, energies)
        sort_time = time.time()- start
-       print "Events were loaded in {} seconds".format(sort_time)
+       print ("Events were loaded in {} seconds".format(sort_time))
     else:
        # Getting Data                                                                                                                                                                                              
        events_per_file = 10000
@@ -820,8 +820,6 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
        Trainfiles = Trainfiles[: Filesused]
        Testfiles = Testfiles[: Filesused]
-       print Trainfiles
-       print Testfiles
        if Test:
           data_files = Testfiles
        else:
@@ -829,7 +827,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
        start = time.time()
        var = get_sorted(data_files, energies, True, num_events1, num_events2)
        data_time = time.time() - start
-       print "{} events were loaded in {} seconds".format(num_data, data_time)
+       print ("{} events were loaded in {} seconds".format(num_data, data_time))
        if save_data:
           save_sorted(var, energies, sortdir)
     total = 0
@@ -847,12 +845,12 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
       var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m, x=x, y=y, z=z)
     data_time = time.time() - start
-    print "{} events were put in {} bins".format(total, len(energies))
+    print ("{} events were put in {} bins".format(total, len(energies)))
     #### Generate Data table to screen                                                                                                                                                                             
-    print "Actual Data"
-    print "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2"
+    print ("Actual Data")
+    print ("Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
     for energy in energies:
-       print "{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), np.mean(var["max_pos_act" + str(energy)], axis=0), np.mean(var["events_act" + str(energy)]), np.mean(var["momentX_act"+ str(energy)][:, 1]), np.mean(var["momentY_act"+ str(energy)][:, 1]), np.mean(var["momentZ_act"+ str(energy)][:, 1]))
+       print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), np.mean(var["max_pos_act" + str(energy)], axis=0), np.mean(var["events_act" + str(energy)]), np.mean(var["momentX_act"+ str(energy)][:, 1]), np.mean(var["momentY_act"+ str(energy)][:, 1]), np.mean(var["momentZ_act"+ str(energy)][:, 1])))
 
     for gen_weights, disc_weights, scale, i in zip(gweights, dweights, scales, np.arange(len(gweights))):
        gendir = gendirs + '/n_' + str(i)
@@ -883,7 +881,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], var["energy" + str(energy)], energy, gendir)
              gen_time = time.time() - start
             
-             print "Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)])
+             print ("Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)]))
           if read_disc:
              var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)], var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= get_disc(energy, discdir)
           else:
@@ -892,7 +890,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_act" + str(energy)] * scale)
              var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)] )
              disc_time = time.time() - start
-             print "Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)])
+             print ("Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)]))
 
              if save_disc:
                discout = {}
@@ -900,9 +898,9 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
                   if key in ["isreal_act" + str(energy), "aux_act" + str(energy), "isreal_gan" + str(energy), "aux_gan" + str(energy), "ecal_act"+ str(energy), "ecal_gan"+ str(energy)]:
                      discout[key]=var[key]['n_'+ str(i)]
                for key in discout:
-                   print key
+                   print (key)
                save_discriminated(discout, energy, discdir)
-          print 'Calculations for ....', energy
+          print ('Calculations for ....', energy)
           var["events_gan" + str(energy)]['n_'+ str(i)] = var["events_gan" + str(energy)]['n_'+ str(i)]/scale
           var["isreal_act" + str(energy)]['n_'+ str(i)] = np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)])
           var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)
@@ -916,10 +914,10 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
 
        #### Generate GAN table to screen                                                                                                                                                                          
  
-       print "Generated Data"
-       print "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2"
+       print ("Generated Data")
+       print ("Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
 
        for energy in energies:
-          print "{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["max_pos_gan" + str(energy)]['n_'+ str(i)], axis=0), np.mean(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["momentX_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentY_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentZ_gan"+ str(energy)]['n_'+ str(i)][:, 1]))
+          print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["max_pos_gan" + str(energy)]['n_'+ str(i)], axis=0), np.mean(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["momentX_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentY_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentZ_gan"+ str(energy)]['n_'+ str(i)][:, 1])))
 
     return var

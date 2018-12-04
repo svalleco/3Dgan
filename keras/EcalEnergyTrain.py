@@ -87,7 +87,6 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     particle = 'Ele'
     f = [0.9, 0.1]
     print('[INFO] Building discriminator')
-    #discriminator.summary()
     discriminator.compile(
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
@@ -96,7 +95,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
 
     # build the generator
     print('[INFO] Building generator')
-    #generator.summary()
+
     generator.compile(
         optimizer=RMSprop(),
         loss='binary_crossentropy'
@@ -260,10 +259,10 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
-                                   overwrite=True)
+                                overwrite=True)
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, time.time()-test_start, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history},
-        open(pklfile, 'wb'))
+                    open(pklfile, 'wb'))
         if analysis:
             var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
             noise = np.random.normal(0.1, 1, (nb_test, latent_size))
@@ -302,3 +301,4 @@ def get_parser():
 
 if __name__ == '__main__':
     main()
+
