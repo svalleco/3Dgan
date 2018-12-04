@@ -2,6 +2,7 @@ from os import path
 import ROOT
 from ROOT import kFALSE, TLegend, TCanvas, gPad, TGraph, gStyle, TProfile
 import os
+import sys
 import h5py
 import numpy as np
 import math
@@ -9,26 +10,27 @@ import time
 import glob
 import numpy.core.umath_tests as umath
 from utils.GANutils import perform_calculations_multi, safe_mkdir #Common functions from GANutils.py
-import ROOTutils as my
+import utils.ROOTutils as my
 import matplotlib
 import matplotlib.pyplot as plt
 plt.switch_backend('Agg')
- 
+sys.path.insert(0,'/nfshome/gkhattak/3Dgan/keras')
+
 def main():
    #Architectures 
    from EcalEnergyGan import generator, discriminator
-   disc_weights="params_discriminator_epoch_041.hdf5"
-   gen_weights= "params_generator_epoch_041.hdf5"
+   disc_weights="../weights/3Dweights/params_discriminator_epoch_041.hdf5"
+   gen_weights= "../weights/3Dweights/params_generator_epoch_041.hdf5"
 
-   plots_dir = "correlation_plots/"
+   plots_dir = "results/test_plots/"
    latent = 200
    num_data = 100000
    num_events = 2000
    m = 3
    energies=[0, 50, 100, 200, 250, 300, 400, 500]
    particle='Ele'
-   #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path caltech
-   datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
+   datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path caltech
+   #datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
    sortdir = 'SortedData'
    gendir = 'Gen'  
    discdir = 'Disc' 
@@ -760,8 +762,11 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    leg.AddEntry(h1x,"Data","l")
    leg.Draw()
    canvas.Update()
-   canvas.Print(out_file3)
- 
+   if ifpdf:
+      canvas.Print(out_file3 + '.pdf')
+   else:
+      canvas.Print(out_file3 + '.C')
+           
 def plot_moment(array1, array2, out_file, dim, energy, m, labels, ifpdf=True):
    c1 = TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    array1= array1[:, m]
@@ -849,7 +854,7 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
           plots+=1
           plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
           plots+=1
-          plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
+          #plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
        plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy, labels, stest=stest)
        plots+=1
       # plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, stest=stest)
