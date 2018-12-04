@@ -326,7 +326,7 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
    else:
       c1.Print(out_file + '.C')
 
-def plot_ecal_flatten_hist(event1, event2, penergy, out_file, energy, labels, p=[2, 500], ifpdf=True, log=0):
+def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True, log=0):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color =2
@@ -1101,7 +1101,7 @@ def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True):
 
 ##################################### Get plots for Fixed angle #####################################################################
 
-def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=True, cell=0):
+def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=True, cell=0, corr=0):
 
     actdir = plots_dir + 'Actual'
     safe_mkdir(actdir)
@@ -1142,12 +1142,22 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
           plots+=1
           plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
           plots+=1
-          #plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)                                                                                                                                                                                                                           
+          if corr:
+             plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
+             plots+=1
+          if cell:
+             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+             plots+=1
+             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, log=1)
+             plots+=1
        plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy, labels, stest=stest, ang=ang)
        plots+=1
-       if cell:
-          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, stest=stest)                                                                                                                  
-          plots+=1                                                                                                                                                                                                                                                                        
+       if cell>1:
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          plots+=1
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          plots+=1
+                    
        plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy, labels, thresh = 0.0002)
        plots+=1
        plot_aux_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)] , os.path.join(discdir, energyfile), energy, labels)
@@ -1242,13 +1252,19 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                            var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)],                               
                            var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)],                                  
                            var["energy" + str(energy)], var["events_act" + str(energy)],                                     
-                           var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)    
+                           var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
+         if cell:
+           plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)],
+                         os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, p=p, log=1, ifpdf=ifpdf)
+           plots+=1
+           plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)],
+                           os.path.join(comdir, 'flat' + ecalfile), energy, labels, p=p, ifpdf=ifpdf)
+                                       
          
-      
       plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], 
                      os.path.join(discdir, ecalfile), energy, labels, p, stest=stest, ifpdf=ifpdf)
       plots+=1
-      if cell:
+      if cell>1:
          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)], 
                                 os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, p=p, log=1, ifpdf=ifpdf)
          plots+=1     
