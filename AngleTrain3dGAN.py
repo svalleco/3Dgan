@@ -20,8 +20,14 @@ import numpy as np
 import time
 import math
 import argparse
-import setGPU #if Caltech
-#from memory_profiler import profile
+
+if 'tlab-gpu-gtx1080ti-06.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
+    tlab = True
+
+if 'nfshome/' in os.environ.get('HOME'): # Only at caltech use setGPU
+    import setGPU #if Caltech
+
+#from memory_profiler import profile # used for memory profiling
 import keras.backend as K
 import analysis.utils.GANutils as gan
 #K.set_image_dim_ordering('tf')
@@ -33,11 +39,11 @@ from keras.utils.generic_utils import Progbar
 #config = tf.ConfigProto(log_device_placement=True)
 
 # printing versions of software used
-print('keras version:', keras.__version__)
-print('python version:', sys.version)
-import tensorflow as tf
-print('tensorflow version', tf.__version__)
-print('numpy version', np.version.version)
+#print('keras version:', keras.__version__)
+#print('python version:', sys.version)
+#import tensorflow as tf
+#print('tensorflow version', tf.__version__)
+#print('numpy version', np.version.version)
 
 #get data for training
 def GetDataAngle(datafile, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
@@ -270,12 +276,15 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=5000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='angleweights', help='Directory to store weights.')
-    parser.add_argument('--pklfile', action='store', type=str, default='3dgan-history.pkl', help='Pickle file to store losses.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='3dgan_weights', help='Directory to store weights.')
+    parser.add_argument('--pklfile', action='store', type=str, default='3dgan_history.pkl', help='Pickle file to store losses.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
+    parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
+    parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
     return parser
 
 def main():
@@ -295,22 +304,16 @@ def main():
     fitmod = params.mod # used only for Ecal sum estimation corressponding to sampled primary energies
     ascale = params.ascale
     yscale = params.yscale
-
-    #following can be changed if using from command line
-    #weightdir = params.weightsdir
-    weightdir = 'weights/3Dweights' # renamed to keep record
-    #pklfile = params.pklfile
-    pklfile = '3dgan-history.pkl' # loss history
+    weightdir = params.weightsdir
+    pklfile = params.pklfile # loss history
     resultfile = 'analysis_result.pkl' # optimization metric history
-    #xscale = params.xscale
-    xscale=1
-    nb_epochs = 50
+    xscale = params.xscale
+    analysis=params.analyse # if analysing
+    energies =params.energies # Bins
+    resultfile = params.resultfile # analysis result
 
     print(params)
-    # if analysis is to be performed
-    analyse = False
-    energies =[0, 110, 150, 190]
-    
+        
     # set for each training
     gen_weight = 3  # weight for generation loss
     aux_weight= 0.1  # weight for primary energy regression loss
@@ -318,6 +321,12 @@ def main():
     ecal_weight = 0.1 # weight for ecal loss
     thresh = 0 # threshold for data
     angtype = 'mtheta'
+
+    if not tlab:
+      datapath = '/data/shared/gkhattak/*Measured3ThetaEscan/*.h5'
+      weightdir = '/data/weights/3Dweights'
+      pklfile = '/data/results/3dgan_history.pkl'
+       
  
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
