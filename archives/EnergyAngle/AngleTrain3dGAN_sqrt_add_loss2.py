@@ -83,13 +83,13 @@ def safe_log(x):
         
 def hist_count(x):
     #xl = safe_log(x)
-    bin1 = np.sum(np.where(x> 0.1, 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<0.1) & (x>0.05) , 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<0.05) & (x>0.01), 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<0.01) & (x>0), 1, 0), axis=(1, 2, 3))
+    bin1 = np.sum(np.where(x> 0.15, 1, 0), axis=(1, 2, 3))
+    bin2 = np.sum(np.where((x<0.15) & (x>0.1) , 1, 0), axis=(1, 2, 3))
+    bin3 = np.sum(np.where((x<0.1) & (x>0.05), 1, 0), axis=(1, 2, 3))
+    bin4 = np.sum(np.where((x<0.05) & (x>0.0), 1, 0), axis=(1, 2, 3))
     bin5 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
     return np.concatenate([bin1, bin2, bin3, bin4, bin5], axis=1)
-   
+ 
             
 def GetDataAngle(datafile, preproc=sqrt, xscale =1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     #get data for training                                                                                                                             
@@ -236,9 +236,9 @@ def Gan3DTrainAngle(discriminator, generator, datapath, EventsperFile, nEvents, 
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, hist_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, hist_batch])
             
-            #disc_out= discriminator.predict(generated_images)
-            #print('disc_out',disc_out[4][:5])
-            #print('hist batch', hist_batch[:5])
+            disc_out= discriminator.predict(generated_images)
+            print('disc_out',disc_out[4][:5])
+            print('hist batch', hist_batch[:5])
             #print('real_batch_loss', real_batch_loss)
             #print('fake_batch_loss', fake_batch_loss)
          
