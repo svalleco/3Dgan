@@ -50,7 +50,7 @@ from keras.utils.generic_utils import Progbar
 def main():
     #Architectures to import
     if keras.__version__ == '1.2.2':
-        from AngleArch3dGAN_add_loss_bce2 import generator, discriminator
+        from AngleArch3dGAN_add_loss_bce import generator, discriminator
     else:
         from AngleArch3dGAN_k2 import generator, discriminator
 
@@ -107,13 +107,13 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='/data/shared/gkhattak/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Total Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights', help='Directory to store weights.')
-    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='Pickle file to store losses.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights_bce', help='Directory to store weights.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history_bce.pkl', help='Pickle file to store losses.')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=1, help='pre processing of cell energies by raising to a power')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
-    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bce.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
     parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
@@ -291,8 +291,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             epoch_gen_loss.append(generator_loss)
             #print ('generator_loss', generator_loss)
             index +=1
-            print('real_batch_loss', real_batch_loss)
-            print ('fake_batch_loss', fake_batch_loss)
+            #print('real_batch_loss', real_batch_loss)
+            #print ('fake_batch_loss', fake_batch_loss)
                             
 
         # Testing    
