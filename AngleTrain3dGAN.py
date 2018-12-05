@@ -26,8 +26,10 @@ if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check
 else:
     tlab= False
     
-if 'nfshome/' in os.environ.get('HOME'): # Only at caltech use setGPU
+try:
     import setGPU #if Caltech
+except
+    pass
 
 #from memory_profiler import profile # used for memory profiling
 import keras.backend as K
