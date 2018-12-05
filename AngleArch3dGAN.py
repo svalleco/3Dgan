@@ -18,12 +18,14 @@ import tensorflow as tf
 
 K.set_image_dim_ordering('tf')
 
-def ecal_sum(image):
+def ecal_sum(image, power=1):
+    image = K.pow(image, 1./power)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
-def ecal_angle(image):
+def ecal_angle(image, power=1):
     image = K.squeeze(image, axis=4)
+    image = K.pow(image, 1./power)
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
@@ -83,7 +85,7 @@ def ecal_angle(image):
     ang = K.expand_dims(ang, 1)
     return ang
 
-def discriminator():
+def discriminator(power=1):
   
     image=Input(shape=(51, 51, 25, 1))
 
@@ -118,8 +120,8 @@ def discriminator():
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ang = Lambda(ecal_angle)(image)
-    ecal = Lambda(ecal_sum)(image)
+    ang = Lambda(ecal_angle)(image, power)
+    ecal = Lambda(ecal_sum)(image, power)
     Model(input=[image], output=[fake, aux, ang, ecal]).summary()
     return Model(input=[image], output=[fake, aux, ang, ecal])
 
