@@ -21,9 +21,11 @@ import time
 import math
 import argparse
 
-if 'tlab-gpu-gtx1080ti-06.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
+if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
     tlab = True
-
+else:
+    tlab= False
+    
 if 'nfshome/' in os.environ.get('HOME'): # Only at caltech use setGPU
     import setGPU #if Caltech
 
@@ -276,8 +278,8 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=5000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='3dgan_weights', help='Directory to store weights.')
-    parser.add_argument('--pklfile', action='store', type=str, default='3dgan_history.pkl', help='Pickle file to store losses.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights', help='Directory to store weights.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='Pickle file to store losses.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
@@ -308,7 +310,7 @@ def main():
     pklfile = params.pklfile # loss history
     resultfile = 'analysis_result.pkl' # optimization metric history
     xscale = params.xscale
-    analysis=params.analyse # if analysing
+    analyse=params.analyse # if analysing
     energies =params.energies # Bins
     resultfile = params.resultfile # analysis result
 
@@ -322,10 +324,10 @@ def main():
     thresh = 0 # threshold for data
     angtype = 'mtheta'
 
-    if not tlab:
-      datapath = '/data/shared/gkhattak/*Measured3ThetaEscan/*.h5'
-      weightdir = '/data/weights/3Dweights'
-      pklfile = '/data/results/3dgan_history.pkl'
+    if tlab:
+      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
+      weightdir = '/gkhattak/weights/3Dweights'
+      pklfile = '/gkhattak/results/3dgan_history.pkl'
        
  
     # Building discriminator and generator
