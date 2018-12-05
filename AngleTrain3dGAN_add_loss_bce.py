@@ -26,9 +26,12 @@ if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check
 else:
     tlab= False
     
-if 'nfshome/' in os.environ.get('HOME'): # Only at caltech use setGPU
+#if 'nfshome/' in os.environ.get('HOME'): # Only at caltech use setGPU
+#    import setGPU #if Caltech
+try:
     import setGPU #if Caltech
-
+except:
+    pass
 #from memory_profiler import profile # used for memory profiling
 import keras.backend as K
 import analysis.utils.GANutils as gan
@@ -122,7 +125,7 @@ def get_parser():
     return parser
 
 def mapping(x):
-    return x
+    return x/11.64
     
 #get data for training
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
@@ -291,8 +294,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             epoch_gen_loss.append(generator_loss)
             #print ('generator_loss', generator_loss)
             index +=1
-            #print('real_batch_loss', real_batch_loss)
-            #print ('fake_batch_loss', fake_batch_loss)
+            print('real_batch_loss', real_batch_loss)
+            print ('fake_batch_loss', fake_batch_loss)
                             
 
         # Testing    

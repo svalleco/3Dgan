@@ -26,8 +26,10 @@ if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check
 else:
     tlab= False
     
-if 'nfshome/' in os.environ.get('HOME'): # Only at caltech use setGPU
+try:
     import setGPU #if Caltech
+except:
+    pass
 
 #from memory_profiler import profile # used for memory profiling
 import keras.backend as K
@@ -50,7 +52,7 @@ from keras.utils.generic_utils import Progbar
 def main():
     #Architectures to import
     if keras.__version__ == '1.2.2':
-        from AngleArch3dGAN_add_loss_bins2 import generator, discriminator
+        from AngleArch3dGAN_add_loss_bins import generator, discriminator
     else:
         from AngleArch3dGAN_k2 import generator, discriminator
 
@@ -107,13 +109,13 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='/data/shared/gkhattak/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Total Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights', help='Directory to store weights.')
-    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='Pickle file to store losses.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights_bins', help='Directory to store weights.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history_bins.pkl', help='Pickle file to store losses.')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=1, help='pre processing of cell energies by raising to a power')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
-    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bins.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
     parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
@@ -126,12 +128,17 @@ def mapping(x):
     
 def hist_count(x):
     #xl = safe_log(x)
-    bin1 = np.sum(np.where(x> 0.1, 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<0.1) & (x>0.05) , 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<0.05) & (x>0.01), 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<0.01) & (x>0.0), 1, 0), axis=(1, 2, 3))
-    bin5 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
-    return np.concatenate([bin1, bin2, bin3, bin4, bin5], axis=1)
+    bin1 = np.sum(np.where(x> 0.2, 1, 0), axis=(1, 2, 3))
+    bin2 = np.sum(np.where((x<0.2) & (x>0.08) , 1, 0), axis=(1, 2, 3))
+    bin3 = np.sum(np.where((x<0.08) & (x>0.05) , 1, 0), axis=(1, 2, 3))
+    bin4 = np.sum(np.where((x<0.05) & (x>0.03), 1, 0), axis=(1, 2, 3))
+    bin5 = np.sum(np.where((x<0.03) & (x>0.02), 1, 0), axis=(1, 2, 3))
+    bin6 = np.sum(np.where((x<0.02) & (x>0.0125), 1, 0), axis=(1, 2, 3))
+    bin7 = np.sum(np.where((x<0.0125) & (x>0.008), 1, 0), axis=(1, 2, 3))
+    bin8 = np.sum(np.where((x<0.008) & (x>0.003), 1, 0), axis=(1, 2, 3))
+    bin9 = np.sum(np.where((x<0.003) & (x>0.), 1, 0), axis=(1, 2, 3))
+    bin10 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
+    return np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8, bin9, bin10], axis=1)
 
 #get data for training
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
@@ -301,9 +308,15 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             epoch_gen_loss.append(generator_loss)
             #print ('generator_loss', generator_loss)
             index +=1
-            print('real_batch_loss', real_batch_loss)
-            print ('fake_batch_loss', fake_batch_loss)
-                            
+
+            # Used at design time for debugging
+            #print('real_batch_loss', real_batch_loss)
+            #print ('fake_batch_loss', fake_batch_loss)
+            #disc_out = discriminator.predict(image_batch)
+            #print('disc_out')
+            #print(np.transpose(disc_out[4][:5]))
+            #print('add_loss_batch')
+            #print(np.transpose(add_loss_batch[:5]))
 
         # Testing    
         print ('Total batches were {}'.format(index))
