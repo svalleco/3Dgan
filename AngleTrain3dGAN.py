@@ -41,7 +41,7 @@ from keras.utils.generic_utils import Progbar
 #config = tf.ConfigProto(log_device_placement=True)
 
 # printing versions of software used
-print('keras version:', keras.__version__)
+#print('keras version:', keras.__version__)
 #print('python version:', sys.version)
 #import tensorflow as tf
 #print('tensorflow version', tf.__version__)
@@ -73,10 +73,7 @@ def main():
     analyse=params.analyse # if analysing
     energies =params.energies # Bins
     resultfile = params.resultfile # analysis result
-    gen_weight = params.lossweights[0]  # weight for generation loss
-    aux_weight= params.lossweights[1]  # weight for primary energy regression loss
-    ang_weight= params.lossweights[2]   # weight for angle loss
-    ecal_weight = params.lossweights[3] # weight for ecal loss
+    loss_weights = params.lossweights
     thresh = params.thresh # threshold for data
     angtype = params.angtype
 
@@ -89,7 +86,7 @@ def main():
 
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
-    d=discriminator()
+    d=discriminator(xpower)
     g=generator(latent_size)
     Gan3DTrainAngle(d, g, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, gen_weight=gen_weight, aux_weight=aux_weight, ang_weight=ang_weight, ecal_weight=ecal_weight,
@@ -108,7 +105,7 @@ def get_parser():
     parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights', help='Directory to store weights.')
     parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='Pickle file to store losses.')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
-    parser.add_argument('--xpower', action='store', type=int, default=0.5, help='pre processing of cell energies by raising to a power')
+    parser.add_argument('--xpower', action='store', type=float, default=1, help='pre processing of cell energies by raising to a power')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
     parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
@@ -136,7 +133,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ang, ecal
 
-def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, ang_weight=10, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[]):
+def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[]):
     start_init = time.time()
     verbose = False    
     particle='Ele'
@@ -147,7 +144,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     discriminator.compile(
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
+        loss_weights= loss_weights
     )
 
     # build the generator
@@ -172,7 +169,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ang_weight, ecal_weight]
+        loss_weights=loss_weights
     )
 
     # Getting Data
