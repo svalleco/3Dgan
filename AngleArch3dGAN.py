@@ -19,13 +19,15 @@ import tensorflow as tf
 K.set_image_dim_ordering('tf')
 
 def ecal_sum(image, power=1):
-    image = K.pow(image, 1./power)
+    if power !=1:
+      image = K.pow(image, 1./power)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
 def ecal_angle(image, power=1):
     image = K.squeeze(image, axis=4)
-    image = K.pow(image, 1./power)
+    if power !=1:
+      image = K.pow(image, 1./power)
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
