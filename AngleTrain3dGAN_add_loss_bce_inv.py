@@ -50,7 +50,7 @@ from keras.utils.generic_utils import Progbar
 def main():
     #Architectures to import
     if keras.__version__ == '1.2.2':
-        from AngleArch3dGAN_add_loss_bce2 import generator, discriminator
+        from AngleArch3dGAN_add_loss_bce_inv import generator, discriminator
     else:
         from AngleArch3dGAN_k2 import generator, discriminator
 
@@ -121,7 +121,22 @@ def get_parser():
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
     return parser
 
+def safe_log10(x):
+    x[np.where(x>0)] = np.log10(x[np.where(x>0)])
+    return x
+
 def mapping(x):
+    p0 = 6.82245e-02
+    p1 = -1.70385
+    p2 = 6.27896e-01
+    p3 = 1.39350
+    p4 = 2.26181
+    p5 = 1.23621e-01
+    p6 = 4.30815e+01
+    p7 = -8.20837e-02
+    p8 = -1.08072e-02
+    log10x = safe_log10(x)
+    x = ((1+np.power(np.abs((log10x-p1)/p2),2*p3))/p0) * 1/ ((p4+x*(p7+x*p8))* np.sin(p5*(log10x-p6)))
     return x
     
 #get data for training
@@ -258,6 +273,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
             add_loss_batch = mapping(image_batch)
+            print('The mapped data ranges from {} to {} with mean of {}'.format(np.amin(add_loss_batch), np.amax(add_loss_batch), np.mean(add_loss_batch)))
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4

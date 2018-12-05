@@ -23,9 +23,25 @@ def ecal_sum(image, power=1):
       image = K.pow(image, 1./power)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
-   
+
+def safe_log(x):
+    x =K.tf.where(K.equal(x, 0.0), K.zeros_like(x), K.log(x))
+    return x
+
 def mapped(x):
-    return 1. * x # directly connecting to input produced error
+    p0 = 6.82245e-02
+    p1 = -1.70385
+    p2 = 6.27896e-01
+    p3 = 1.39350
+    p4 = 2.26181
+    p5 = 1.23621e-01
+    p6 = 4.30815e+01
+    p7 = -8.20837e-02
+    p8 = -1.08072e-02
+    log10 = np.log(10)
+    log10x = safe_log(x)/ log10
+    val = ((1+K.pow(K.abs((log10x-p1)/p2),2*p3))/p0) * 1/ ((p4+x*(p7+x*p8))* K.sin(p5*(log10x-p6)))
+    return val # directly connecting to input produced error
 
 def ecal_angle(image, power=1):
     image = K.squeeze(image, axis=4)
