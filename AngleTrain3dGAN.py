@@ -89,8 +89,8 @@ def main():
     d=discriminator(xpower)
     g=generator(latent_size)
     Gan3DTrainAngle(d, g, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
-                    latent_size=latent_size, gen_weight=gen_weight, aux_weight=aux_weight, ang_weight=ang_weight, ecal_weight=ecal_weight,
-                    xscale = xscale, xpower=xpower, angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
+                    latent_size=latent_size, loss_weights= loss_weights, xscale = xscale, xpower=xpower,
+                    angscale=ascale, yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
                     energies=energies)
 
 def get_parser():
