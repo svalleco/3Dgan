@@ -18,13 +18,14 @@ import tensorflow as tf
 
 K.set_image_dim_ordering('tf')
 
-def ecal_sum(image):
+def ecal_sum(image, power=1):
+    if power !=1:
+      image = K.pow(image, 1./power)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
-
-def safe_log(image):
-    image =K.tf.where(K.equal(image, 0.0), K.zeros_like(image), K.log(image))
-    return image
+   
+def mapped(x):
+    return 1. * x # directly connecting to input produced error
 
 def count(image):
     bin1 = K.sum(K.tf.where(image > 0.1, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
@@ -34,9 +35,10 @@ def count(image):
     bin5 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
     return K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5], axis=1), -1)
 
-def ecal_angle(image):
+def ecal_angle(image, power=1):
     image = K.squeeze(image, axis=4)
-
+    if power !=1:
+      image = K.pow(image, 1./power)
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
@@ -94,10 +96,9 @@ def ecal_angle(image):
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
-    #print(K.int_shape(ang))
     return ang
 
-def discriminator():
+def discriminator(power=1):
   
     image=Input(shape=(51, 51, 25, 1))
 
@@ -132,15 +133,15 @@ def discriminator():
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ang = Lambda(ecal_angle)(image)
-    ecal = Lambda(ecal_sum)(image)
-    hist_count= Lambda(count)(image)
-    Model(input=image, output=[fake, aux, ang, ecal, hist_count]).summary()
-    return Model(input=image, output=[fake, aux, ang, ecal, hist_count])
+    ang = Lambda(ecal_angle)(image, power)
+    ecal = Lambda(ecal_sum)(image, power)
+    add_loss = Lambda(count)(image)
+    Model(input=[image], output=[fake, aux, ang, ecal, add_loss]).summary()
+    return Model(input=[image], output=[fake, aux, ang, ecal, add_loss])
 
 
 def generator(latent_size=200, return_intermediate=False):
-   
+    
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
         Reshape((9, 9, 8, 8)),
@@ -159,19 +160,20 @@ def generator(latent_size=200, return_intermediate=False):
         ZeroPadding3D((0, 2,0)),
         Conv3D(6, 3, 5, 8, init='he_uniform'),
         LeakyReLU(),
-        Conv3D(1, 2, 2, 2, bias=False, init='glorot_normal'),
+        Conv3D(1, 2, 2, 2, init='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
     fake_image = loc(latent)
     loc.summary()
-    Model(input=[latent], output=fake_image).summary()
-    return Model(input=[latent], output=fake_image)
+    Model(input=[latent], output=[fake_image]).summary()
+    return Model(input=[latent], output=[fake_image])
 
 def main():
-  g= generator()
-  d=discriminator()
+    g= generator()
+    d=discriminator()
 
 if __name__ == "__main__":
     main()
-        
+
+                
