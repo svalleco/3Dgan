@@ -7,14 +7,9 @@ from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
 
 from keras.models import Model, Sequential
 
-def discriminator(keras_dformat='channels_last'):
-    if keras_dformat =='channels_last':
-        dshape=(25, 25, 25,1)
-        daxis=(1,2,3)
-    else:
-        dshape=(1, 25, 25, 25)
-        daxis=(2,3,4)
-    image = Input(shape=dshape)
+def discriminator():
+
+    image = Input(shape=(25, 25, 25, 1))
 
     x = Conv3D(32, 5, 5,5, border_mode='same')(image)
     x = LeakyReLU()(x)
@@ -50,7 +45,7 @@ def discriminator(keras_dformat='channels_last'):
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ecal = Lambda(lambda x: K.sum(x, axis=daxis))(image)
+    ecal = Lambda(lambda x: K.sum(x, axis=(1, 2, 3)))(image)
     Model(input=image, output=[fake, aux, ecal]).summary()
     return Model(input=image, output=[fake, aux, ecal])
 

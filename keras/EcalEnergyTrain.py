@@ -12,14 +12,13 @@ import keras
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
-from six.moves import range
-import sys
+#from six.moves import range
+#import sys
 import glob
 import h5py 
 import numpy as np
 import time
 import math
-import argparse
 import analysis.utils.GANutils as gan # some common functions for gan
 
 import keras.backend as K
@@ -57,7 +56,9 @@ def main():
     batch_size = params.batchsize #batch size
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
-    datapath = params.datapath#Data path 
+    tf_flags=params.tf_flags
+    datapath = params.datapath#Data path
+    keras_format = params. keras_format
     nEvents = params.nbEvents#Total events for training
     fitmod = params.mod# Fit to use
     weightdir = params.weightsdir # weight dir
@@ -76,7 +77,7 @@ def main():
     # Building discriminator and generator
     d=discriminator()
     g=generator(latent_size)
-    Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , loss_weights=lossweights, xscale = xscale, analysis=analysis, energies=energies)
+    Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , loss_weights=lossweights, xscale = xscale, analysis=analysis, energies=energies, tf_flags=tf_flags)
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -86,6 +87,8 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.') # Caltech
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--verbose', action='store_true', default=False, help='Whether or not to use a progress bar')
+    parser.add_argument('--tf_flags', action='store', default=False, help='Setting Tensorflow flags')
+    parser.add_argument('--keras_format', action='store', type=str, default='channels_last', help='Keras format')
     parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dganWeights', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=1, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
@@ -114,7 +117,19 @@ def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ecal
 
-def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, resultfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[2, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, analysis=False, energies=[]):
+def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, resultfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[2, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, analysis=False, energies=[], tf_flags=False):
+    if tf_flags:
+       tf.flags.DEFINE_string("d", "/data/svalleco/Ele_v1_1_2.h5", "data file")
+       tf.flags.DEFINE_integer("bs", 128, "inference batch size")
+       tf.flags.DEFINE_integer("num_inter_threads", 1, "number of inter_threads")
+       tf.flags.DEFINE_integer("num_intra_threads", 56, "number of intra_threads")
+       tf.flags.DEFINE_integer("num_epochs", 2, "number of epochs")
+       FLAGS = tf.flags.FLAGS
+
+       session_config = tf.ConfigProto(log_device_placement=True, inter_op_parallelism_threads=FLAGS.num_inter_threads, intra_op_parallelism_threads=FLAGS.num_intra_threads)
+       session = tf.Session(config=session_config)
+       K.set_session(session)
+
     start_init = time.time()
     verbose = False
     particle = 'Ele'
