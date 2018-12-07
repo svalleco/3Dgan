@@ -31,13 +31,24 @@ from keras.optimizers import Adadelta, Adam, RMSprop
 from keras.utils.generic_utils import Progbar
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
-if 'nfshome/' in os.environ.get('HOME'): # Here a check for host can be used
-  import setGPU #if Caltech
+
+if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
+    tlab = True
+else:
+    tlab= False
+    
+try:
+    import setGPU #if Caltech
+except:
+    pass
 
 def main():
 
     #Architectures to import
-    from EcalEnergyGan import generator, discriminator
+    if keras.__version__ == '1.2.2':
+       from EcalEnergyGan_k2 import generator, discriminator
+    else:
+       from EcalEnergyGan import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
