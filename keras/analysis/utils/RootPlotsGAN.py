@@ -5,9 +5,9 @@ import os
 import math
 import time
 import numpy.core.umath_tests as umath
-import matplotlib
-import matplotlib.pyplot as plt
-plt.switch_backend('Agg')
+#import matplotlib
+#import matplotlib.pyplot as plt
+#plt.switch_backend('Agg')
 
 import ROOTutils as my # common utility functions for root
 from GANutils import safe_mkdir, get_sums
