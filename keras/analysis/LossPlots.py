@@ -9,7 +9,7 @@ except ImportError:
     import pickle
 
 def main():
-   lossfile = 'dcgan-ch-pion-history.pkl'
+   lossfile = '3dgan_analysis.pkl'
    weights = [2, 0.1, 0.1]
    #defining limits for different plots. Varies with result
    ymax = [30, 4, 3, 100, 1.25, 2.] #[weighted loss for all, BCE_test loss, BCE_train_loss, Aux unweighted, BCE-train for generator only]
@@ -21,7 +21,7 @@ def main():
 def plot_loss(lossfile, weights, ymax, lossdir, fig=1):
    #Getting losses in arrays
    with open(lossfile, 'rb') as f:
-    			x = pickle.load(f)
+      x = pickle.load(f)
    gen_test = np.asarray(x['test']['generator'])
    gen_train = np.asarray(x['train']['generator'])
    disc_test = np.asarray(x['test']['discriminator'])

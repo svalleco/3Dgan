@@ -1,7 +1,7 @@
 from os import path
 import ROOT
 from ROOT import kFALSE, TLegend, TCanvas, gPad, TGraph, gStyle, TProfile
-import os
+import os, sys
 import h5py
 import numpy as np
 import math
@@ -9,16 +9,25 @@ import time
 import glob
 import numpy.core.umath_tests as umath
 from utils.GANutils import perform_calculations_multi, safe_mkdir #Common functions from GANutils.py
-import ROOTutils as my
+import utils.ROOTutils as my
 import matplotlib
 import matplotlib.pyplot as plt
 plt.switch_backend('Agg')
  
+import ptvsd
+ 
 def main():
+  #  ptvsd.enable_attach(address=('128.141.213.77', 3000), redirect_output=True)
+  #  ptvsd.wait_for_attach()
+
    #Architectures 
+   sys.path.insert(1, os.path.join(sys.path[0], '..'))
    from EcalEnergyGan import generator, discriminator
-   disc_weights="params_discriminator_epoch_041.hdf5"
-   gen_weights= "params_generator_epoch_041.hdf5"
+   disc_weights="good_weights/params_discriminator_epoch_041.hdf5"
+   gen_weights= "good_weights/params_generator_epoch_041.hdf5"
+
+   import keras.backend as K
+   K.set_image_dim_ordering('tf')
 
    plots_dir = "correlation_plots/"
    latent = 200
@@ -28,7 +37,7 @@ def main():
    energies=[0, 50, 100, 200, 250, 300, 400, 500]
    particle='Ele'
    #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path caltech
-   datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
+   datapath = '/mnt/nfshead/ahhesam/data/*.h5' # Training data CERN EOS
    sortdir = 'SortedData'
    gendir = 'Gen'  
    discdir = 'Disc' 

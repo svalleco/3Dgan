@@ -315,7 +315,7 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
 
             epoch_time = time.time()-epoch_start
             print("The {} epoch took {} seconds".format(epoch, epoch_time))
-            # pickle.dump({'train': train_history, 'test': test_history}, open(WeightsDir + 'dcgan2D-history.pkl', 'wb'))
+            pickle.dump({'train': train_history, 'test': test_history}, open(WeightsDir + 'dcgan2D-history.pkl', 'wb'))
             if analysis:
               analysis_history = defaultdict(list)
               noise_test = np.random.normal(0., 1., (nb_test, latent_size))
@@ -339,16 +339,16 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--model', '-m', action='store', type=str, default='EcalEnergyGan', help='Model architecture to use.')
-    parser.add_argument('--nbepochs', action='store', type=int, default=25, help='Number of epochs to train for.')
-    parser.add_argument('--batchsize', action='store', type=int, default=126, help='batch size per update')
-    parser.add_argument('--latentsize', action='store', type=int, default=128, help='size of random N(0, 1) latent space to sample')
+    parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
+    parser.add_argument('--batchsize', action='store', type=int, default=512, help='batch size per update')
+    parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/eos/project/d/dshep/LCD/V1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--weightsdir', action='store', type=str, default='weights2D', help='Directory to store weights.')
-    parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
-    parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
+    parser.add_argument('--mod', action='store', type=int, default=1, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
+    parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--learningRate', '-lr', action='store', type=float, default=0.001, help='Learning Rate')
     parser.add_argument('--optimizer', action='store', type=str, default='RMSprop', help='Keras Optimizer to use.')
@@ -361,18 +361,23 @@ def get_parser():
 
 
 if __name__ == '__main__':
-
     import keras.backend as K
-
 
     from keras.layers import Input
     from keras.models import Model
     from keras.optimizers import Adadelta, Adam, RMSprop
     from keras.utils.generic_utils import Progbar
-    from sklearn.cross_validation import train_test_split
+    from sklearn.model_selection import train_test_split
 
     import tensorflow as tf
     import horovod.keras as hvd
+
+    # Initialize Horovod.
+    hvd.init()
+    config = tf.ConfigProto()
+    config.gpu_options.visible_device_list = str(hvd.local_rank())
+
+    # os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
     #Values to be set by user
     parser = get_parser()
@@ -387,7 +392,6 @@ if __name__ == '__main__':
     else:
         print('Setting tf channel ordering (NHWC)')
         K.set_image_dim_ordering('tf')
-    config = tf.ConfigProto()#(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
     os.environ['KMP_BLOCKTIME'] = str(1)
@@ -398,9 +402,6 @@ if __name__ == '__main__':
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
     K.set_session(tf.Session(config=config))
    
-    # Initialize Horovod.
-    hvd.init()
-
     #Architectures to import
     from EcalEnergyGan import generator, discriminator
 
