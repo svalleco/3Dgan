@@ -1,9 +1,3 @@
-import sys
-import h5py
-
-from h5py import File as HDF5File
-import numpy as np
-
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
                           Dropout, BatchNormalization, Activation, Embedding)
@@ -13,16 +7,14 @@ from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
 
 from keras.models import Model, Sequential
 
-K.set_image_dim_ordering('tf')
-
-def ecal_sum(image):
-    sum = K.sum(image, axis=(1, 2, 3))
-    return sum
-   
-
-def discriminator():
-
-    image = Input(shape=(25, 25, 25, 1))
+def discriminator(keras_dformat='channels_last'):
+    if keras_dformat =='channels_last':
+        dshape=(25, 25, 25,1)
+        daxis=(1,2,3)
+    else:
+        dshape=(1, 25, 25, 25)
+        daxis=(2,3,4)
+    image = Input(shape=dshape)
 
     x = Conv3D(32, 5, 5,5, border_mode='same')(image)
     x = LeakyReLU()(x)
@@ -50,7 +42,7 @@ def discriminator():
     h = Flatten()(x)
 
     dnn = Model(image, h)
-
+    dnn.summary()
     image = Input(shape=(25, 25, 25, 1))
 
     dnn_out = dnn(image)
@@ -58,11 +50,11 @@ def discriminator():
 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ecal = Lambda(lambda x: K.sum(x, axis=(1, 2, 3)))(image)
+    ecal = Lambda(lambda x: K.sum(x, axis=daxis))(image)
     Model(input=image, output=[fake, aux, ecal]).summary()
     return Model(input=image, output=[fake, aux, ecal])
 
-def generator(latent_size=1024, return_intermediate=False):
+def generator(latent_size=200, return_intermediate=False):
 
     loc = Sequential([
         Dense(64 * 7* 7, input_dim=latent_size),
@@ -89,6 +81,13 @@ def generator(latent_size=1024, return_intermediate=False):
     latent = Input(shape=(latent_size, ))
      
     fake_image = loc(latent)
-
+    loc.summary()
     Model(input=[latent], output=fake_image).summary()
-return Model(input=[latent], output=fake_image)
+    return Model(input=[latent], output=fake_image)
+
+def main():
+    d = discriminator()
+    g = generator()
+
+if __name__ == '__main__':
+    main()
