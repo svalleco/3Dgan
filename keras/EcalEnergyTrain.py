@@ -46,7 +46,7 @@ def main():
 
     #Architectures to import
     if keras.__version__ == '1.2.2':
-       from EcalEnergyGan_k2 import generator, discriminator
+       from EcalEnergyGan_k1 import generator, discriminator
     else:
        from EcalEnergyGan import generator, discriminator
 
@@ -63,19 +63,41 @@ def main():
     weightdir = params.weightsdir # weight dir
     xscale = params.xscale #scaling of data
     pklfile = params.pklfile # loss history
+    lossweights = params.lossweights # weights for losses [Gen loss, Aux loss, Ecal sum loss]
     # Analysis
     analysis=params.analyse # if analysing
     energies =params.energies # Bins
     resultfile = params.resultfile # analysis result
+    if tlab:
+       datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
     print(params)
     gan.safe_mkdir(weightdir)
 
     # Building discriminator and generator
     d=discriminator()
     g=generator(latent_size)
-    Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , gen_weight=2, aux_weight=0.1, ecal_weight=0.1, xscale = xscale, analysis=analysis, energies=energies)
+    Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , loss_weights=lossweights, xscale = xscale, analysis=analysis, energies=energies)
 
-# This functions loads data from a file and also does any pre processing
+def get_parser():
+    parser = argparse.ArgumentParser(description='3D GAN Params' )
+    parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
+    parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
+    parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
+    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.') # Caltech
+    parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
+    parser.add_argument('--verbose', action='store_true', default=False, help='Whether or not to use a progress bar')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dganWeights', help='Directory to store weights.')
+    parser.add_argument('--mod', action='store', type=int, default=1, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
+    parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
+    parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='File to save losses.')
+    parser.add_argument('--lossweights', action='store', type=int, default=[2, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ecal_weight]')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
+    parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
+    parser.add_argument('--energies', action='store', type=int, default=[100, 200, 300, 400], help='Energy bins for analysis')
+    return parser
+
+# Ths functions loads data from a file and also does any pre processing
 def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     #get data for training
     print ('Loading Data from .....', datafile)
@@ -92,7 +114,7 @@ def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, ecal
 
-def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, resultfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, analysis=False, energies=[]):
+def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, resultfile, mod=0, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[2, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, analysis=False, energies=[]):
     start_init = time.time()
     verbose = False
     particle = 'Ele'
@@ -101,7 +123,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     discriminator.compile(
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ecal_weight]
+        loss_weights=loss_weights
     )
 
     # build the generator
@@ -126,7 +148,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ecal_weight]
+        loss_weights=loss_weights
     )
 
     # Getting Data
@@ -179,15 +201,15 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
             loaded_data = X_train.shape[0]
             used_data = file_index * batch_size
             if (loaded_data - used_data) < batch_size + 1 and (nb_file < len(Trainfiles)):
+                X_train = X_train[(file_index * batch_size):]
+                Y_train = Y_train[(file_index * batch_size):]
+                ecal_train = ecal_train[(file_index * batch_size):]
                 X_temp, Y_temp, ecal_temp = GetprocData(Trainfiles[nb_file], xscale=xscale)
                 print("\nData file loaded..........",Trainfiles[nb_file])
                 nb_file+=1
-                X_left = X_train[(file_index * batch_size):]
-                Y_left = Y_train[(file_index * batch_size):]
-                ecal_left = ecal_train[(file_index * batch_size):]
-                X_train = np.concatenate((X_left, X_temp))
-                Y_train = np.concatenate((Y_left, Y_temp))
-                ecal_train = np.concatenate((ecal_left, ecal_temp))
+                X_train = np.concatenate((X_train, X_temp))
+                Y_train = np.concatenate((Y_train, Y_temp))
+                ecal_train = np.concatenate((ecal_train, ecal_temp))
                 nb_batches = int(X_train.shape[0] / batch_size)                
                 print("{} batches loaded..........".format(nb_batches))
                 file_index = 0
@@ -288,27 +310,6 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
             analysis_history['moment'].append(result[2])
             print('Result = ', result)
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
-
-def get_parser():
-    parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--model', '-m', action='store', type=str, default='EcalEnergyGan', help='Model architecture to use.')
-    parser.add_argument('--nbepochs', action='store', type=int, default=50, help='Number of epochs to train for.')
-    parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
-    parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
-    #parser.add_argument('--datapath', action='store', type=str, default='/eos/project/d/dshep/LCD/V1/*scan/*.h5', help='HDF5 files to train from.') # CERN EOS
-    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.') # Caltech
-    parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
-    #parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
-    parser.add_argument('--verbose', action='store_true', default=False, help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dganWeights', help='Directory to store weights.')
-    parser.add_argument('--mod', action='store', type=int, default=1, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
-    parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
-    parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
-    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='File to save losses.')
-    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
-    parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
-    parser.add_argument('--energies', action='store', type=int, default=[100, 200, 300, 400], help='Energy bins for analysis')
-    return parser
 
 if __name__ == '__main__':
     main()
