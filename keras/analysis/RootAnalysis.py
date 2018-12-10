@@ -15,14 +15,18 @@ if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check
 else:
     tlab= False
 
-sys.path.insert(0,'../')
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 def main():
+
    #Architectures 
    if keras.__version__ == '1.2.2':
-        from EcalEnergyGan_k1 import generator, discriminator
+      from EcalEnergyGan_k1 import generator, discriminator
    else:
-        from EcalEnergyGan import generator, discriminator
+      from EcalEnergyGan import generator, discriminator
+
+   import keras.backend as K
+   K.set_image_dim_ordering('tf')
 
    parser = get_parser()
    params = parser.parse_args()
@@ -48,23 +52,25 @@ def main():
    save_disc= params.save_disc
    read_disc= params.read_disc
    ifpdf= params.ifpdf
-   gweights= params.gweights
-   dweights= params.dweights
+   gweights= [params.gweights]
+   dweights= [params.dweights]
    xscales= params.xscales
    yscale= params.yscale
    energies= params.energies
    thresh = params.thresh
 
+   labels = ['']
+
    if tlab:
       datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
       gweights = ['/gkhattak/EnergyWeights/params_generator_epoch_041.hdf5']
       dweights = ['/gkhattak/EnergyWeights/params_discriminator_epoch_041.hdf5']
-      
+
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    d = discriminator()
    g = generator(latent)
    var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, nbEvents, binevents, moments, xscales, flags, latent, particle)
-   pl.get_plots_multi(var, labels, plotsdir, energies, m, len(gweights), ifpdf, stest, cell)
+   pl.get_plots_multi(var, labels, plotsdir, energies, moments, len(gweights), ifpdf, stest, cell)
 
 def get_parser():
     # defaults apply at caltech
@@ -72,13 +78,13 @@ def get_parser():
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
-    parser.add_argument('--plotsdir', action='store', type=str, default='/results/Analysis_plots', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotsdir', action='store', type=str, default='results/Analysis_plots', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
     parser.add_argument('--nbEvents', action='store', type=int, default=100000, help='Total Number of events used for Testing')
     parser.add_argument('--binevents', action='store', type=int, default=2000, help='Number of events in each bin')
-    parser.add_argument('--moments', action='store', type=int, default=2, help='Number of moments')
+    parser.add_argument('--moments', action='store', type=int, default=3, help='Number of moments')
     parser.add_argument('--cell', action='store', type=int, default=0, help='Whether to plot cell energies..0)Not plotted...1)Only for bin with uniform spectrum.....2)For all energy bins')
     parser.add_argument('--corr', action='store', default=False, help='Plot correlation plots')
     parser.add_argument('--test', action='store', default=True, help='Use Test data')
@@ -90,8 +96,8 @@ def get_parser():
     parser.add_argument('--save_disc', action='store', default=False, help='Save discriminator output')
     parser.add_argument('--read_disc', action='store', default=False, help='Get discriminator output')
     parser.add_argument('--ifpdf', action='store', default=True, help='Whether generate pdf plots or .C plots') 
-    parser.add_argument('--gweights', action='store', type=str, default=['../weights/3dgan_weights/params_generator_epoch_041.hdf5'], help='list for paths to Generator weights.')
-    parser.add_argument('--dweights', action='store', type=str, default=['../weights/3dgan_weights/params_discriminator_epoch_041.hdf5'], help='list for paths to Discriminator weights')
+    parser.add_argument('--gweights', action='store', type=str, default=['../weights/3dgan_weights/params_generator_epoch_049.hdf5'], help='list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, default=['../weights/3dgan_weights/params_discriminator_epoch_049.hdf5'], help='list for paths to Discriminator weights')
     parser.add_argument('--xscales', action='store', type=int, default=[100], help='list for Multiplication factors for all models to be checked')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--energies', action='store', type=int, default=[0, 50, 100, 200, 250, 300, 400, 500], help='Energy bins for analysis')
