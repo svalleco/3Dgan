@@ -309,8 +309,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                 overwrite=True)
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, time.time()-test_start, WeightsDir))
-        pickle.dump({'train': train_history, 'test': test_history},
-                    open(pklfile, 'wb'))
+        pickle.dump({'train': train_history, 'test': test_history}, open(pklfile, 'wb'))
         if analysis:
             var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
             noise = np.random.normal(0.1, 1, (nb_test, latent_size))
