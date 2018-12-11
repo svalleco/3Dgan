@@ -14,13 +14,16 @@ except ImportError:
 import sys
 import h5py
 import os
-
+import json
+import hashlib
 import numpy as np
 import glob
 
 from skopt import gp_minimize
 from skopt.space import Real, Integer, Categorical
 from skopt.plots import plot_convergence
+from skopt import Optimizer
+from skopt.learning import GaussianProcessRegressor
 
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
@@ -44,15 +47,41 @@ import matplotlib.cm as cm
 from matplotlib.colors import LogNorm, Normalize
 plt.switch_backend('Agg')
 import math
+from opt import manager
+import setGPU
+
+class externalfunc:
+    def __init__(self , prog, names):
+        self.call = prog
+        self.N = names
+
+    def __call__(self, X):
+        self.args = dict(zip(self.N,X))
+        h = hashlib.md5(str(self.args)).hexdigest()
+        com = '%s %s'% (self.call, ' '.join(['--%s %s'%(k,v) for (k,v) in self.args.items() ]))
+        com += ' --hash %s'%h
+        print ("Executing: ",com)
+        ## run the command                                                                                                                                                                                         
+        c = os.system( com )
+        ## get the output                                                                                                                                                                                          
+        try:
+            r = json.loads(open('%s.json'%h).read())
+            Y = r['result']
+        except:
+            print ("Failed on",com)
+            Y == None
+        return Y
 
 def hpscan():
+    run_for = 20
+    start = time.time()
     space = [
          #Integer(25, 25), #name ='epochs'),  
          #Integer(5, 8), #name ='batch_size'),
          #Integer(8, 10), #name='latent size'),
-         Categorical([1, 2, 5, 6, 8]), #name='gen_weight'),
-         Categorical([0.1, 0.2, 1, 2, 10]), #name='aux_weight'),
-         Categorical([0.1, 0.2, 1, 2, 10]), #name='ecal_weight'),
+         Real(1, 8), #name='gen_weight'),
+         Real(0.1, 10), #name='aux_weight'),
+         Real(0.1, 10), #name='ecal_weight'),
          #Real(10**-5, 10**0, "log-uniform"), #name ='lr'),
          #Real(8, 9), #name='rho'),
          #Real(0, 0.0001), #name='decay'), 
@@ -68,15 +97,32 @@ def hpscan():
          #Integer(2, 16), #name='gy'),
          #Integer(2, 16)] #name='gz')
            ]
-    res_gp = gp_minimize(evaluate, space, n_calls=15, n_random_starts=5, verbose=True, random_state=0)
-    "Best score=%.4f" % res_gp.fun
-    print("""Best parameters:
-    Loss Weights:
-    _ Weight Gen loss ={}
-    _ Weight Aux loss ={}
-    _ Weight Ecal loss ={}
-   """.format(res_gp.x[0], res_gp.x[1], res_gp.x[2]))
-    plot_convergence(res_gp)
+    externalize = externalfunc(prog = evaluate_threaded, names = space)
+    use_func = externalize
+
+    o = Optimizer(
+        n_initial_points =5,
+        acq_func = 'gp_hedge',
+        acq_optimizer='auto',
+        base_estimator=GaussianProcessRegressor(alpha=0.0, copy_X_train=True,
+                                                #kernel=1**2 * Matern(length_scale=[1, 1], nu=2.5),            
+                                                n_restarts_optimizer=2,
+                                                noise='gaussian', normalize_y=True,
+                                                optimizer='fmin_l_bfgs_b'),
+        dimensions=space,
+    )
+
+    m = manager(n = 4,
+                skobj = o,
+                iterations = run_for,
+                func = use_func,
+                wait= 0
+    )
+    start = time.time()
+    m.run()
+    print("Best parameters:\nLoss Weights:\n_ Weight Gen loss ={}\n_ Weight Aux loss ={}\n_ Weight Ecal loss ={}".format(res_gp.x[0], res_gp.x[1], res_gp.x[2]))
+    print("Time taken {} seconds".format(time.time()- start))
+    plot_convergence(res_gp).savefig("result_hyp.pdf")
 
 #Function to return a single value for a network performnace metric. The metric needs to be minimized.
 def evaluate(params):
@@ -94,8 +140,46 @@ def evaluate(params):
    d = discriminator()
    g = generator()
    loss = vegantrain(d, g, Trainfiles, gen_weight = gen_weight, aux_weight = aux_weight, ecal_weight = aux_weight)
-   score = analyse(g, True, False, gen_weights, Testfiles)
+   score = analyse(g, gen_weights, Testfiles)
    return score
+
+#Function to return a single value for a network performnace metric. The metric needs to be minimized.                                                                                                             
+def evaluate_threaded(params):
+   id_res = hash(str(params))
+   gweights = 'g{}_weights.hdf5'.format(id_res)
+   dweights = 'd{}_weights.hdf5'.format(id_res)
+   scanfile = 'HyperScan.txt'
+   #datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
+   datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5'
+   num_events = 200000
+   Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_events, datasetnames=["ECAL"], Particles =["Ele"])
+   latent =200
+   sorted_saved = True
+   #print(Trainfiles)
+   #print(Testfiles)
+   # Just done to print the parameter setting to screen                                                                                                                                                            
+   gen_weight, aux_weight, ecal_weight= params
+   params1= [gen_weight, aux_weight, ecal_weight]# If the params have to be modified before training useful for learning rate etc.
+   #print("Generation loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}".format(*params))
+   d = discriminator()
+   g = generator()
+   loss = vegantrain(d, g, Trainfiles, epochs=15, gen_weight = gen_weight, aux_weight = aux_weight, ecal_weight = aux_weight, g_weights=gweights, d_weights=dweights)
+   if sorted_saved == False:
+      score = analyse(g, gweights, datapath, metric4, read_data= False, save_data= True)
+      sorted_saved = True
+   else:
+      score = analyse(g, gweights, datapath, metric4, read_data= True, save_data= False)
+   results = params + loss + score
+   with open(scanfile,'a') as sfile:
+      for value in params:
+         sfile.write(str(value) + '\t')
+      sfile.write(str(loss) + '\t')
+      for value in score:
+         sfile.write(str(value) + '\t')
+      sfile.write('\n')
+   open('%s.json'%id_res,'w').write(json.dumps({'result': score[0]}))
+   return score[0]
+
 
 # Fuction used to flip random bits for training
 def bit_flip(x, prob=0.05):
@@ -186,9 +270,9 @@ def generator(latent_size=200, gflag=0, gf=8, gx=5, gy=5, gz=5):
     return Model(input=[latent], output=fake_image)
 
 def GetFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
-    print ("Searching in :",FileSearch)
+    #print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
-    print ("Found {} files. ".format(len(Files)))
+    #print ("Found {} files. ".format(len(Files)))
     Filesused = int(math.ceil(nEvents/EventsperFile))
     FileCount=0
     Samples={}
@@ -219,7 +303,7 @@ def GetFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 1000
 
 def get_data(datafile):
     #get data for training                                                                                                                                                                      
-    print ('Loading Data from .....', datafile)
+    #print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     y=f.get('target')
     X=np.array(f.get('ECAL'))
@@ -244,13 +328,13 @@ def sort(data, energies, num_events):
        srt["energy" + str(energy)] = Y[indexes]
     return srt
 
-def save_sorted(srt, energies):
+def save_sorted(srt, energies, sorted_file):
     for energy in energies:
-       filename = "sorted_{:03d}.hdf5".format(energy)
+       filename = sorted_file + "_{:03d}.hdf5".format(energy)
        with h5py.File(filename ,'w') as outfile:
           outfile.create_dataset('ECAL',data=srt["events_act" + str(energy)])
           outfile.create_dataset('Target',data=srt["energy" + str(energy)])
-       print ("Sorted data saved to ", filename)
+       #print ("Sorted data saved to ", filename)
 
 def load_sorted(sorted_path):
     sorted_files = sorted(glob.glob(sorted_path))
@@ -262,14 +346,14 @@ def load_sorted(sorted_path):
        srtfile = h5py.File(f,'r')
        srt["events_act" + str(energy)] = np.array(srtfile.get('ECAL'))
        srt["energy" + str(energy)] = np.array(srtfile.get('Target'))
-       print ("Loaded from file", f)
+       #print ("Loaded from file", f)
     return energies, srt
 
 def get_gen(energy):
     filename = "Gen_{:03d}.hdf5".format(energy)
     f=h5py.File(filename,'r')
     generated_images = np.array(f.get('ECAL'))
-    print ("Generated file ", filename, " is loaded")
+    #print ("Generated file ", filename, " is loaded")
     return generated_images
 
 def generate(g, index, latent, sampled_labels):
@@ -316,11 +400,12 @@ def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
     return momentX, momentY, momentZ
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, Testfiles):
+def analyse(g, gen_weights, datapath, optimizer, read_data=True, save_data=False):
    print ("Started")
    num_events=2000
    num_data = 100000
-   sortedpath = 'sortedTest_*.hdf5'
+   sortedfile = 'sorted_'
+   sortedpath = sortedfile + '*.hdf5'
    Test = False
    latent= 200
    m = 2
@@ -330,13 +415,18 @@ def analyse(g, read_data, save_data, gen_weights, Testfiles):
      start = time.time()
      energies, var = load_sorted(sortedpath)
      sort_time = time.time()- start
-     print ("Events were loaded in {} seconds".format(sort_time))
+     #print ("Events were loaded in {} seconds".format(sort_time))
    else:
      # Getting Data
      events_per_file = 10000
      energies = [50, 100, 200, 250, 300, 400, 500]
+     Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Ele"])
+     if Test:
+        data_files = Testfiles
+     else:
+        data_files = Trainfiles + Testfiles
      start = time.time()
-     for index, dfile in enumerate(Testfiles):
+     for index, dfile in enumerate(data_files):
         data = get_data(dfile)
         sorted_data = sort(data, energies, num_events)
         data = None
@@ -346,22 +436,22 @@ def analyse(g, read_data, save_data, gen_weights, Testfiles):
           for key in var:
             var[key]= np.append(var[key], sorted_data[key], axis=0)
      data_time = time.time() - start
-     print ("{} events were loaded in {} seconds".format(num_data, data_time))
+     #print ("{} events were loaded in {} seconds".format(num_data, data_time))
      if save_data:
-        save_sorted(var, energies)
+        save_sorted(var, energies, sortedfile)
    total = 0
    for energy in energies:
      var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
      total += var["index" + str(energy)]
      data_time = time.time() - start
-   print ("{} events were put in {} bins".format(total, len(energies)))
+   #print ("{} events were put in {} bins".format(total, len(energies)))
    g.load_weights(gen_weights)
 
    start = time.time()
    for energy in energies:
      var["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], latent, var["energy" + str(energy)]/100)
    gen_time = time.time() - start
-   print ("{} events were generated in {} seconds".format(total, gen_time))
+   #print ("{} events were generated in {} seconds".format(total, gen_time))
 
    for energy in energies:
      var["ecal_act"+ str(energy)] = np.sum(var["events_act" + str(energy)], axis = (1, 2, 3))
@@ -370,7 +460,7 @@ def analyse(g, read_data, save_data, gen_weights, Testfiles):
      var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)] = get_sums(var["events_gan" + str(energy)])
      var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["events_act" + str(energy)], var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
      var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["events_gan" + str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m)
-   return matric4(var, energies, m)
+   return optimizer(var, energies, m)
 
 def metric4(var, energies, m):
 
@@ -409,21 +499,19 @@ def metric4(var, energies, m):
    metricp = metricp/len(energies)
    metrice = metrice/len(energies)
    tot = metricp + metrice
-   print('Energy\t\tEvents\t\tPosition Error\tEnergy Error')
-   for energy in energies:
-     print ("%d \t\t%d \t\t%f \t\t%f" %(energy, var["index" +str(energy)], var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
+   #print('Energy\t\tEvents\t\tPosition Error\tEnergy Error')
+   #for energy in energies:
+    # print ("%d \t\t%d \t\t%f \t\t%f" %(energy, var["index" +str(energy)], var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
    print(" Total Position Error = %.4f\t Total Energy Profile Error =   %.4f" %(metricp, metrice))
    print(" Total Error =  %.4f" %(tot))
    return(tot, metricp, metrice)
 
 ## Training Function
-def vegantrain(d, g, Trainfiles, epochs=10, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0):
+def vegantrain(d, g, Trainfiles, epochs=5, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='gweights.h5', d_weights='dweights.h5'):
 #dflag=0, df= 16, dx=8, dy=8, dz= 8, dp=0.2, gflag=0, gf= 16, gx=8, gy=8, gz= 8):
     init_start = time.time()
-    g_weights = 'params_generator_epoch_'
-    d_weights = 'params_discriminator_epoch_'
     verbose = 'false'
-    print('[INFO] Building discriminator')
+    #print('[INFO] Building discriminator')
     d.compile(
         optimizer=RMSprop(lr=lr, rho=rho, decay=decay),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
@@ -431,7 +519,7 @@ def vegantrain(d, g, Trainfiles, epochs=10, batch_size=128, latent_size=200, gen
     )
 
     # build the generator                                                       
-    print('[INFO] Building generator')
+    #print('[INFO] Building generator')
     g.compile(
         optimizer=RMSprop(lr=lr, rho=rho, decay=decay),
         loss='binary_crossentropy')
@@ -453,7 +541,7 @@ def vegantrain(d, g, Trainfiles, epochs=10, batch_size=128, latent_size=200, gen
     train_history = defaultdict(list)
     for epoch in range(epochs):
         start = time.time()
-        print('Epoch {} of {}'.format(epoch + 1, epochs))
+        #print('Epoch {} of {}'.format(epoch + 1, epochs))
         epoch_start = time.time()
         epoch_gen_loss = []
         epoch_disc_loss = []
@@ -467,8 +555,8 @@ def vegantrain(d, g, Trainfiles, epochs=10, batch_size=128, latent_size=200, gen
         for index in range(total_batches):
             if verbose:
                 progress_bar.update(index)
-            if index % 100 == 0:
-               print('processed {}/{} batches'.format(index + 1, nb_batches))
+            #if index % 100 == 0:
+               #print('processed {}/{} batches'.format(index + 1, nb_batches))
 
             loaded_data = X_train.shape[0]
             used_data = file_index * batch_size
@@ -516,22 +604,15 @@ def vegantrain(d, g, Trainfiles, epochs=10, batch_size=128, latent_size=200, gen
             ])
 
         epoch_time = time.time() - start
-        print('Training for {} epoch took {} seconds'.format(epoch, epoch_time))
+        #print('Training for {} epoch took {} seconds'.format(epoch, epoch_time))
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)      
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
 
-        #print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
-         #   'component', *d.metrics_names))
-       # print('-' * 65)
-
-        # print(ROW_FMT.format('generator (train)', *train_history['generator'][-1]))
-        # print(ROW_FMT.format('discriminator (train)', *train_history['discriminator'][-1]))
-           
     #save weights at last epoch                                                                                   
-    g.save_weights('gen_weights.hdf5'.format(g_weights, epoch), overwrite=True)
-    d.save_weights('disc_weights.hdf5'.format(d_weights, epoch), overwrite=True)
+    g.save_weights(g_weights, overwrite=True)
+    d.save_weights(d_weights, overwrite=True)
     return epoch_gen_loss[nb_batches -1][1]
 
 if __name__ == "__main__":
