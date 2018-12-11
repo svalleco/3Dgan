@@ -36,7 +36,7 @@ def main():
    discdir= params.discdir
    nbEvents= params.nbEvents
    binevents= params.binevents
-   moments= params.moments
+   m= params.moments
    cell= params.cell
    corr= params.corr
    test= params.test
@@ -54,11 +54,12 @@ def main():
    yscale= params.yscale
    energies= params.energies
    thresh = params.thresh
-
+   labels=['']
+   
    if tlab:
       datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
-      gweights = ['/gkhattak/EnergyWeights/params_generator_epoch_041.hdf5']
-      dweights = ['/gkhattak/EnergyWeights/params_discriminator_epoch_041.hdf5']
+      gweights = ['/gkhattak/EnergyWeights/3dganWeights/params_generator_epoch_027.hdf5']
+      dweights = ['/gkhattak/EnergyWeights/3dganWeights/params_discriminator_epoch_027.hdf5']
       
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    d = discriminator()
@@ -72,7 +73,7 @@ def get_parser():
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
-    parser.add_argument('--plotsdir', action='store', type=str, default='/results/Analysis_plots', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotsdir', action='store', type=str, default='results/Analysis_plots/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')

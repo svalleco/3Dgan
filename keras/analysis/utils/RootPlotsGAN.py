@@ -741,7 +741,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    c1.Update()
    c1.cd(4)
    leg.AddEntry(h1x,"G4","l")
-   leg.SetHeader("#splitline{Weighted Histograms for position of}{ max energy deposition along x, y, z axis}", "C")
+   leg.SetHeader("Max energy deposition along x, y, z axis")
    if not stest:
      for i, h in enumerate(h2xs):
        leg.AddEntry(h, 'GAN ' + labels[i],"l")
@@ -892,7 +892,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1z.Draw('sames hist')
    canvas.cd(4)
    leg.AddEntry(h1x, "G4","l")
-   leg.SetHeader("#splitline{Weighted Histograms for energies}{ deposited along x, y, z axis}", "C")
+   leg.SetHeader("Energies deposited along x, y, z axis")#, "C")
    if not stest:
       for i, h in enumerate(h2xs):
         leg.AddEntry(h, 'GAN ' + labels[i],"l")
