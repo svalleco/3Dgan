@@ -124,3 +124,18 @@ dmypy.json
 *.pdf
 *.hdf5
 *.h5
+
+# GAN3D outputs
+**/weights
+**/results
+**/analysis/results
+**/analysis/*sorted
+**/analysis/Sorted**
+*_copy.py
+*.pyc
+*~
+*.txt
+*.dat
+*.log
+#*.*#
+__pycache__
