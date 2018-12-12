@@ -7,6 +7,8 @@ from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
 
 from keras.models import Model, Sequential
 
+K.set_image_data_format('channels_last')
+
 def discriminator():
 
     image = Input(shape=(25, 25, 25, 1))

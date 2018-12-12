@@ -45,8 +45,10 @@ def main():
 
     #Architectures to import
     if keras.__version__ == '1.2.2':
+       print(keras.__version__ )
        from EcalEnergyGan_k1 import generator, discriminator
     else:
+       print(keras.__version__ ) 
        from EcalEnergyGan import generator, discriminator
 
     #Values to be set by user
@@ -64,13 +66,16 @@ def main():
     weightdir = params.weightsdir # weight dir
     xscale = params.xscale #scaling of data
     pklfile = params.pklfile # loss history
-    lossweights = params.lossweights # weights for losses [Gen loss, Aux loss, Ecal sum loss]
+    lossweights = [params.gen_weight, params.aux_weight, params.ecal_weight] # weights for losses [Gen loss, Aux loss, Ecal sum loss]
     # Analysis
     analysis=params.analyse # if analysing
     energies =params.energies # Bins
     resultfile = params.resultfile # analysis result
     if tlab:
        datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
+       weightsdir = '/gkhattak/weights/EnergyWeights/3dganWeights_k2'
+       pklfile = '/gkhattak/results/3dgan_history.pkl'
+       resultfile = '/gkhattak/results/3dgan_analysis.pkl'
     print(params)
     gan.safe_mkdir(weightdir)
 
@@ -94,7 +99,9 @@ def get_parser():
     parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='File to save losses.')
-    parser.add_argument('--lossweights', action='store', type=int, default=[2, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ecal_weight]')
+    parser.add_argument('--gen_weight', action='store', type=float, default=2, help='loss weight for generation real/fake loss')
+    parser.add_argument('--aux_weight', action='store', type=float, default=0.1, help='loss weight for auxilliary energy regression loss')
+    parser.add_argument('--ecal_weight', action='store', type=float, default=0.1, help='loss weight for ecal sum loss')
     parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[100, 200, 300, 400], help='Energy bins for analysis')
