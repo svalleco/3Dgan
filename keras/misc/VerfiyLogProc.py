@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 plt.switch_backend('Agg')
 import math
 from keras import backend as K
-import ROOTutils  
+import ROOTutils as my
+  
 # Computing log only when not zero
 def logftn(x, base, f1, f2):
     select= np.where(x>0)
@@ -38,38 +39,59 @@ def GetProcData(datafile, num_events):
     y = y.astype(np.float32)
     return x, y
 
-def PlotEcalFlatlog(x, outfile, label, fig=1):
-    x = x.flatten()
-    bins = np.logspace(np.log10(1e-7),np.log10(1),50)
-    plt.figure(fig)
-    plt.hist(x, bins=bins, histtype='step', label=label)
-    plt.legend()
-    plt.xscale('log', nonposy='clip')
-    plt.xlabel('Flattend Ecal energies')
-    print('Saving plot for Flat Ecal in {}.'.format(outfile))
-    plt.savefig(outfile)
+def PlotEcalFlatlog(x, X, outfile, ifpdf=True):
+    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
+    c1.SetGrid()
+    color =2
+    ROOT.gPad.SetLogx()
+    hd = ROOT.TH1F("Geant4", "", 100, -6, 0)
+    my.BinLogX(hd)
+    hd.GetXaxis().SetTitle("Ecal GeV")
+    my.fill_hist(hd, x.flatten())
+    hd.Draw()
+    hd.SetLineColor(color)
+    legend = ROOT.TLegend(.5, .8, .6, .9)
+    legend.AddEntry(hd,"Ecal Energy","l")
+    hg = ROOT.TH1F("FromLambda", "", 100, -6, 0)
+    color+=2
+    my.BinLogX(hg)
+    my.fill_hist(hg, X.flatten())
+    hg.SetLineColor(color)
+    hg.Draw('sames')
+    c1.Update()
+    legend.AddEntry(hg, "From Lambda", "l")
+    legend.Draw()
+    c1.Modified()
+    if ifpdf:
+      c1.Print(outfile + 'Log.pdf')
+    else:
+      c1.Print(outfile + 'Log.C')
 
-def PlotEcalFlat(x, outfile, label, fig=1):
-    x = x.flatten()
-    bins = np.arange(0.01, 1, 0.01)
-    plt.figure(fig)
-    plt.hist(x, bins=bins, histtype='step', label=label)
-    #plt.xscale('log', nonposy='clip')
-    plt.legend()
-    plt.xlabel('Log of G4')
-    print('Saving plot for Flat Ecal in {}.'.format(outfile))
-    plt.savefig(outfile)
+def PlotEcalFlat(x, outfile, ifpdf=True):
+    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make 
+    c1.SetGrid()
+    hd = ROOT.TH1F("Lambda", "", 100, 0.0001, 1)
+    my.fill_hist(hd, x.flatten())
+    hd.Draw()
+    c1.Update()
+    legend = ROOT.TLegend(.5, .8, .6, .9)
+    legend.AddEntry(hd,"From Lambda","l")
+    c1.Update()
+    if ifpdf:
+      c1.Print(outfile + 'Flat.pdf')
+    else:
+      c1.Print(outfile + 'Flat.C')
+
 
 def main():
     datafile="/eos/project/d/dshep/LCD/V1/EleEscan/EleEscan_1_1.h5"
     num_events=100
-    outfile = 'flat_ecal_python'
+    outfile = 'ecal_root'
     X, Y = GetProcData(datafile, num_events)
-    PlotEcalFlatlog(X, outfile + '1.pdf', label='G4')
     xlog = logftn(X, 10, 1.0/6.0, 1.0)
-    PlotEcalFlat(xlog, outfile + '_log.pdf', fig=2, label='log Ecal')
+    PlotEcalFlat(xlog, outfile)
     x = get_log(xlog)
-    PlotEcalFlatlog(x, outfile + '2.pdf', label= 'out of lambda')
+    PlotEcalFlatlog(X, x, outfile)
                    
 if __name__ == '__main__':
     main()
