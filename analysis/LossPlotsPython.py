@@ -11,36 +11,47 @@ except ImportError:
 
 def main():
    #pkl file name and plots dir
-   lossfile =  '/nfshome/gkhattak/3Dgan/3dgan_history_adam_sqrt_p0005.pkl'
-   outdir = 'results/loss_plots_adam_p0005'
+   lossfile =  '../results/3dgan_history_bins.pkl'
+   outdir = 'results/loss_plots_bins'
 
    # limits for plots. Adjust according to current plots
    ymax = [20, 5, 5, 40, 1, 3.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
 
    start_epoch =0 # removing initial epochs to check for overfitting of Generation loss
-   fit_order = 3
+   fit_order = 3 # order of fit used
    num_ang_losses = 1 # number of angle losses
+   num_add_loss = 1 # any additional loss used
 
-   safe_mkdir(outdir)
-   plot_loss(lossfile, ymax, outdir, start_epoch, num_ang_losses, order=fit_order)
-   print('Loss Plots are saved in {}'.format(outdir))
-   
-def plot_loss(lossfile, ymax, lossdir, start_epoch, num_ang_losses, fig=1, order=3):
    #Getting losses in arrays
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
    bloss= 'Binary cross entropy'
    angtype = 'theta'
-            
-   if num_ang_losses==1:
-      weights = [1, 3, 0.1, 50, 0.1]
-      losstype = ['Weighted sum', bloss, ploss, aloss, ploss]
-      lossnames = ['tot', 'gen', 'aux', '{}'.format(angtype), 'ecal sum']
+   gen_weight = 3   # weight of generation loss
+   aux_weight = 0.1 # weight of auxilliary regression loss
+   ecal_weight = 0.1 # weight of ecal sum loss
+   ang_weight = 25 # weight of angle loss
+   add_weight = 0.1 # weight of any additional loss
 
+   if num_ang_losses==1:
+       weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
+       losstypes = ['Weighted sum', bloss, ploss, aloss, ploss]
+       lossnames = ['tot', 'gen', 'aux', '{}'.format(angtype), 'ecal sum']
+      
    elif num_ang_losses==2:
-      weights = [1, 3, 0.1, 10, 15, 0.1]
-      losstype = ['Weighted sum', bloss, ploss, aloss, aloss, ploss]
-      lossnames = ['tot', 'gen', 'aux', '{}1'.format(angtype), '{}2'.format(angtype), 'ecal sum']
+       weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
+       losstypes = ['Weighted sum', bloss, ploss, aloss, aloss, ploss]
+       lossnames = ['tot', 'gen', 'aux', '{}1'.format(angtype), '{}2'.format(angtype), 'ecal sum']
+   if num_add_loss==1:
+       weights.append(add_weight)
+       losstypes.append(ploss)
+       lossnames.append('bin')
+
+   safe_mkdir(outdir)
+   plot_loss(lossfile, ymax, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order)
+   print('Loss Plots are saved in {}'.format(outdir))
+   
+def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3):
                              
    with open(lossfile, 'rb') as f:
     			x = pickle.load(f)
