@@ -30,6 +30,7 @@ from keras.optimizers import Adadelta, Adam, RMSprop
 from keras.utils.generic_utils import Progbar
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
+from keras.callbacks import TensorBoard
 
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
     tlab = True
@@ -40,6 +41,15 @@ try:
     import setGPU #if Caltech
 except:
     pass
+
+def write_log(callback, common_tag, tags, logs, batch_no):
+    for tag, value in zip(tags, logs):
+        summary = tf.Summary()
+        summary_value = summary.value.add()
+        summary_value.simple_value = value
+        summary_value.tag = common_tag + tag
+        callback.writer.add_summary(summary, batch_no)
+        callback.writer.flush()
 
 def main():
 
@@ -108,7 +118,7 @@ def get_parser():
     return parser
 
 # Ths functions loads data from a file and also does any pre processing
-def GetprocData(datafile, xscale =1, yscale = 100, limit = 1e-6):
+def GetprocData(datafile, xscale = 1, yscale = 100, limit = 1e-6):
     #get data for training
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
@@ -173,6 +183,10 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         loss_weights=loss_weights
     )
 
+    log_path = './logs/' + time.strftime("%Y%m%d-%H%M%S")
+    callback = TensorBoard(log_path)
+    callback.set_model(combined)
+
     # Getting Data
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
     print('The total data was divided in {} Train files and {} Test files'.format(len(Trainfiles), len(Testfiles)))
@@ -199,6 +213,8 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     test_history = defaultdict(list)
     analysis_history = defaultdict(list)
     
+    tb_tags = ['total_loss', 'generation_loss', 'auxiliary_loss', 'lambda_loss']
+
     init_time = time.time()- start_init
     print('Initialization time is {} seconds'.format(init_time))
     for epoch in range(nb_epochs):
@@ -295,6 +311,13 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         train_history['discriminator'].append(discriminator_train_loss)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
+
+        global_index = epoch * total_batches
+        write_log(callback, 'discriminator_train/', tb_tags, discriminator_train_loss, global_index)
+        write_log(callback, 'generator_train/', tb_tags, generator_train_loss, global_index)
+        write_log(callback, 'discriminator_test/', tb_tags, discriminator_test_loss, global_index)
+        write_log(callback, 'generator_test/', tb_tags, generator_test_loss, global_index)
+
 
         print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
             'component', *discriminator.metrics_names))
