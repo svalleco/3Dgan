@@ -40,7 +40,7 @@ def main():
    discdir= params.discdir
    nbEvents= params.nbEvents
    binevents= params.binevents
-   m= params.moments
+   moments= params.moments
    cell= params.cell
    corr= params.corr
    test= params.test
