@@ -109,16 +109,16 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='/data/shared/gkhattak/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Total Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights_bins', help='Directory to store weights.')
-    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history_bins.pkl', help='Pickle file to store losses.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights_bins_lr005', help='Directory to store weights.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history_bins_lr005.pkl', help='Pickle file to store losses.')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=1, help='pre processing of cell energies by raising to a power')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
-    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bins.pkl', help='File to save losses.')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bins_lr005.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
-    parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
+    parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 50, 0.2, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
     return parser
@@ -127,18 +127,17 @@ def mapping(x):
     return x
     
 def hist_count(x):
-    #xl = safe_log(x)
-    bin1 = np.sum(np.where(x> 0.2, 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<0.2) & (x>0.08) , 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<0.08) & (x>0.05) , 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<0.05) & (x>0.03), 1, 0), axis=(1, 2, 3))
-    bin5 = np.sum(np.where((x<0.03) & (x>0.02), 1, 0), axis=(1, 2, 3))
-    bin6 = np.sum(np.where((x<0.02) & (x>0.0125), 1, 0), axis=(1, 2, 3))
-    bin7 = np.sum(np.where((x<0.0125) & (x>0.008), 1, 0), axis=(1, 2, 3))
-    bin8 = np.sum(np.where((x<0.008) & (x>0.003), 1, 0), axis=(1, 2, 3))
-    bin9 = np.sum(np.where((x<0.003) & (x>0.), 1, 0), axis=(1, 2, 3))
-    bin10 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
-    return np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8, bin9, bin10], axis=1)
+    bin1 = np.sum(np.where((x>0.05) , 1, 0), axis=(1, 2, 3))
+    bin2 = np.sum(np.where((x<0.05) & (x>0.03), 1, 0), axis=(1, 2, 3))
+    bin3 = np.sum(np.where((x<0.03) & (x>0.02), 1, 0), axis=(1, 2, 3))
+    bin4 = np.sum(np.where((x<0.02) & (x>0.0125), 1, 0), axis=(1, 2, 3))
+    bin5 = np.sum(np.where((x<0.0125) & (x>0.008), 1, 0), axis=(1, 2, 3))
+    bin6 = np.sum(np.where((x<0.008) & (x>0.003), 1, 0), axis=(1, 2, 3))
+    bin7 = np.sum(np.where((x<0.003) & (x>0.), 1, 0), axis=(1, 2, 3))
+    bin8 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
+    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
+    bins[np.where(bins==0)]=1
+    return bins
 
 #get data for training
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
@@ -176,7 +175,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     print('[INFO] Building generator')
     #generator.summary()
     generator.compile(
-        optimizer=RMSprop(),
+        optimizer=RMSprop(lr=0.005),
         loss='binary_crossentropy'
     )
  
@@ -192,7 +191,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(),
+        optimizer=RMSprop(lr=0.005),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -323,24 +322,25 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         print('\nTesting for epoch {}:'.format(epoch))
         test_start = time.time()
-        noise = np.random.normal(0, 1, (nb_test, latent_size-1))
+        noise = np.random.normal(0, 1, (nb_Test, latent_size-1))
         noise = np.multiply(Y_test.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang_test.reshape(-1, 1), noise), axis=1)
         generated_images = generator.predict(generator_ip, verbose=False)
         add_loss_test = loss_ftn(X_test)
         X = np.concatenate((X_test, generated_images))
-        y = np.array([1] * nb_test + [0] * nb_test)
+        y = np.array([1] * nb_Test + [0] * nb_Test)
         ang = np.concatenate((ang_test, ang_test))
         ecal = np.concatenate((ecal_test, ecal_test))
         aux_y = np.concatenate((Y_test, Y_test), axis=0)
-        add_loss= np.concatenate((add_loss_test, add_loss_test), axis=0)        
+        add_loss= np.concatenate((add_loss_test, add_loss_test), axis=0)
+        add_loss = np.expand_dims(add_loss, axis=-1)
         discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
-        noise = np.random.normal(0, 1, (2 * nb_test, latent_size - 1))
+        noise = np.random.normal(0, 1, (2 * nb_Test, latent_size - 1))
         noise = np.multiply(aux_y.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang.reshape(-1, 1), noise), axis=1)
-        trick = np.ones(2 * nb_test)
+        trick = np.ones(2 * nb_Test)
         generator_test_loss = combined.evaluate(generator_ip,
                 [trick, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
@@ -359,10 +359,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             print('Result = ', result)
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
 
-        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s}'.format(
+        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s} | {6:8s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
-        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}'
+        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
         print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',
