@@ -303,13 +303,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         print('\nTesting for epoch {}:'.format(epoch))
         test_start = time.time()
-        noise = np.random.normal(0, 1, (nb_test, latent_size-1))
+        noise = np.random.normal(0, 1, (nb_Test, latent_size-1))
         noise = np.multiply(Y_test.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang_test.reshape(-1, 1), noise), axis=1)
         generated_images = generator.predict(generator_ip, verbose=False)
         add_loss_test = mapping(X_test)
         X = np.concatenate((X_test, generated_images))
-        y = np.array([1] * nb_test + [0] * nb_test)
+        y = np.array([1] * nb_Test + [0] * nb_Test)
         ang = np.concatenate((ang_test, ang_test))
         ecal = np.concatenate((ecal_test, ecal_test))
         aux_y = np.concatenate((Y_test, Y_test), axis=0)
@@ -317,10 +317,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
-        noise = np.random.normal(0, 1, (2 * nb_test, latent_size - 1))
+        noise = np.random.normal(0, 1, (2 * nb_Test, latent_size - 1))
         noise = np.multiply(aux_y.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang.reshape(-1, 1), noise), axis=1)
-        trick = np.ones(2 * nb_test)
+        trick = np.ones(2 * nb_Test)
         generator_test_loss = combined.evaluate(generator_ip,
                 [trick, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
@@ -339,10 +339,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             print('Result = ', result)
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
 
-        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s}'.format(
+        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s}| {6:8s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
-        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}'
+        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
         print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',

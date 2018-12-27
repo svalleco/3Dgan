@@ -25,7 +25,7 @@ def ecal_sum(image, power=1):
     return sum
    
 def mapped(x):
-    return x/11.64 # directly connecting to input produced error
+    return x #/11.64 # directly connecting to input produced error
 
 def ecal_angle(image, power=1):
     image = K.squeeze(image, axis=4)
