@@ -37,7 +37,7 @@ if 'nfshome/' in os.environ.get('HOME'): # Here a check for host can be used
 def main():
 
     #Architectures to import
-    from EcalEnergyGan import generator, discriminator
+    from EcalEnergyGan_k1 import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
