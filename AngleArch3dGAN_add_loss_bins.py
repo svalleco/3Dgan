@@ -28,17 +28,16 @@ def mapped(x):
     return 1. * x # directly connecting to input produced error
 
 def count(image):
-    bin1 = K.sum(K.tf.where(image > 0.2, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.2, image > 0.08), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.08, image > 0.05), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05, image > 0.03), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.03, image > 0.02), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.02, image > 0.0125), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0125, image > 0.008), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin8 = K.sum(K.tf.where(K.tf.logical_and(image < 0.008, image > 0.003), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin9 = K.sum(K.tf.where(K.tf.logical_and(image < 0.003, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin10 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    return K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8, bin9, bin10], axis=1), -1)
+    bin1 = K.sum(K.tf.where(image > 0.05, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05, image > 0.03), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.03, image > 0.02), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.02, image > 0.0125), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0125, image > 0.008), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.008, image > 0.003), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.003, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
+    return bins
 
 def ecal_angle(image, power=1):
     image = K.squeeze(image, axis=4)
