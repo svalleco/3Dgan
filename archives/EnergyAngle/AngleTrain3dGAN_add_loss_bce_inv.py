@@ -74,11 +74,6 @@ def main():
     energies =params.energies # Bins
     resultfile = params.resultfile # analysis result
     loss_weights=params.lossweights
-    #gen_weight = params.lossweights[0]  # weight for generation loss
-    #aux_weight= params.lossweights[1]  # weight for primary energy regression loss
-    #ang_weight= params.lossweights[2]   # weight for angle loss
-    #ecal_weight = params.lossweights[3] # weight for ecal loss
-    #add_loss_weight = params.lossweights[4]
     thresh = params.thresh # threshold for data
     angtype = params.angtype
 
@@ -122,8 +117,9 @@ def get_parser():
     return parser
 
 def safe_log10(x):
-    x[np.where(x>0)] = np.log10(x[np.where(x>0)])
-    return x
+    out = 1. * x
+    out[np.where(out>0)] = np.log10(out[np.where(out>0)])
+    return out
 
 def mapping(x):
     p0 = 6.82245e-02
@@ -135,9 +131,16 @@ def mapping(x):
     p6 = 4.30815e+01
     p7 = -8.20837e-02
     p8 = -1.08072e-02
-    log10x = safe_log10(x)
-    x = ((1+np.power(np.abs((log10x-p1)/p2),2*p3))/p0) * 1/ ((p4+x*(p7+x*p8))* np.sin(p5*(log10x-p6)))
-    return x
+    res= 1. * x
+    res[res<1e-7]=0
+    log10x = safe_log10(res)
+    #res = ((1+np.power(np.abs((log10x-p1)/p2),2*p3))/p0) * 1/ ((p4+x*(p7+x*p8))* np.sin(p5*(log10x-p6)))
+    res = (p0 /(1+np.power(np.abs((log10x-p1)/p2),2*p3))) * ((p4+res*(p7+res*p8))* np.sin(p5*(log10x-p6)))
+    return res
+
+def inv_mapping(x):
+    out = np.where(x<1e-7, 0, 1./mapping(x))
+    return out*x
     
 #get data for training
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
@@ -272,8 +275,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            add_loss_batch = mapping(image_batch)
-            print('The mapped data ranges from {} to {} with mean of {}'.format(np.amin(add_loss_batch), np.amax(add_loss_batch), np.mean(add_loss_batch)))
+            add_loss_batch = inv_mapping(image_batch)
+            print('The mapped data ranges from {} to {} with mean of {}'.format(np.amin(add_loss_batch[add_loss_batch>0]), np.amax(add_loss_batch), np.mean(add_loss_batch)))
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
@@ -307,8 +310,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             epoch_gen_loss.append(generator_loss)
             #print ('generator_loss', generator_loss)
             index +=1
-            print('real_batch_loss', real_batch_loss)
-            print ('fake_batch_loss', fake_batch_loss)
+            #print('real_batch_loss', real_batch_loss)
+            #print ('fake_batch_loss', fake_batch_loss)
                             
 
         # Testing    
@@ -320,7 +323,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         noise = np.multiply(Y_test.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang_test.reshape(-1, 1), noise), axis=1)
         generated_images = generator.predict(generator_ip, verbose=False)
-        add_loss_test = mapping(X_test)
+        add_loss_test = inv_mapping(X_test)
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_test + [0] * nb_test)
         ang = np.concatenate((ang_test, ang_test))
