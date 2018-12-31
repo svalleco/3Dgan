@@ -52,8 +52,8 @@ def main():
    save_disc= params.save_disc
    read_disc= params.read_disc
    ifpdf= params.ifpdf
-   gweights= [params.gweights]
-   dweights= [params.dweights]
+   gweights= params.gweights
+   dweights= params.dweights
    xscales= params.xscales
    yscale= params.yscale
    energies= params.energies
@@ -95,8 +95,8 @@ def get_parser():
     parser.add_argument('--save_disc', action='store', default=False, help='Save discriminator output')
     parser.add_argument('--read_disc', action='store', default=False, help='Get discriminator output')
     parser.add_argument('--ifpdf', action='store', default=True, help='Whether generate pdf plots or .C plots') 
-    parser.add_argument('--gweights', action='store', type=str, default=['../weights/3dgan_weights/params_generator_epoch_049.hdf5'], help='list for paths to Generator weights.')
-    parser.add_argument('--dweights', action='store', type=str, default=['../weights/3dgan_weights/params_discriminator_epoch_049.hdf5'], help='list for paths to Discriminator weights')
+    parser.add_argument('--gweights', action='store', type=str, default=['../weights/3dganWeights/params_generator_epoch_049.hdf5'], help='list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, default=['../weights/3dganWeights/params_discriminator_epoch_049.hdf5'], help='list for paths to Discriminator weights')
     parser.add_argument('--xscales', action='store', type=int, default=[100], help='list for Multiplication factors for all models to be checked')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--energies', action='store', type=int, default=[0, 50, 100, 200, 250, 300, 400, 500], help='Energy bins for analysis')

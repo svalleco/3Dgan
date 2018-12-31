@@ -40,18 +40,20 @@ from sklearn.cross_validation import train_test_split
 K.set_image_dim_ordering('tf')
 import tensorflow as tf
 config = tf.ConfigProto(log_device_placement=True)
-from EcalEnergyGan_5layer import generator
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
+
+from EcalEnergyGan_k1 import generator
 import setGPU
-from GANutils import get_sorted
+from analysis.utils.GANutils import get_sorted
 
 def main():
 #    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
 #    genpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_generator*.hdf5"
 #    discpath = "/afs/cern.ch/work/g/gkhattak/newweights/params_discriminator*.hdf5"
     datapath = "/bigdata/shared/LCD/NewV1/*scan/*.h5"
-    genpath = "/nfshome/gkhattak/keras/veganweights2/params_generator*.hdf5"
+    genpath = "../weights/3dganWeights/params_generator*.hdf5"
     sorted_path = 'Elesorted_*.hdf5'
-    filename = 'Ele_5layer'
+    filename = 'optimization_plots'
     particle = "Ele"
     scale = 100
     g= generator()

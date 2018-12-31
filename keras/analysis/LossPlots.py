@@ -9,11 +9,11 @@ except ImportError:
     import pickle
 
 def main():
-   lossfile = 'dcgan-ch-pion-history.pkl'
+   lossfile = '../results/3dgan_history.pkl'
    weights = [2, 0.1, 0.1]
    #defining limits for different plots. Varies with result
-   ymax = [30, 4, 3, 100, 1.25, 2.] #[weighted loss for all, BCE_test loss, BCE_train_loss, Aux unweighted, BCE-train for generator only]
-   outdir = 'loss_plots_ch_pions_1000'
+   ymax = [10, 3, 2, 40, 0.75, 1.] #[weighted loss for all, BCE_test loss, BCE_train_loss, Aux unweighted, BCE-train for generator only]
+   outdir = 'results/loss_plots'
    safe_mkdir(outdir)
    plot_loss(lossfile, weights, ymax, outdir)
    print('The plots are saved in {}'.format(outdir))
