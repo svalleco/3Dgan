@@ -14,12 +14,16 @@ except ImportError:
 import sys
 import h5py
 import os
-
+import json
+import hashlib
 import numpy as np
 import glob
 
 from skopt import gp_minimize
 from skopt.space import Real, Integer, Categorical
+from skopt.plots import plot_convergence
+from skopt import Optimizer
+from skopt.learning import GaussianProcessRegressor
 
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
@@ -42,6 +46,140 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import LogNorm, Normalize
 plt.switch_backend('Agg')
+import math
+from opt import manager
+import setGPU
+
+class externalfunc:
+    def __init__(self , prog, names):
+        self.call = prog
+        self.N = names
+
+    def __call__(self, X):
+        self.args = dict(zip(self.N,X))
+        h = hashlib.md5(str(self.args)).hexdigest()
+        com = '%s %s'% (self.call, ' '.join(['--%s %s'%(k,v) for (k,v) in self.args.items() ]))
+        com += ' --hash %s'%h
+        print ("Executing: ",com)
+        ## run the command                                                                                                                                                                                         
+        c = os.system( com )
+        ## get the output                                                                                                                                                                                          
+        try:
+            r = json.loads(open('%s.json'%h).read())
+            Y = r['result']
+        except:
+            print ("Failed on",com)
+            Y == None
+        return Y
+
+def hpscan():
+    run_for = 20
+    start = time.time()
+    space = [
+         #Integer(25, 25), #name ='epochs'),  
+         #Integer(5, 8), #name ='batch_size'),
+         #Integer(8, 10), #name='latent size'),
+         Real(1, 8), #name='gen_weight'),
+         Real(0.1, 10), #name='aux_weight'),
+         Real(0.1, 10), #name='ecal_weight'),
+         #Real(10**-5, 10**0, "log-uniform"), #name ='lr'),
+         #Real(8, 9), #name='rho'),
+         #Real(0, 0.0001), #name='decay'), 
+         #Categorical([True,False]), #name='dflag'),
+         #Integer(4, 64), #name='df'),
+         #Integer(2, 16), #name='dx'),
+         #Integer(2, 16), #name='dy'),
+         #Integer(2, 16), #name='dz'),
+         #Real(0.01, 0.5), #name='dp'),
+         #Categorical([True,False]), #name='gflag'),
+         #Integer(4, 64), #name='gf'),
+         #Integer(2, 16), #name='gx'),
+         #Integer(2, 16), #name='gy'),
+         #Integer(2, 16)] #name='gz')
+           ]
+    externalize = externalfunc(prog = evaluate_threaded, names = space)
+    use_func = externalize
+
+    o = Optimizer(
+        n_initial_points =5,
+        acq_func = 'gp_hedge',
+        acq_optimizer='auto',
+        base_estimator=GaussianProcessRegressor(alpha=0.0, copy_X_train=True,
+                                                #kernel=1**2 * Matern(length_scale=[1, 1], nu=2.5),            
+                                                n_restarts_optimizer=2,
+                                                noise='gaussian', normalize_y=True,
+                                                optimizer='fmin_l_bfgs_b'),
+        dimensions=space,
+    )
+
+    m = manager(n = 4,
+                skobj = o,
+                iterations = run_for,
+                func = use_func,
+                wait= 0
+    )
+    start = time.time()
+    m.run()
+    print("Best parameters:\nLoss Weights:\n_ Weight Gen loss ={}\n_ Weight Aux loss ={}\n_ Weight Ecal loss ={}".format(res_gp.x[0], res_gp.x[1], res_gp.x[2]))
+    print("Time taken {} seconds".format(time.time()- start))
+    plot_convergence(res_gp).savefig("result_hyp.pdf")
+
+#Function to return a single value for a network performnace metric. The metric needs to be minimized.
+def evaluate(params):
+   gen_weights = "gen_weights.hdf5"
+   disc_weights = "disc_weights.hdf5"
+   datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
+   num_events = 200000
+   Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_events, datasetnames=["ECAL"], Particles =["Ele"])
+   latent =200
+   print( Trainfiles)   
+   # Just done to print the parameter setting to screen
+   gen_weight, aux_weight, ecal_weight= params
+   params1= [gen_weight, aux_weight, ecal_weight]
+   print("Generation loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}".format(*params))
+   d = discriminator()
+   g = generator()
+   loss = vegantrain(d, g, Trainfiles, gen_weight = gen_weight, aux_weight = aux_weight, ecal_weight = aux_weight)
+   score = analyse(g, gen_weights, Testfiles)
+   return score
+
+#Function to return a single value for a network performnace metric. The metric needs to be minimized.                                                                                                             
+def evaluate_threaded(params):
+   id_res = hash(str(params))
+   gweights = 'g{}_weights.hdf5'.format(id_res)
+   dweights = 'd{}_weights.hdf5'.format(id_res)
+   scanfile = 'HyperScan.txt'
+   #datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
+   datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5'
+   num_events = 200000
+   Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_events, datasetnames=["ECAL"], Particles =["Ele"])
+   latent =200
+   sorted_saved = True
+   #print(Trainfiles)
+   #print(Testfiles)
+   # Just done to print the parameter setting to screen                                                                                                                                                            
+   gen_weight, aux_weight, ecal_weight= params
+   params1= [gen_weight, aux_weight, ecal_weight]# If the params have to be modified before training useful for learning rate etc.
+   #print("Generation loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}".format(*params))
+   d = discriminator()
+   g = generator()
+   loss = vegantrain(d, g, Trainfiles, epochs=15, gen_weight = gen_weight, aux_weight = aux_weight, ecal_weight = aux_weight, g_weights=gweights, d_weights=dweights)
+   if sorted_saved == False:
+      score = analyse(g, gweights, datapath, metric4, read_data= False, save_data= True)
+      sorted_saved = True
+   else:
+      score = analyse(g, gweights, datapath, metric4, read_data= True, save_data= False)
+   results = params + loss + score
+   with open(scanfile,'a') as sfile:
+      for value in params:
+         sfile.write(str(value) + '\t')
+      sfile.write(str(loss) + '\t')
+      for value in score:
+         sfile.write(str(value) + '\t')
+      sfile.write('\n')
+   open('%s.json'%id_res,'w').write(json.dumps({'result': score[0]}))
+   return score[0]
+
 
 # Fuction used to flip random bits for training
 def bit_flip(x, prob=0.05):
@@ -131,37 +269,249 @@ def generator(latent_size=200, gflag=0, gf=8, gx=5, gy=5, gz=5):
     Model(input=[latent], output=fake_image)
     return Model(input=[latent], output=fake_image)
 
+def GetFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 10000, Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+    #print ("Searching in :",FileSearch)
+    Files =sorted( glob.glob(FileSearch))
+    #print ("Found {} files. ".format(len(Files)))
+    Filesused = int(math.ceil(nEvents/EventsperFile))
+    FileCount=0
+    Samples={}
+    for F in Files:
+        FileCount+=1
+        basename=os.path.basename(F)
+        ParticleName=basename.split("_")[0].replace("Escan","")
+        if ParticleName in Particles:
+            try:
+                Samples[ParticleName].append(F)
+            except:
+                Samples[ParticleName]=[(F)]
+        if MaxFiles>0:
+            if FileCount>MaxFiles:
+                break
+    out=[]
+    for j in range(len(Fractions)):
+        out.append([])
+    SampleI=len(Samples.keys())*[int(0)]
+    for i,SampleName in enumerate(Samples):
+        Sample=Samples[SampleName][:Filesused]
+        NFiles=len(Sample)
+        for j,Frac in enumerate(Fractions):
+            EndI=int(SampleI[i]+ round(NFiles*Frac))
+            out[j]+=Sample[SampleI[i]:EndI]
+            SampleI[i]=EndI
+    return out
+
 def get_data(datafile):
-    #get data for training                                                                                                                                                                        
-    print('Loading Data.....')
-    start_load = time.time()
+    #get data for training                                                                                                                                                                      
+    #print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     y=f.get('target')
     X=np.array(f.get('ECAL'))
     y=(np.array(y[:,1]))
     X[X < 1e-6] = 0
     X = np.expand_dims(X, axis=-1)
-    #y=np.expand_dims(y[:,1], axis=-1)
-    #y = y/100
     X = X.astype(np.float32)
     y = y.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
-    X_train, X_test, y_train, y_test, ecal_train, ecal_test = train_test_split(X, y, ecal, train_size=0.9)
-    load_time = time.time()- start_load
-    print('Data is loaded in {:2} seconds.'.format(load_time))
-    return X_train, X_test, y_train, y_test, ecal_train, ecal_test
-  
+    return X, y, ecal
+
+def sort(data, energies, num_events):
+    X = data[0]
+    Y = data[1]
+    tolerance = 5
+    srt = {}
+    for energy in energies:
+       indexes = np.where((Y > energy - tolerance ) & ( Y < energy + tolerance))
+       if len(indexes) > num_events:
+          indexes = indexes[:num_events]
+       srt["events_act" + str(energy)] = X[indexes]
+       srt["energy" + str(energy)] = Y[indexes]
+    return srt
+
+def save_sorted(srt, energies, sorted_file):
+    for energy in energies:
+       filename = sorted_file + "_{:03d}.hdf5".format(energy)
+       with h5py.File(filename ,'w') as outfile:
+          outfile.create_dataset('ECAL',data=srt["events_act" + str(energy)])
+          outfile.create_dataset('Target',data=srt["energy" + str(energy)])
+       #print ("Sorted data saved to ", filename)
+
+def load_sorted(sorted_path):
+    sorted_files = sorted(glob.glob(sorted_path))
+    energies = []
+    srt = {}
+    for f in sorted_files:
+       energy = int(filter(str.isdigit, f)[:-1])
+       energies.append(energy)
+       srtfile = h5py.File(f,'r')
+       srt["events_act" + str(energy)] = np.array(srtfile.get('ECAL'))
+       srt["energy" + str(energy)] = np.array(srtfile.get('Target'))
+       #print ("Loaded from file", f)
+    return energies, srt
+
+def get_gen(energy):
+    filename = "Gen_{:03d}.hdf5".format(energy)
+    f=h5py.File(filename,'r')
+    generated_images = np.array(f.get('ECAL'))
+    #print ("Generated file ", filename, " is loaded")
+    return generated_images
+
+def generate(g, index, latent, sampled_labels):
+    noise = np.random.normal(0, 1, (index, latent))
+    sampled_labels=np.expand_dims(sampled_labels, axis=1)
+    gen_in = sampled_labels * noise
+    generated_images = g.predict(gen_in, verbose=False, batch_size=50)
+    return generated_images
+
+def get_sums(images):
+    sumsx = np.squeeze(np.sum(images, axis=(2,3)))
+    sumsy = np.squeeze(np.sum(images, axis=(1,3)))
+    sumsz = np.squeeze(np.sum(images, axis=(1,2)))
+    return sumsx, sumsy, sumsz
+
+def get_moments(images, sumsx, sumsy, sumsz, totalE, m):
+    ecal_size = 25
+    totalE = np.squeeze(totalE)
+    index = images.shape[0]
+    momentX = np.zeros((index, m))
+    momentY = np.zeros((index, m))
+    momentZ = np.zeros((index, m))
+    ECAL_midX = np.zeros(index)
+    ECAL_midY = np.zeros(index)
+    ECAL_midZ = np.zeros(index)
+    for i in range(m):
+      relativeIndices = np.tile(np.arange(ecal_size), (index,1))
+      moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
+      ECAL_momentX = umath.inner1d(sumsx, moments) /totalE
+      if i==0: ECAL_midX = ECAL_momentX.transpose()
+      momentX[:,i] = ECAL_momentX
+    for i in range(m):
+      relativeIndices = np.tile(np.arange(ecal_size), (index,1))
+      moments = np.power((relativeIndices.transpose()-ECAL_midY).transpose(), i+1)
+      ECAL_momentY = umath.inner1d(sumsy, moments) /totalE
+      if i==0: ECAL_midY = ECAL_momentY.transpose()
+      momentY[:,i]= ECAL_momentY
+    for i in range(m):
+      relativeIndices = np.tile(np.arange(ecal_size), (index,1))
+      moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
+      ECAL_momentZ = umath.inner1d(sumsz, moments)/totalE
+      if i==0: ECAL_midZ = ECAL_momentZ.transpose()
+      momentZ[:,i]= ECAL_momentZ
+    return momentX, momentY, momentZ
+
+# This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
+def analyse(g, gen_weights, datapath, optimizer, read_data=True, save_data=False):
+   print ("Started")
+   num_events=2000
+   num_data = 100000
+   sortedfile = 'sorted_'
+   sortedpath = sortedfile + '*.hdf5'
+   Test = False
+   latent= 200
+   m = 2
+   var = {}
+   g =generator(latent)
+   if read_data:
+     start = time.time()
+     energies, var = load_sorted(sortedpath)
+     sort_time = time.time()- start
+     #print ("Events were loaded in {} seconds".format(sort_time))
+   else:
+     # Getting Data
+     events_per_file = 10000
+     energies = [50, 100, 200, 250, 300, 400, 500]
+     Trainfiles, Testfiles = GetFiles(datapath, nEvents=num_data, EventsperFile = events_per_file, datasetnames=["ECAL"], Particles =["Ele"])
+     if Test:
+        data_files = Testfiles
+     else:
+        data_files = Trainfiles + Testfiles
+     start = time.time()
+     for index, dfile in enumerate(data_files):
+        data = get_data(dfile)
+        sorted_data = sort(data, energies, num_events)
+        data = None
+        if index==0:
+          var.update(sorted_data)
+        else:
+          for key in var:
+            var[key]= np.append(var[key], sorted_data[key], axis=0)
+     data_time = time.time() - start
+     #print ("{} events were loaded in {} seconds".format(num_data, data_time))
+     if save_data:
+        save_sorted(var, energies, sortedfile)
+   total = 0
+   for energy in energies:
+     var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
+     total += var["index" + str(energy)]
+     data_time = time.time() - start
+   #print ("{} events were put in {} bins".format(total, len(energies)))
+   g.load_weights(gen_weights)
+
+   start = time.time()
+   for energy in energies:
+     var["events_gan" + str(energy)] = generate(g, var["index" + str(energy)], latent, var["energy" + str(energy)]/100)
+   gen_time = time.time() - start
+   #print ("{} events were generated in {} seconds".format(total, gen_time))
+
+   for energy in energies:
+     var["ecal_act"+ str(energy)] = np.sum(var["events_act" + str(energy)], axis = (1, 2, 3))
+     var["ecal_gan"+ str(energy)] = np.sum(var["events_gan" + str(energy)], axis = (1, 2, 3))
+     var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
+     var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)] = get_sums(var["events_gan" + str(energy)])
+     var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["events_act" + str(energy)], var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m)
+     var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["events_gan" + str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m)
+   return optimizer(var, energies, m)
+
+def metric4(var, energies, m):
+
+   ecal_size = 25
+   metricp = 0
+   metrice = 0
+   for energy in energies:
+     #Relative error on mean moment value for each moment and each axis
+     x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
+     x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
+     y_act= np.mean(var["momentY_act"+ str(energy)], axis=0)
+     y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
+     z_act= np.mean(var["momentZ_act"+ str(energy)], axis=0)
+     z_gan= np.mean(var["momentZ_gan"+ str(energy)], axis=0)
+     var["posx_error"+ str(energy)]= (x_act - x_gan)/x_act
+     var["posy_error"+ str(energy)]= (y_act - y_gan)/y_act
+     var["posz_error"+ str(energy)]= (z_act - z_gan)/z_act
+     #Taking absolute of errors and adding for each axis then scaling by 3
+     var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
+     #Summing over moments and dividing for number of moments
+     var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
+     metricp += var["pos_total"+ str(energy)]
+     #Take profile along each axis and find mean along events
+     sumxact, sumyact, sumzact = np.mean(var["sumsx_act" + str(energy)], axis=0), np.mean(var["sumsy_act" + str(energy)], axis=0), np.mean(var["sumsz_act" + str(energy)], axis=0)
+     sumxgan, sumygan, sumzgan = np.mean(var["sumsx_gan" + str(energy)], axis=0), np.mean(var["sumsy_gan" + str(energy)], axis=0), np.mean(var["sumsz_gan" + str(energy)], axis=0)
+     var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
+     var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
+     var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
+     #Take absolute of error and mean for all events
+     var["eprofilex_total"+ str(energy)]= np.sum(np.absolute(var["eprofilex_error"+ str(energy)]))/ecal_size
+     var["eprofiley_total"+ str(energy)]= np.sum(np.absolute(var["eprofiley_error"+ str(energy)]))/ecal_size
+     var["eprofilez_total"+ str(energy)]= np.sum(np.absolute(var["eprofilez_error"+ str(energy)]))/ecal_size
+
+     var["eprofile_total"+ str(energy)]= (var["eprofilex_total"+ str(energy)] + var["eprofiley_total"+ str(energy)] + var["eprofilez_total"+ str(energy)])/3
+     metrice += var["eprofile_total"+ str(energy)]
+   metricp = metricp/len(energies)
+   metrice = metrice/len(energies)
+   tot = metricp + metrice
+   #print('Energy\t\tEvents\t\tPosition Error\tEnergy Error')
+   #for energy in energies:
+    # print ("%d \t\t%d \t\t%f \t\t%f" %(energy, var["index" +str(energy)], var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
+   print(" Total Position Error = %.4f\t Total Energy Profile Error =   %.4f" %(metricp, metrice))
+   print(" Total Error =  %.4f" %(tot))
+   return(tot, metricp, metrice)
+
 ## Training Function
-def vegantrain(d, g, X_train, y_train, ecal_train, epochs=10, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0):
+def vegantrain(d, g, Trainfiles, epochs=5, batch_size=128, latent_size=200, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='gweights.h5', d_weights='dweights.h5'):
 #dflag=0, df= 16, dx=8, dy=8, dz= 8, dp=0.2, gflag=0, gf= 16, gx=8, gy=8, gz= 8):
     init_start = time.time()
-    g_weights = 'params_generator_epoch_'
-    d_weights = 'params_discriminator_epoch_'
-
-    #d= discriminator(dflag=dflag, df= df, dx=dx, dy=dy, dz= dz, dp=dp)
-    #g= generator(latent_size=latent_size, gflag=gflag, gf=gf, gx=gx, gy=gy, gz=gz)
-
-    print('[INFO] Building discriminator')
+    verbose = 'false'
+    #print('[INFO] Building discriminator')
     d.compile(
         optimizer=RMSprop(lr=lr, rho=rho, decay=decay),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
@@ -169,11 +519,10 @@ def vegantrain(d, g, X_train, y_train, ecal_train, epochs=10, batch_size=128, la
     )
 
     # build the generator                                                       
-    print('[INFO] Building generator')
+    #print('[INFO] Building generator')
     g.compile(
         optimizer=RMSprop(lr=lr, rho=rho, decay=decay),
         loss='binary_crossentropy')
-    y_train= y_train/100
     latent = Input(shape=(latent_size, ), name='combined_z')
     fake_image = g(latent)
     d.trainable = False
@@ -187,44 +536,63 @@ def vegantrain(d, g, X_train, y_train, ecal_train, epochs=10, batch_size=128, la
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ecal_weight])
     
-    nb_train= X_train.shape[0]
+    nb_train = 10000 * len(Trainfiles)# Total events in training files                         
+    total_batches = nb_train / batch_size
     train_history = defaultdict(list)
-    init_time = time.time() - init_start
-    print('Initialization time = {}'.format(init_time))
     for epoch in range(epochs):
-
-        print('Epoch {} of {}'.format(epoch + 1, epochs))
+        start = time.time()
+        #print('Epoch {} of {}'.format(epoch + 1, epochs))
         epoch_start = time.time()
-        nb_batches = int(X_train.shape[0] / batch_size)
-        
         epoch_gen_loss = []
         epoch_disc_loss = []
+        X_train, Y_train, ecal_train = get_data(Trainfiles[0])
+       
+        nb_file=1
+        nb_batches = int(X_train.shape[0] / batch_size)
+        if verbose:
+            progress_bar = Progbar(target=total_batches)
+        file_index = 0
+        for index in range(total_batches):
+            if verbose:
+                progress_bar.update(index)
+            #if index % 100 == 0:
+               #print('processed {}/{} batches'.format(index + 1, nb_batches))
 
-        for index in range(nb_batches):
-            if index % 100 == 0:
-                    print('processed {}/{} batches'.format(index + 1, nb_batches))
-
+            loaded_data = X_train.shape[0]
+            used_data = file_index * batch_size
+            if (loaded_data - used_data) < batch_size + 1 and (nb_file < len(Trainfiles)):
+                X_temp, Y_temp, ecal_temp= get_data(Trainfiles[nb_file])
+                nb_file+=1
+                X_left = X_train[(file_index * batch_size):]
+                Y_left = Y_train[(file_index * batch_size):]
+                ecal_left = ecal_train[(file_index * batch_size):]
+#                print(Y_left.shape)
+                X_train = np.concatenate((X_left, X_temp))
+                Y_train = np.concatenate((Y_left, Y_temp))
+                ecal_train = np.concatenate((ecal_left, ecal_temp))
+                nb_batches = int(X_train.shape[0] / batch_size)
+#                print("{} batches loaded..........".format(nb_batches))
+                file_index = 0
             noise = np.random.normal(0, 1, (batch_size, latent_size))
+            image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
+            energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
+            ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
+            file_index +=1
+#            print(image_batch.shape)
+#            print(ecal_batch.shape)
 
-            image_batch = X_train[index * batch_size:(index + 1) * batch_size]
-            energy_batch = y_train[index * batch_size:(index + 1) * batch_size]
-            ecal_batch = ecal_train[index * batch_size:(index + 1) * batch_size]
-            sampled_energies = np.random.uniform(0, 5,( batch_size,1 ))
+            sampled_energies = np.random.uniform(0.1, 5,( batch_size,1 ))
             generator_ip = np.multiply(sampled_energies, noise)
             ecal_ip = np.multiply(2, sampled_energies)
             generated_images = g.predict(generator_ip, verbose=0)
             real_batch_loss = d.train_on_batch(image_batch, [bit_flip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = d.train_on_batch(generated_images, [bit_flip(np.zeros(batch_size)), sampled_energies, ecal_ip])
-
             epoch_disc_loss.append([(a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)])
-
             trick = np.ones(batch_size)
-
             gen_losses = []
-
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size))
-                sampled_energies = np.random.uniform(0, 5, ( batch_size,1 ))
+                sampled_energies = np.random.uniform(0.1, 5, ( batch_size,1 ))
                 generator_ip = np.multiply(sampled_energies, noise)
                 ecal_ip = np.multiply(2, sampled_energies)
                 gen_losses.append(combined.train_on_batch(
@@ -235,290 +603,17 @@ def vegantrain(d, g, X_train, y_train, ecal_train, epochs=10, batch_size=128, la
                 (a + b) / 2 for a, b in zip(*gen_losses)
             ])
 
-        epoch_time = time.time() - epoch_start
-        print('Training for one epoch took {} seconds'.format(epoch_time))
-
-        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
-        
+        epoch_time = time.time() - start
+        #print('Training for {} epoch took {} seconds'.format(epoch, epoch_time))
+        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)      
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
-
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
 
-        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
-            'component', *d.metrics_names))
-        print('-' * 65)
-
-        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
-        print(ROW_FMT.format('generator (train)', *train_history['generator'][-1]))
-       # print(ROW_FMT.format('generator (test)', *test_history['generator'][-1]))
-        print(ROW_FMT.format('discriminator (train)', *train_history['discriminator'][-1]))
-       # print(ROW_FMT.format('discriminator (test)',  *test_history['discriminator'][-1]))
-        
-        pickle.dump({'train': train_history},open('dcgan-history.pkl', 'wb'))
-
-    #save weights at last epoch                                                                                          
-    g.save_weights('gen_weights.hdf5'.format(g_weights, epoch), overwrite=True)
-    d.save_weights('disc_weights.hdf5'.format(d_weights, epoch), overwrite=True)
-
-# This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(d, g, X, Y, gen_weights, disc_weights, latent=200):
-   print ("Started")
-   num_events=1000
-   energies=[50, 100, 150, 200, 300, 400, 500] 
-   tolerance = 5
-   m = 2
-   g.load_weights(gen_weights)
-   d.load_weights(disc_weights)
-   #X = np.concatenate(X_train, X_test)
-   Y = np.reshape(Y, (-1, 1))
-   #ecal = np.concatenate(ecal_train, ecal_test)
-   # Initialization of parameters  
-   var = {}
-   for energy in energies:
-     var["index" + str(energy)] = 0
-     var["events_act" + str(energy)] = np.zeros((num_events, 25, 25, 25))
-     var["max_pos_act_" + str(energy)] = np.zeros((num_events, 3))
-     var["sumact" + str(energy)] = np.zeros((num_events, 3, 25))
-     var["energy_sampled" + str(energy)] = np.zeros((num_events, 1))
-     var["max_pos_gan_" + str(energy)] = np.zeros((num_events, 3))
-     var["sumgan" + str(energy)] = np.zeros((num_events, 3, 25))
-     var["x_act" + str(energy)] = np.zeros((num_events, m))
-     var["y_act" + str(energy)] =np.zeros((num_events, m))
-     var["z_act" + str(energy)] =np.zeros((num_events, m))
-     var["x_gan" + str(energy)] =np.zeros((num_events, m))
-     var["y_gan" + str(energy)] =np.zeros((num_events, m))
-     var["z_gan" + str(energy)] =np.zeros((num_events, m))
-          
-   ## Sorting data in bins                                                         
-   size_data = int(X.shape[0])
-   print ("Sorting data")
-   print (X.shape)
-   print (Y.shape)
-   print (Y[:10])
-   for i in range(size_data):
-     for energy in energies:
-        if Y[i][0] > energy-tolerance and Y[i][0] < energy+tolerance and var["index" + str(energy)] < num_events:
-            var["events_act" + str(energy)][var["index" + str(energy)]]= np.squeeze(X[i])
-            var["energy_sampled" + str(energy)][var["index" + str(energy)]] = Y[i]/100
-            var["index" + str(energy)]= var["index" + str(energy)] + 1
-            
-        #print('The energy {} has {} events'.format(energy, var["index" + str(energy)]))
-   # Generate images
-   for energy in energies:        
-        noise = np.random.normal(0, 1, (var["index" + str(energy)], latent))
-        print(energy, var["index" + str(energy)], noise.shape)
-        sampled_labels = var["energy_sampled" + str(energy)]
-        generator_in = np.multiply(sampled_labels, noise)
-        generated_images = g.predict(generator_in, verbose=False, batch_size=100)
-        var["events_gan" + str(energy)]= np.squeeze(generated_images)
-        var["isreal_gan" + str(energy)], var["energy_gan" + str(energy)], var["ecal_gan"] = np.array(d.predict(generated_images, verbose=False, batch_size=100))
-        var["isreal_act" + str(energy)], var["energy_act" + str(energy)], var["ecal_act"] = np.array(d.predict(np.expand_dims(var["events_act" + str(energy)], -1), verbose=False, batch_size=100))
-        #print(var["events_gan" + str(energy)].shape)
-        #print(var["events_act" + str(energy)].shape)
-# calculations                                                                                        
-   for energy in energies:
-     for j in range(var["index" + str(energy)]):
-        var["max_pos_act_" + str(energy)][j] = np.unravel_index(var["events_act" + str(energy)][j].argmax(), (25, 25, 25))
-        var["sumact" + str(energy)][j, 0] = np.sum(var["events_act" + str(energy)][j], axis=(1,2))
-        var["sumact" + str(energy)][j, 1] = np.sum(var["events_act" + str(energy)][j], axis=(0,2))
-        var["sumact" + str(energy)][j, 2] = np.sum(var["events_act" + str(energy)][j], axis=(0,1))
-        var["max_pos_gan_" + str(energy)][j] = np.unravel_index(var["events_gan" + str(energy)][j].argmax(), (25, 25, 25))
-        var["sumgan" + str(energy)][j, 0] = np.sum(var["events_gan" + str(energy)][j], axis=(1,2))
-        var["sumgan" + str(energy)][j, 1] = np.sum(var["events_gan" + str(energy)][j], axis=(0,2))
-        var["sumgan" + str(energy)][j, 2] = np.sum(var["events_gan" + str(energy)][j], axis=(0,1))
-     var["totalE_act" + str(energy)] = np.sum(var["events_act" + str(energy)][:var["index" + str(energy)]], axis=(1, 2, 3))
-     var["totalE_gan" + str(energy)] = np.sum(var["events_gan" + str(energy)][:var["index" + str(energy)]], axis=(1, 2, 3))
-     # Moments Computations                                                                                          
-     ecal_size = 25
-     ECAL_midX = np.zeros(var["index" + str(energy)])
-     ECAL_midY = np.zeros(var["index" + str(energy)])
-     ECAL_midZ = np.zeros(var["index" + str(energy)])
-     for i in range(m):
-        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-        moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
-        sumx = var["sumact" + str(energy)][0:(var["index" + str(energy)]), 0]
-        ECAL_momentX = umath.inner1d(sumx, moments)/var["totalE_act" + str(energy)]
-        if i==0: ECAL_midX = ECAL_momentX.transpose()
-        var["x_act"+ str(energy)][:var["index" + str(energy)],i]= ECAL_momentX
-     for i in range(m):
-        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-        moments = np.power((relativeIndices.transpose()-ECAL_midY).transpose(), i+1)
-        ECAL_momentY = umath.inner1d(var["sumact" + str(energy)][:var["index" + str(energy)], 1], moments)/var["totalE_act" + str(energy)]
-        if i==0: ECAL_midY = ECAL_momentY.transpose()
-        var["y_act"+ str(energy)][:var["index" + str(energy)],i]= ECAL_momentY
-     for i in range(m):
-        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-        moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
-        ECAL_momentZ = umath.inner1d(var["sumact" + str(energy)][:var["index" + str(energy)], 2], moments)/var["totalE_act" + str(energy)]
-        if i==0: ECAL_midZ = ECAL_momentZ.transpose()
-        var["z_act"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentZ
-
-     ECAL_midX = np.zeros(var["index" + str(energy)])
-     ECAL_midY = np.zeros(var["index" + str(energy)])
-     ECAL_midZ = np.zeros(var["index" + str(energy)])
-     for i in range(m):
-        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-        moments = np.power((relativeIndices.transpose()-ECAL_midX).transpose(), i+1)
-        ECAL_momentX = umath.inner1d(var["sumgan" + str(energy)][:var["index" + str(energy)], 0], moments)/var["totalE_gan" + str(energy)]
-        if i==0: ECAL_midX = ECAL_momentX.transpose()
-        var["x_gan"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentX
-     for i in range(m):
-        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-        moments = np.power((relativeIndices.transpose()-ECAL_midY).transpose(), i+1)
-        ECAL_momentY = umath.inner1d(var["sumgan" + str(energy)][:var["index" + str(energy)], 1], moments)/var["totalE_gan" + str(energy)]
-        if i==0: ECAL_midY = ECAL_momentY.transpose()
-        var["y_gan"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentY
-     for i in range(m):
-        relativeIndices = np.tile(np.arange(ecal_size), (var["index" + str(energy)],1))
-        moments = np.power((relativeIndices.transpose()-ECAL_midZ).transpose(), i+1)
-        ECAL_momentZ = umath.inner1d(var["sumgan" + str(energy)][:var["index" + str(energy)], 2], moments)/var["totalE_gan" + str(energy)]
-        if i==0: ECAL_midZ = ECAL_momentZ.transpose()
-        var["z_gan"+ str(energy)][:var["index" + str(energy)], i]= ECAL_momentZ
-   metricp = 0
-   metrice = 0
-   for energy in energies:
-       var["posx_error"+ str(energy)]= (var["x_act"+ str(energy)]-var["x_gan"+ str(energy)])/25
-       var["posy_error"+ str(energy)]= (var["y_act"+ str(energy)]-var["y_gan"+ str(energy)])/25
-       var["posz_error"+ str(energy)]= (var["z_act"+ str(energy)]-var["z_gan"+ str(energy)])/25
-       var["pos_error"+ str(energy)]= ((var["posx_error"+ str(energy)])**2 + (var["posy_error"+ str(energy)])**2 + (var["posz_error"+ str(energy)])**2)
-       var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/var["index" + str(energy)]
-       metricp += var["pos_total"+ str(energy)]
-       Ecal = np.tile(var["totalE_act" + str(energy)], (25,3, 1))
-       Ecal = Ecal.transpose()
-       var["eprofile_error"+ str(energy)]= np.divide((var["sumact" + str(energy)] - var["sumgan" + str(energy)]), Ecal)
-       var["eprofile_total"+ str(energy)]= np.sum(var["eprofile_error"+ str(energy)]**2)
-       var["eprofile_total"+ str(energy)]= var["eprofile_total"+ str(energy)]/var["index" + str(energy)]
-       metrice += var["eprofile_total"+ str(energy)]
-   tot = metricp + metrice
-
-   for energy in energies:
-       print ("%d \t\t%d \t\t%f \t\t%s \t\t%f \t\t%f \t\t%f \t\t%f" %(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]), str(np.unravel_index(var["events_gan" + str(energy)].argmax(), (var["index" + str(energy)], 25, 25, 25))), np.mean(var["events_gan" + str(energy)]), np.amin(var["events_gan" + str(energy)]), var["pos_total"+ str(energy)], var["eprofile_total"+ str(energy)]))
-   print(" Position Error = %.4f\t Energy Profile Error =   %.4f" %(metricp, metrice))
-   print(" Total Error =  %.4f" %(tot))
-   return(tot, metricp, metrice)
-
-#Function to return a single value for a network performnace metric. The metric needs to be minimized.
-def objective(params):
-   gen_weights = "gen_weights.hdf5"
-   disc_weights = "disc_weights.hdf5"
-   datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-   
-   X_train, X_test, y_train, y_test, ecal_train, ecal_test= get_data(datafile)
-   
-   # Just done to print the parameter setting to screen
-   epochs, batch_size, latent, gen_weight, aux_weight, ecal_weight, lr, rho, decay, dflag, df, dx, dy, dz, dp, gflag, gf, gx, gy, gz= params
-   params1= [epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, lr, rho * 0.1, decay, dflag, df, dx, dy, dz, dp, gflag, gf, gx, gy, gz]
-   print("epochs= {}   batchsize={}   Latent space={}\nGeneration loss weight={}   Auxilliary loss weight={}   ECAL loss weight={}\nLearning rate={}   rho={}   decay={}\nDiscriminator: extra layer={}  filters={}  x={}  y={}  z={} dp={}\nGenerator: extra layer={}  filters={}  x={}  y={}  z{}\n".format(*params1))
-   d = discriminator(dflag, df, dx, dy, dz, dp)
-   g = generator(pow(2,latent), gflag, gf, gx, gy, gz)
-   vegantrain(d, g, X_train, y_train, ecal_train, 1*epochs, pow(2,batch_size), pow(2,latent), gen_weight, aux_weight, ecal_weight, lr, rho * 0.1, decay)
-   score = analyse(X_train, y_train, gen_weights, disc_weights, datafile, pow(2,latent), discriminator, generator)
-   return score
-
-def hpscan():
-    space = [Integer(1, 25), #name ='epochs'),  
-         Integer(5, 8), #name ='batch_size'),
-         Integer(8, 10), #name='latent size'),
-         Real(1, 10), #name='gen_weight'),
-         Real(0.01, 0.1), #name='aux_weight'),
-         Real(0.01, 0.1), #name='ecal_weight'),
-         Real(10**-5, 10**0, "log-uniform"), #name ='lr'),
-         Real(8, 9), #name='rho'),
-         Real(0, 0.0001), #name='decay'), 
-         Categorical([True,False]), #name='dflag'),
-         Integer(4, 64), #name='df'),
-         Integer(2, 16), #name='dx'),
-         Integer(2, 16), #name='dy'),
-         Integer(2, 16), #name='dz'),
-         Real(0.01, 0.5), #name='dp'),
-         Categorical([True,False]), #name='gflag'),
-         Integer(4, 64), #name='gf'),
-         Integer(2, 16), #name='gx'),
-         Integer(2, 16), #name='gy'),
-         Integer(2, 16)] #name='gz')]
-    res_gp = gp_minimize(objective, space, n_calls=100, random_state=0)
-    "Best score=%.4f" % res_gp.fun
-    print("""Best parameters:
-    Algorithm:
-    _ Epochs     ={}
-    _ Batch size ={}
-    _ Latent Space ={}
-    Loss Weights:
-    _ Weight Gen loss ={}
-    _ Weight Aux loss ={}
-    _ Weight Ecal loss ={}
-    Optimizer:
-    _ Learning rate ={}
-    _ rho = {}
-    _ Decay = {}
-    Discriminator:
-    _ Disc. Extra Layer ={}
-    _ Disc. filter for extra layer ={}
-    _ Disc. x for extra layer ={}
-    _ Disc. y for extra layer ={}     
-    _ Disc. z for extra layer ={} 
-    _ Disc. Drop out ={}
-    Generator:                                                                     
-    _ Gen. Extra Layer ={}      
-    _ Gen. filter for extra layer ={}                                                  
-    _ Gen. x for extra layer ={}                                                       
-    _ Gen. y for extra layer ={}                                                       
-    _ gen. z for extra layer ={}""".format(res_gp.x[0], res_gp.x[1], res_gp.x[2],
-                                           res_gp.x[3], res_gp.x[4], res_gp.x[5],
-                                           res_gp.x[6], res_gp.x[7], res_gp.x[8],
-                                           res_gp.x[9], res_gp.x[10], res_gp.x[11],
-                                           res_gp.x[12], res_gp.x[13], res_gp.x[14],
-                                           res_gp.x[15], res_gp.x[16], res_gp.x[17],
-                                           res_gp.x[18], res_gp.x[19]))
-
-def analysisTest(X, y, weightpath, resultfile):
-    from arch16 import generator, discriminator
-    genpath = weightpath +  "/params_generator*.hdf5"
-    discpath = weightpath + "/params_discriminator*.hdf5"
-    
-    gen_weights=[]
-    disc_weights=[]
-    for f in sorted(glob.glob(genpath)):
-      gen_weights.append(f)
-    for f in sorted(glob.glob(discpath)):
-      disc_weights.append(f)
-    print(len(gen_weights))
-    print(len(disc_weights))
-    print(X.shape)
-    print(y.shape)
-    results = []
-    d = discriminator()
-    g = generator(200)
-#    for i in range(len(gen_weights)):
-    for i in range(2):                                                                                            
-       results.append(analyse(d, g, X, y, gen_weights[i], disc_weights[i]))
-
-#    for i in range(len(gen_weights)):
-    for i in range(2):                                                                                            
-       print ('The results for......',gen_weights[i])
-       print (" The result for {} = {:.2f} , {:.2f}, {:.2f}".format(i, results[i][0], results[i][1], results[i][2]\
-))
-    total=[]
-    pos_e=[]
-    energy_e=[]
-    for item in results:
-        total.append(item[0])
-        pos_e.append(item[1])
-        energy_e.append(item[2])
-    plt.figure()
-    plt.plot(total, label = 'Total')
-    plt.plot(pos_e, label = 'Max pos error')
-    plt.plot(energy_e , label = 'Energy profile error')
-    plt.legend()
-    plt.xticks(np.arange(0, 30, 1.0))
-    plt.savefig(resultfile)
+    #save weights at last epoch                                                                                   
+    g.save_weights(g_weights, overwrite=True)
+    d.save_weights(d_weights, overwrite=True)
+    return epoch_gen_loss[nb_batches -1][1]
 
 if __name__ == "__main__":
-    #hpscan()
-    datafile = "/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5"
-    weightpath = "/afs/cern.ch/work/g/gkhattak/weights/arch16weights"
-    resultfile = 'result_train.pdf'          
-    #X_train, X_test, y_train, y_test, ecal_train, ecal_test= get_data(datafile)
-    #analysisTest(X_train, y_train, weightpath, resultfile)
     hpscan()

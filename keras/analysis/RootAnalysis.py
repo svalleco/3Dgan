@@ -1,6 +1,3 @@
-from os import path
-import ROOT
-from ROOT import kFALSE, TLegend, TCanvas, gPad, TGraph, gStyle, TProfile
 import os
 import sys
 import h5py
@@ -8,54 +5,104 @@ import numpy as np
 import math
 import time
 import glob
-import numpy.core.umath_tests as umath
 from utils.GANutils import perform_calculations_multi, safe_mkdir #Common functions from GANutils.py
-import utils.ROOTutils as my
+import keras
+import argparse
 import utils.RootPlotsGAN as pl
-import matplotlib
-import matplotlib.pyplot as plt
-plt.switch_backend('Agg')
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan/keras')
+
+if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
+    tlab = True
+else:
+    tlab= False
+
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
 
 def main():
-   #Architectures 
-   from EcalEnergyGan import generator, discriminator
-   disc_weights="../weights/3Dweights/params_discriminator_epoch_041.hdf5"
-   gen_weights= "../weights/3Dweights/params_generator_epoch_041.hdf5"
 
-   plots_dir = "results/test_plots/"
-   latent = 200
-   num_data = 100000
-   num_events = 2000
-   m = 3
-   cell=1 # if producing the cell energy histogram
-   energies=[0, 50, 100, 200, 250, 300, 400, 500]
-   particle='Ele'
-   datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path caltech
-   #datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
-   sortdir = 'SortedData'
-   gendir = 'Gen'  
-   discdir = 'Disc' 
-   Test = True
-   stest = False 
-   save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
-   read_data = False # True if loading previously sorted data  
-   save_gen =  False # True if saving generated data. 
-   read_gen = False # True if generated data is already saved and can be loaded
-   save_disc = False # True if discriminiator data is to be saved
-   read_disc =  False # True if discriminated data is to be loaded from previously saved file
-   ifpdf = True # True if pdf are required. If false .C files will be generated
- 
-   flags =[Test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
-   # Lists for different versions comparison. The weights, scales and labels will need to be provided for each version
-   dweights = [disc_weights]
-   gweights = [gen_weights]
-   scales = [100]
-   labels = ['']
+   #Architectures 
+   if keras.__version__ == '1.2.2':
+      from EcalEnergyGan_k1 import generator, discriminator
+   else:
+      from EcalEnergyGan import generator, discriminator
+
+   import keras.backend as K
+   K.set_image_dim_ordering('tf')
+
+   parser = get_parser()
+   params = parser.parse_args()
+
+   datapath =params.datapath#Data path
+   latent = params.latentsize
+   particle= params.particle
+   plotsdir= params.plotsdir
+   sortdir= params.sortdir
+   gendir= params.gendir
+   discdir= params.discdir
+   nbEvents= params.nbEvents
+   binevents= params.binevents
+   moments= params.moments
+   cell= params.cell
+   corr= params.corr
+   test= params.test
+   stest= params.stest
+   save_data= params.save_data
+   read_data= params.read_data
+   save_gen= params.save_gen
+   read_gen= params.read_gen
+   save_disc= params.save_disc
+   read_disc= params.read_disc
+   ifpdf= params.ifpdf
+   gweights= [params.gweights]
+   dweights= [params.dweights]
+   xscales= params.xscales
+   yscale= params.yscale
+   energies= params.energies
+   thresh = params.thresh
+   labels=['']
+   
+   if tlab:
+      datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
+      gweights = ['/gkhattak/EnergyWeights/3dganWeights/params_generator_epoch_027.hdf5']
+      dweights = ['/gkhattak/EnergyWeights/3dganWeights/params_discriminator_epoch_027.hdf5']
+      
+   flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    d = discriminator()
    g = generator(latent)
-   var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data, num_events, m, scales, flags, latent, particle)
-   pl.get_plots_multi(var, labels, plots_dir, energies, m, len(gweights), ifpdf, stest, cell)
+   var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, nbEvents, binevents, moments, xscales, flags, latent, particle)
+   pl.get_plots_multi(var, labels, plotsdir, energies, moments, len(gweights), ifpdf, stest, cell)
+
+def get_parser():
+    # defaults apply at caltech
+    parser = argparse.ArgumentParser(description='3D GAN Params' )
+    parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
+    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
+    parser.add_argument('--plotsdir', action='store', type=str, default='results/Analysis_plots/', help='Directory to store the analysis plots.')
+    parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
+    parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
+    parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
+    parser.add_argument('--nbEvents', action='store', type=int, default=100000, help='Total Number of events used for Testing')
+    parser.add_argument('--binevents', action='store', type=int, default=2000, help='Number of events in each bin')
+    parser.add_argument('--moments', action='store', type=int, default=3, help='Number of moments')
+    parser.add_argument('--cell', action='store', type=int, default=0, help='Whether to plot cell energies..0)Not plotted...1)Only for bin with uniform spectrum.....2)For all energy bins')
+    parser.add_argument('--corr', action='store', default=False, help='Plot correlation plots')
+    parser.add_argument('--test', action='store', default=True, help='Use Test data')
+    parser.add_argument('--stest', action='store', default=False, help='Statistics test for shower profiles')
+    parser.add_argument('--save_data', action='store', default=False, help='Save sorted data')
+    parser.add_argument('--read_data', action='store', default=False, help='Get saved and sorted data')
+    parser.add_argument('--save_gen', action='store', default=False, help='Save generated images')
+    parser.add_argument('--read_gen', action='store', default=False, help='Get saved generated images')
+    parser.add_argument('--save_disc', action='store', default=False, help='Save discriminator output')
+    parser.add_argument('--read_disc', action='store', default=False, help='Get discriminator output')
+    parser.add_argument('--ifpdf', action='store', default=True, help='Whether generate pdf plots or .C plots') 
+    parser.add_argument('--gweights', action='store', type=str, default=['../weights/3dgan_weights/params_generator_epoch_049.hdf5'], help='list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, default=['../weights/3dgan_weights/params_discriminator_epoch_049.hdf5'], help='list for paths to Discriminator weights')
+    parser.add_argument('--xscales', action='store', type=int, default=[100], help='list for Multiplication factors for all models to be checked')
+    parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
+    parser.add_argument('--energies', action='store', type=int, default=[0, 50, 100, 200, 250, 300, 400, 500], help='Energy bins for analysis')
+    parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
+    return parser
+
 
 if __name__ == "__main__":
     main()
