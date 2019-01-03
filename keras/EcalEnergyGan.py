@@ -36,19 +36,19 @@ def discriminator(keras_dformat='channels_last'):
     x = ZeroPadding3D((2, 2,2))(x)
     x = Conv3D(8, (5, 5, 5), data_format=keras_dformat, padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
+    x = BatchNormalization()(x, training=True)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((2, 2, 2))(x)
     x = Conv3D(8, (5, 5,5), data_format=keras_dformat, padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
+    x = BatchNormalization()(x, training=True)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((1, 1, 1))(x)
     x = Conv3D(8, (5, 5, 5), data_format=keras_dformat, padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
+    x = BatchNormalization()(x, training=True)
     x = Dropout(0.2)(x)
 
     x = AveragePooling3D((2, 2, 2), data_format=keras_dformat)(x)
