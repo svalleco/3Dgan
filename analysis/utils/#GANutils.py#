@@ -742,7 +742,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
           if read_disc:
              disc_out = get_disc(energy, discdir, angloss, addloss, ang)
              var["isreal_act" + str(energy)]['n_'+ str(i)] = disc_out[0]
-             var["aux_act" + str(energy)]['n_'+ str(i)] = disc_out[1]
+             var["aux_" + str(energy)]['n_'+ str(i)] = disc_out[1]
              var["ecal_act"+ str(energy)]['n_'+ str(i)] = disc_out[2]
              var["isreal_gan" + str(energy)]['n_'+ str(i)] = disc_out[3]
              var["aux_gan" + str(energy)]['n_'+ str(i)] = disc_out[4]
@@ -787,7 +787,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
                for key in var:
                   if key in ["isreal_act" + str(energy), "aux_act" + str(energy), "isreal_gan" + str(energy), "aux_gan" + str(energy), "ecal_act"+ str(energy), "ecal_gan"+ str(energy), "angle2_act"+ str(energy), "angle2_gan"+ str(energy), "angle_act"+ str(energy), "angle_gan"+ str(energy), "addloss_act"+ str(energy), "addloss_gan"+ str(energy)]:
                      discout[key]=var[key]['n_'+ str(i)]
-               save_discriminated(discout, energy, discdir, angloss, addloss, ang)
+               save_discriminated(discout, energy, discdir, nloss, ang)
           print ('Calculations for ....', energy)
           var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale)
           var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0

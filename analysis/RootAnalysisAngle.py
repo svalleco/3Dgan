@@ -10,14 +10,14 @@ sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
 
 def main():
    #Architecture 
-   from AngleArch3dGAN_sqrt import generator, discriminator
+   from AngleArch3dGAN_add_loss_bins import generator, discriminator
 
    #Weights
-   disc_weight1="../weights/params_discriminator_epoch_073.hdf5"
-   gen_weight1= "../weights/params_generator_epoch_073.hdf5"
+   disc_weight1="../weights/3dgan_weights_bins_lr005/params_discriminator_epoch_059.hdf5"
+   gen_weight1= "../weights/3dgan_weights_bins_lr005/params_generator_epoch_059.hdf5"
       
    #Path to store results
-   plots_dir = "results/lrp0001/"
+   plots_dir = "results/gen_lrp005/"
 
    #Parameters
    latent = 256 # latent space
@@ -25,9 +25,10 @@ def main():
    num_events = 2000
    events_per_file = 5000
    m = 3  # number of moments 
-   nloss= 4 # total number of losses...4 or 5
+   angloss= 1 # total number of losses...1 or 2
+   addloss=1 # additional loss like count loss
    concat = 1 # if concatenting angle to latent space
-   cell=1 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
+   cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
    corr=0 # if making correlation plots
    energies=[0, 110, 150, 190] # energy bins
    angles = [math.radians(x) for x in [62, 85, 90, 105, 118]] # angle bins
@@ -46,11 +47,11 @@ def main():
    stest = False # K and chi2 test
    
    #following flags are used to save sorted and GAN data and to load from sorted data. These are used while development and should be False for one time analysis
-   save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
-   read_data = False # True if loading previously sorted data  
-   save_gen =  False # True if saving generated data. 
-   read_gen = False # True if generated data is already saved and can be loaded
-   save_disc = False # True if discriminiator data is to be saved
+   save_data = True # True if the sorted data is to be saved. It only saves when read_data is false
+   read_data = True # True if loading previously sorted data  
+   save_gen =  True # True if saving generated data. 
+   read_gen = True # True if generated data is already saved and can be loaded
+   save_disc = True # True if discriminiator data is to be saved
    read_disc =  False # True if discriminated data is to be loaded from previously saved file
    ifpdf = True # True if pdf are required. If false .C files will be generated
  
@@ -65,11 +66,11 @@ def main():
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
                 aindexes, datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, 
                 ascales, flags, latent, events_per_file, particle, thresh=thresh, angtype=angtype, offset=0.0,
-                nloss=nloss, concat=concat
-                , pre =sqrt, post =square  # Adding other preprocessing, Default is simple scaling                 
+                angloss=angloss, addloss=addloss, concat=concat
+                #, pre =sqrt, post =square  # Adding other preprocessing, Default is simple scaling                 
    )
    
-   get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,  m, len(gweights), ifpdf, stest, nloss=nloss, cell=cell, corr=corr)
+   get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,  m, len(gweights), ifpdf, stest, angloss=angloss, addloss=addloss, cell=cell, corr=corr)
 
 def sqrt(n, scale=1):
    return np.sqrt(n * scale)

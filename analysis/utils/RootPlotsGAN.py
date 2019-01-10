@@ -1191,7 +1191,7 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
 
 ##################################### Get plots for variable angle #####################################################################
 
-def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, nloss=3, cell=0, corr=0):
+def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, angloss=1, addloss=0, cell=0, corr=0):
    actdir = plots_dir + 'Actual'
    safe_mkdir(actdir)
    discdir = plots_dir + 'disc_outputs'
@@ -1307,7 +1307,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
       plot_angle_2Dhist(var["angle_act" + str(energy)], var["angle_gan" + str(energy)],  var["angle" + str(energy)],
                         os.path.join(discdir, angfile + "ang_2D") , angtype, labels, p, ifpdf=ifpdf)
       plots+=1
-      if nloss==5:
+      if angloss==2:
          plot_angle_2Dhist(var["angle2_act" + str(energy)], var["angle2_gan" + str(energy)],  var["angle" + str(energy)],
                            os.path.join(discdir, angfile + "ang2_2D") , angtype, labels, p, ifpdf=ifpdf)
          plots+=1
@@ -1354,7 +1354,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                                angle, angtype, alabels, p=p, ifpdf=ifpdf)
          plots+=1
 
-         if nloss==5:
+         if angloss == 2:
             plot_ang_hist(var["angle2_act" + str(energy) + "ang_" + str(a)], var["angle2_gan" + str(energy) + "ang_" + str(a)] ,
                           os.path.join(ediscdir, "ang2_" + str(a)), angle, angtype, a2labels, p=p, ifpdf=ifpdf)
             plots+=1
