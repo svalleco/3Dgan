@@ -109,13 +109,13 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='/data/shared/gkhattak/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Total Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights_bins_lr005', help='Directory to store weights.')
-    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history_bins_lr005.pkl', help='Pickle file to store losses.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights_bins_sqrt', help='Directory to store weights.')
+    parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history_bins_sqrt.pkl', help='Pickle file to store losses.')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
-    parser.add_argument('--xpower', action='store', type=float, default=1, help='pre processing of cell energies by raising to a power')
+    parser.add_argument('--xpower', action='store', type=float, default=0.5, help='pre processing of cell energies by raising to a power')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
-    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bins_lr005.pkl', help='File to save losses.')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bins_sqrt.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
     parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 50, 0.2, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
@@ -126,14 +126,14 @@ def get_parser():
 def mapping(x):
     return x
     
-def hist_count(x):
-    bin1 = np.sum(np.where((x>0.05) , 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<0.05) & (x>0.03), 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<0.03) & (x>0.02), 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<0.02) & (x>0.0125), 1, 0), axis=(1, 2, 3))
-    bin5 = np.sum(np.where((x<0.0125) & (x>0.008), 1, 0), axis=(1, 2, 3))
-    bin6 = np.sum(np.where((x<0.008) & (x>0.003), 1, 0), axis=(1, 2, 3))
-    bin7 = np.sum(np.where((x<0.003) & (x>0.), 1, 0), axis=(1, 2, 3))
+def hist_count(x, p=1):
+    bin1 = np.sum(np.where((x>np.power(0.05, p)) , 1, 0), axis=(1, 2, 3))
+    bin2 = np.sum(np.where((x<np.power(0.05, p)) & (x>np.power(0.03, p)), 1, 0), axis=(1, 2, 3))
+    bin3 = np.sum(np.where((x<np.power(0.03, p)) & (x>np.power(0.02, p)), 1, 0), axis=(1, 2, 3))
+    bin4 = np.sum(np.where((x<np.power(0.02, p)) & (x>np.power(0.0125, p)), 1, 0), axis=(1, 2, 3))
+    bin5 = np.sum(np.where((x<np.power(0.0125, p)) & (x>np.power(0.008, p)), 1, 0), axis=(1, 2, 3))
+    bin6 = np.sum(np.where((x<np.power(0.008, p)) & (x>np.power(0.003, p)), 1, 0), axis=(1, 2, 3))
+    bin7 = np.sum(np.where((x<np.power(0.003, p)) & (x>0.), 1, 0), axis=(1, 2, 3))
     bin8 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
     bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
     bins[np.where(bins==0)]=1
@@ -145,7 +145,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     f=h5py.File(datafile,'r')
     ang = np.array(f.get(angtype))
     X=np.array(f.get('ECAL'))* xscale
-    if xpower >1:
+    if xpower !=1:
         X = np.power(X, xpower)
     Y=np.array(f.get('energy'))/yscale
     X[X < thresh] = 0
@@ -175,7 +175,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     print('[INFO] Building generator')
     #generator.summary()
     generator.compile(
-        optimizer=RMSprop(lr=0.005),
+        optimizer=RMSprop(),
         loss='binary_crossentropy'
     )
  
@@ -191,7 +191,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(lr=0.005),
+        optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -223,7 +223,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     print(Y_test.shape)
     print('*************************************************************************************')
     print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
-    
+
     if analyse:
       var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
     train_history = defaultdict(list)
@@ -273,7 +273,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            add_loss_batch = np.expand_dims(loss_ftn(image_batch), axis=-1)
+            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
             file_index +=1
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
@@ -283,7 +283,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
-            # if ecal sum has 100% loss then end the training
+            #if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0 and index >10:
                 print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
                 generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
@@ -309,13 +309,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             index +=1
 
             # Used at design time for debugging
-            #print('real_batch_loss', real_batch_loss)
-            #print ('fake_batch_loss', fake_batch_loss)
-            #disc_out = discriminator.predict(image_batch)
-            #print('disc_out')
-            #print(np.transpose(disc_out[4][:5]))
-            #print('add_loss_batch')
-            #print(np.transpose(add_loss_batch[:5]))
+            print('real_batch_loss', real_batch_loss)
+            print ('fake_batch_loss', fake_batch_loss)
+            disc_out = discriminator.predict(image_batch)
+            print('disc_out')
+            print(np.transpose(disc_out[4][:5].astype(int)))
+            print('add_loss_batch')
+            print(np.transpose(add_loss_batch[:5]))
 
         # Testing    
         print ('Total batches were {}'.format(index))
@@ -326,7 +326,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         noise = np.multiply(Y_test.reshape(-1, 1), noise)
         generator_ip = np.concatenate((ang_test.reshape(-1, 1), noise), axis=1)
         generated_images = generator.predict(generator_ip, verbose=False)
-        add_loss_test = loss_ftn(X_test)
+        add_loss_test = loss_ftn(X_test, xpower)
         X = np.concatenate((X_test, generated_images))
         y = np.array([1] * nb_Test + [0] * nb_Test)
         ang = np.concatenate((ang_test, ang_test))
