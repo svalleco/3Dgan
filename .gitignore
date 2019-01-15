@@ -1,0 +1,16 @@
+**/weights
+**/results
+**/analysis/results
+**/analysis/*sorted
+**/analysis/Sorted**
+*_copy.py
+*.h5
+*.hdf5
+*.pkl
+*.pyc
+*.*~
+*.txt
+*.pdf
+*.dat
+*.log
+*.*#
