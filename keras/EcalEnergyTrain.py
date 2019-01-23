@@ -34,8 +34,10 @@ from keras.callbacks import TensorBoard
 
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
     tlab = True
+    print('tlab = True')
 else:
     tlab= False
+    print('tlab = False')
     
 try:
     import setGPU #if Caltech
@@ -59,7 +61,7 @@ def main():
        from EcalEnergyGan_k1 import generator, discriminator
     else:
        print(keras.__version__ ) 
-       from EcalEnergyGan import generator, discriminator
+       from EcalEnergyGan_bn import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
@@ -83,16 +85,21 @@ def main():
     resultfile = params.resultfile # analysis result
     if tlab:
        datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
-       weightsdir = '/gkhattak/weights/EnergyWeights/3dganWeights_k2'
-       pklfile = '/gkhattak/results/3dgan_history.pkl'
+       weightdir = '/gkhattak/weights/EnergyWeights/3dganWeights_k2_bn'
+       pklfile = '/gkhattak/results/3dgan_history_k2_bn.pkl'
        resultfile = '/gkhattak/results/3dgan_analysis.pkl'
+    
     print(params)
     gan.safe_mkdir(weightdir)
-
+    print(weightdir)
     # Building discriminator and generator
     d=discriminator()
     g=generator(latent_size)
     Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size , loss_weights=lossweights, xscale = xscale, analysis=analysis, energies=energies, tf_flags=tf_flags)
+
+def freeze(model):
+    for i, layer in enumerate(model.layers[1].layers):
+       layer.trainable=False
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -100,7 +107,7 @@ def get_parser():
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.') # Caltech
-    parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
+    parser.add_argument('--nbEvents', action='store', type=int, default=100000, help='Number of Data points to use')
     parser.add_argument('--verbose', action='store_true', default=False, help='Whether or not to use a progress bar')
     parser.add_argument('--tf_flags', action='store', default=False, help='Setting Tensorflow flags')
     parser.add_argument('--keras_format', action='store', type=str, default='channels_last', help='Keras format')
@@ -169,7 +176,17 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     # build combined Model
     latent = Input(shape=(latent_size, ), name='combined_z')   
     fake_image = generator( latent)
-    discriminator.trainable = False
+
+    # instead of discriminator.trainable=false, the layers are made trainable.
+    # this is done so that layer updates for custom BN layer can be effective
+
+    for layer in discriminator.layers[1:]:
+       if hasattr(layer, 'layers'):  
+          for l in layer.layers:
+            l.trainable=False
+       else:
+          layer.trainable=False
+
     fake, aux, ecal = discriminator(fake_image)
     combined = Model(
         input=[latent],
@@ -191,7 +208,10 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
     print('The total data was divided in {} Train files and {} Test files'.format(len(Trainfiles), len(Testfiles)))
     nb_test = int(nEvents * f[1])
-    
+    print(batch_size, nb_test)
+    if nb_test % batch_size >0:
+      nb_test = (nb_test/batch_size) * batch_size
+    print(nb_test)     
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
@@ -265,6 +285,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
             generated_images = generator.predict(generator_ip, verbose=0)        
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
+            
             epoch_disc_loss.append([
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
@@ -298,6 +319,13 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         discriminator_test_loss = discriminator.evaluate(
             X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
+        discriminator_test_loss_true = discriminator.evaluate(
+            X_test, [np.array([1] * nb_test), Y_test, ecal_test], verbose=False, batch_size=batch_size)
+        print('discriminator_test_loss_true=', discriminator_test_loss_true)
+
+        discriminator_test_loss_fake = discriminator.evaluate(
+            generated_images, [np.array([0] * nb_test), sampled_energies, ecal_ip], verbose=False, batch_size=batch_size) 
+        print('discriminator_test_loss_fake=', discriminator_test_loss_fake)
 
         noise = np.random.normal(0.1, 1, (2 * nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (2 * nb_test, 1))
