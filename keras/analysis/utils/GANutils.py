@@ -429,7 +429,7 @@ def save_generated(events, cond, energy, gendir):
     print ("Generated data saved to ", filename)
 
 # save discriminator results
-def save_discriminated(disc, energy, discdir, nloss=4, ang=0):
+def save_discriminated(disc, energy, discdir, angloss=1, addloss=0, ang=0):
     safe_mkdir(discdir)
     filename = os.path.join(discdir, "Disc_{:03d}.hdf5".format(energy))
     with h5py.File(filename ,'w') as outfile:
@@ -442,13 +442,16 @@ def save_discriminated(disc, energy, discdir, nloss=4, ang=0):
       if ang:
           outfile.create_dataset('ANGLE_ACT',data=disc["angle_act" + str(energy)])
           outfile.create_dataset('ANGLE_GAN',data=disc["angle_gan" + str(energy)])
-      if nloss == 5:
+      if angloss == 2:
           outfile.create_dataset('ANGLE2_ACT',data=disc["angle2_act" + str(energy)])
           outfile.create_dataset('ANGLE2_GAN',data=disc["angle2_gan" + str(energy)])
+      if addloss:
+          outfile.create_dataset('ADDLOSS_ACT',data=disc["addloss_act" + str(energy)])
+          outfile.create_dataset('ADDLOSS_GAN',data=disc["addloss_gan" + str(energy)])
     print ("Discriminated data saved to ", filename)
 
 # read D results    
-def get_disc(energy, discdir, nloss=4, ang=0):
+def get_disc(energy, discdir, angloss=1, addloss=0, ang=0):
     filename = os.path.join(discdir, "Disc_{:03d}.hdf5".format(energy))
     f=h5py.File(filename,'r')
     isreal_act = np.array(f.get('ISREAL_ACT'))
@@ -463,11 +466,17 @@ def get_disc(energy, discdir, nloss=4, ang=0):
        angle_gan = np.array(f.get('ANGLE_GAN'))
        disc_out.append(angle_act)
        disc_out.append(angle_gan)
-    if nloss == 5:
+    if angloss == 2:
         angle2_act = np.array(f.get('ANGLE2_ACT'))
         angle2_gan = np.array(f.get('ANGLE2_GAN'))
         disc_out.append(angle2_act)
         disc_out.append(angle2_gan)
+    if addloss:
+        addloss_act = np.array(f.get('ADDLOSS_ACT'))
+        addloss_gan = np.array(f.get('ADDLOSS_GAN'))
+        disc_out.append(addloss_act)
+        disc_out.append(addloss_gan)
+                                        
     print ("Discriminated file ", filename, " is loaded")
     return disc_out
 
@@ -518,7 +527,7 @@ def generate(g, index, cond, latent=256, concat=1):
 
 # discriminator predict
 def discriminate(d, images):
-    disc_out = np.array(d.predict(images, verbose=False, batch_size=50))
+    disc_out = d.predict(images, verbose=False, batch_size=50)
     return disc_out
 
 # find location of maximum depositions
@@ -591,7 +600,7 @@ def preproc(n, xscale=1):
 def postproc(n, xscale=1):
     return n/xscale
 
-def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0, nloss=3, concat=1, pre=preproc, post=postproc, tolerance2 = 0.1):
+def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0, angloss=1, addloss=0, concat=1, pre=preproc, post=postproc, tolerance2 = 0.1):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     print( flags)
     # assign values to flags that decide if data is to be read from dataset or pre binned data
@@ -679,9 +688,12 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
        var["aux_gan" + str(energy)]={}
        var["angle_act" + str(energy)]={}
        var["angle_gan" + str(energy)]={}
-       if nloss==5:
+       if angloss==2:
           var["angle2_act" + str(energy)]={}
           var["angle2_gan" + str(energy)]={}
+       if addloss:
+          var["addloss_act" + str(energy)]={}
+          var["addloss_gan" + str(energy)]={}
                    
        var["ecal_act" + str(energy)]={}
        var["ecal_gan" + str(energy)]={}
@@ -700,9 +712,13 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
           var["aux_gan" + str(energy)+ "ang_" + str(index)]={}
           var["angle_act" + str(energy)+ "ang_" + str(index)]={}
           var["angle_gan" + str(energy)+ "ang_" + str(index)]={}
-          if nloss==5:
+          if angloss==2:
             var["angle2_act" + str(energy)+ "ang_" + str(index)]={}
             var["angle2_gan" + str(energy)+ "ang_" + str(index)]={}
+          if addloss:
+            var["addloss_act" + str(energy)+ "ang_" + str(index)]={}
+            var["addloss_gan" + str(energy)+ "ang_" + str(index)]={}
+                      
           var["ecal_act" + str(energy)+ "ang_" + str(index)]={}
           var["ecal_gan" + str(energy)+ "ang_" + str(index)]={}
           var["sumsx_gan"+ str(energy)+ "ang_" + str(index)]={}
@@ -724,8 +740,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              gen_time = time.time() - start
              print( "Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)]))
           if read_disc:
-             disc_out = get_disc(energy, discdir, nloss, ang)
-             print(len(disc_out))
+             disc_out = get_disc(energy, discdir, angloss, addloss, ang)
              var["isreal_act" + str(energy)]['n_'+ str(i)] = disc_out[0]
              var["aux_act" + str(energy)]['n_'+ str(i)] = disc_out[1]
              var["ecal_act"+ str(energy)]['n_'+ str(i)] = disc_out[2]
@@ -734,36 +749,57 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              var["ecal_gan"+ str(energy)]['n_'+ str(i)] = disc_out[5]
              var["angle_act"+ str(energy)]['n_'+ str(i)] = disc_out[6]
              var["angle_gan"+ str(energy)]['n_'+ str(i)] = disc_out[7]
-             if nloss==5:
-                var["angle2_act"+ str(energy)]['n_'+ str(i)] = disc_out[8]
-                var["angle2_gan"+ str(energy)]['n_'+ str(i)] = disc_out[9]
+             if angloss==2:
+                var["angle2_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out[8])
+                var["angle2_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out[9])
+             else:
+                if addloss:
+                    var["addloss_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out[8])
+                    var["addloss_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out[9])
           else:
              d.load_weights(disc_weights)
              start = time.time()
-             if nloss==5:
-                 var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["angle2_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, pre(var["events_act" + str(energy)], scale))
-                 var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["angle2_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
-             elif nloss==4:
-                 var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, pre(var["events_act" + str(energy)], scale))
-                 var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
-                              
+             disc_out_act = discriminate(d, pre(var["events_act" + str(energy)], scale))
+             disc_out_gan =discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
+             var["isreal_act" + str(energy)]['n_'+ str(i)]= np.array(disc_out_act[0])
+             var["isreal_gan" + str(energy)]['n_'+ str(i)]= np.array(disc_out_gan[0])
+             var["aux_act" + str(energy)]['n_'+ str(i)] = np.array(disc_out_act[1])
+             var["aux_gan" + str(energy)]['n_'+ str(i)]= np.array(disc_out_gan[1])
+             var["angle_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_act[2])
+             var["angle_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_gan[2])
+             if angloss==2:
+                 var["angle2_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_act[3])
+                 var["angle2_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_gan[3])
+                 var["ecal_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_act[4])
+                 var["ecal_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_gan[4])
+             else:
+                 var["ecal_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_act[3])
+                 var["ecal_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_gan[3])
+             if addloss:
+                 var["addloss_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_act[4])
+                 var["addloss_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_gan[4])
+                                
              disc_time = time.time() - start
              print ("Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)]))
 
              if save_disc:
                discout = {}
                for key in var:
-                  if key in ["isreal_act" + str(energy), "aux_act" + str(energy), "isreal_gan" + str(energy), "aux_gan" + str(energy), "ecal_act"+ str(energy), "ecal_gan"+ str(energy), "angle2_act"+ str(energy), "angle2_gan"+ str(energy), "angle_act"+ str(energy), "angle_gan"+ str(energy)]:
+                  if key in ["isreal_act" + str(energy), "aux_act" + str(energy), "isreal_gan" + str(energy), "aux_gan" + str(energy), "ecal_act"+ str(energy), "ecal_gan"+ str(energy), "angle2_act"+ str(energy), "angle2_gan"+ str(energy), "angle_act"+ str(energy), "angle_gan"+ str(energy), "addloss_act"+ str(energy), "addloss_gan"+ str(energy)]:
                      discout[key]=var[key]['n_'+ str(i)]
-               save_discriminated(discout, energy, discdir, nloss, ang)
+               save_discriminated(discout, energy, discdir, angloss, addloss, ang)
           print ('Calculations for ....', energy)
           var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale)
           var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0
           var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze((var["angle_act"+ str(energy)]['n_'+ str(i)]))/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)
           var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["angle_gan"+ str(energy)]['n_'+ str(i)] )/ascale, np.squeeze(var["ecal_gan"+ str(energy)]['n_'+ str(i)]/scale)
-          if nloss==5:
+          if angloss==2:
               var["angle2_act"+ str(energy)]['n_'+ str(i)]=np.squeeze((var["angle2_act"+ str(energy)]['n_'+ str(i)]))/ascale
               var["angle2_gan"+ str(energy)]['n_'+ str(i)]=np.squeeze((var["angle2_gan"+ str(energy)]['n_'+ str(i)]))/ascale
+          if addloss:
+              var["addloss_act"+ str(energy)]['n_'+ str(i)]=np.squeeze((var["addloss_act"+ str(energy)]['n_'+ str(i)]))
+              var["addloss_gan"+ str(energy)]['n_'+ str(i)]=np.squeeze((var["addloss_gan"+ str(energy)]['n_'+ str(i)]))
+                            
           var["max_pos_gan" + str(energy)]['n_'+ str(i)] = get_max(var["events_gan" + str(energy)]['n_'+ str(i)])
           var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)] = get_sums(var["events_gan" + str(energy)]['n_'+ str(i)])
           var["momentX_gan" + str(energy)]['n_'+ str(i)], var["momentY_gan" + str(energy)]['n_'+ str(i)], var["momentZ_gan" + str(energy)]['n_'+ str(i)] = get_moments(var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)], m, x=x, y=y, z=z)
@@ -781,10 +817,12 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              var["ecal_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle_act" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle_gan" + str(energy)]['n_'+ str(i)][indexes]
-             if nloss==5:
+             if angloss==2:
                var["angle2_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle2_act" + str(energy)]['n_'+ str(i)][indexes]
                var["angle2_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle2_gan" + str(energy)]['n_'+ str(i)][indexes]
-                          
+             if addloss:
+               var["addloss_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["addloss_act" + str(energy)]['n_'+ str(i)][indexes]
+               var["addloss_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["addloss_gan" + str(energy)]['n_'+ str(i)][indexes]
        print('For {} iteration:\nWith Generator weights.....{}\nWith Discriminator weights.....{}'.format(i, gen_weights, disc_weights))
     for i in np.arange(len(gweights)):
       #### Generate GAN table to screen                                                                                                       

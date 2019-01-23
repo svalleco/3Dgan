@@ -5,9 +5,9 @@ import os
 import math
 import time
 import numpy.core.umath_tests as umath
-#import matplotlib
-#import matplotlib.pyplot as plt
-#plt.switch_backend('Agg')
+import matplotlib
+import matplotlib.pyplot as plt
+plt.switch_backend('Agg')
 
 import ROOTutils as my # common utility functions for root
 from GANutils import safe_mkdir, get_sums
@@ -741,7 +741,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    c1.Update()
    c1.cd(4)
    leg.AddEntry(h1x,"G4","l")
-   leg.SetHeader("Max energy deposition along x, y, z axis")
+   leg.SetHeader("#splitline{Weighted Histograms for position of}{ max energy deposition along x, y, z axis}", "C")
    if not stest:
      for i, h in enumerate(h2xs):
        leg.AddEntry(h, 'GAN ' + labels[i],"l")
@@ -892,7 +892,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1z.Draw('sames hist')
    canvas.cd(4)
    leg.AddEntry(h1x, "G4","l")
-   leg.SetHeader("Energies deposited along x, y, z axis")#, "C")
+   leg.SetHeader("#splitline{Weighted Histograms for energies}{ deposited along x, y, z axis}", "C")
    if not stest:
       for i, h in enumerate(h2xs):
         leg.AddEntry(h, 'GAN ' + labels[i],"l")
@@ -1191,7 +1191,7 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
 
 ##################################### Get plots for variable angle #####################################################################
 
-def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, nloss=3, cell=0, corr=0):
+def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, angloss=1, addloss=0, cell=0, corr=0):
    actdir = plots_dir + 'Actual'
    safe_mkdir(actdir)
    discdir = plots_dir + 'disc_outputs'
@@ -1307,7 +1307,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
       plot_angle_2Dhist(var["angle_act" + str(energy)], var["angle_gan" + str(energy)],  var["angle" + str(energy)],
                         os.path.join(discdir, angfile + "ang_2D") , angtype, labels, p, ifpdf=ifpdf)
       plots+=1
-      if nloss==5:
+      if angloss==2:
          plot_angle_2Dhist(var["angle2_act" + str(energy)], var["angle2_gan" + str(energy)],  var["angle" + str(energy)],
                            os.path.join(discdir, angfile + "ang2_2D") , angtype, labels, p, ifpdf=ifpdf)
          plots+=1
@@ -1354,7 +1354,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                                angle, angtype, alabels, p=p, ifpdf=ifpdf)
          plots+=1
 
-         if nloss==5:
+         if angloss == 2:
             plot_ang_hist(var["angle2_act" + str(energy) + "ang_" + str(a)], var["angle2_gan" + str(energy) + "ang_" + str(a)] ,
                           os.path.join(ediscdir, "ang2_" + str(a)), angle, angtype, a2labels, p=p, ifpdf=ifpdf)
             plots+=1
