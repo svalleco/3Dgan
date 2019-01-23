@@ -56,12 +56,7 @@ def write_log(callback, common_tag, tags, logs, batch_no):
 def main():
 
     #Architectures to import
-    if keras.__version__ == '1.2.2':
-       print(keras.__version__ )
-       from EcalEnergyGan_k1 import generator, discriminator
-    else:
-       print(keras.__version__ ) 
-       from EcalEnergyGan_bn import generator, discriminator
+    from EcalEnergyGan import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
@@ -85,9 +80,9 @@ def main():
     resultfile = params.resultfile # analysis result
     if tlab:
        datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
-       weightdir = '/gkhattak/weights/EnergyWeights/3dganWeights_k2_bn'
-       pklfile = '/gkhattak/results/3dgan_history_k2_bn.pkl'
-       resultfile = '/gkhattak/results/3dgan_analysis.pkl'
+       weightdir = '/gkhattak/weights/EnergyWeights/3dganWeights_BN2'
+       pklfile = '/gkhattak/results/3dgan_history_k2_BN2.pkl'
+       resultfile = '/gkhattak/results/3dgan_analysis_BN2.pkl'
     
     print(params)
     gan.safe_mkdir(weightdir)
@@ -107,7 +102,7 @@ def get_parser():
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.') # Caltech
-    parser.add_argument('--nbEvents', action='store', type=int, default=100000, help='Number of Data points to use')
+    parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--verbose', action='store_true', default=False, help='Whether or not to use a progress bar')
     parser.add_argument('--tf_flags', action='store', default=False, help='Setting Tensorflow flags')
     parser.add_argument('--keras_format', action='store', type=str, default='channels_last', help='Keras format')
