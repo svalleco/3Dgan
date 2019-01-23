@@ -264,7 +264,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], ifpdf
    else:
       c1.Print(out_file + '.C')
 
-def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=True, stest=True, ang=0):
+def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=True, stest=True, ang=1):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color=2
@@ -1254,10 +1254,10 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                            var["energy" + str(energy)], var["events_act" + str(energy)],                                     
                            var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
          if cell:
-           plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)],
+           plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], 
                          os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, p=p, log=1, ifpdf=ifpdf)
            plots+=1
-           plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)],
+           plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)],
                            os.path.join(comdir, 'flat' + ecalfile), energy, labels, p=p, ifpdf=ifpdf)
                                        
          
