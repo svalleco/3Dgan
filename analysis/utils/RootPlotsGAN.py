@@ -134,7 +134,7 @@ def plot_corr_root(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hi
    return gact
 
 # PLot ecal ratio
-def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf=True, ang=1):
+def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf=True, ang=1, stest=False):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color = 2
@@ -167,14 +167,18 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
       Gprof = Gprofs[i]
       Gprof.SetStats(ROOT.kFALSE)
       my.fill_profile(Gprof, ratio2, y)
-      error = np.mean(np.abs((ratio1 - ratio2 )/ratio1))
+      error = np.mean(np.abs(ratio1 - ratio2 ))
       color +=1
       if color in [10, 18, 19]:
           color+=1
       Gprof.SetLineColor(color)
       Gprof.Draw('sames')
       c1.Update()
-      legend.AddEntry(Gprof, "GAN {} (MAE={:.4f})".format(labels[i], error), "l")
+      legend.AddEntry(Gprof, "GAN {} (MAE={:.6f})".format(labels[i], error), "l")
+      if stest:
+         ks = Eprof.KolmogorovTest(Gprof, 'UU')
+         ch2 = Eprof.Chi2Test(Gprof, 'UU')
+         legend.AddEntry(Gprof, "chi2={:.8f} ks={:.8f} ".format(ks, ch2), "l")
       legend.Draw()
    c1.Modified()
    c1.Update()
@@ -216,7 +220,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
       Gprof.Draw('sames')
       c1.Update()
       mae= np.mean(np.abs(error))
-      legend.AddEntry(Gprof, "GAN {} (MAE={:.4f})".format(labels[i], mae), "l")
+      legend.AddEntry(Gprof, "GAN {} (MAE={:.6f})".format(labels[i], mae), "l")
       legend.Draw()
    c1.Modified()
    c1.Update()
@@ -266,7 +270,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], ifpdf
      mae2= np.mean(np.abs(error2))
      Gprof.Draw('sames')
      c1.Update()
-     legend.AddEntry(Gprof, "GAN {} (MAE={:.4f})".format(labels[i], mae2), "l")
+     legend.AddEntry(Gprof, "GAN {} (MAE={:.6f})".format(labels[i], mae2), "l")
    legend.Draw()
    c1.Modified()
    c1.Update()
@@ -698,8 +702,8 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
          h2x.Draw('sames hist')
       c1.Update()
       if stest:
-         ks = h1x.KolmogorovTest(h2x, "WW NORM")
-         ch2 = h1x.Chi2Test(h2x, "WW NORM")
+         ks = h1x.KolmogorovTest(h2x, "WW")
+         ch2 = h1x.Chi2Test(h2x, "WW")
          glabel = "GAN {} X axis K = {:.4f} ch2={:.4f}".format(labels[i], ks, ch2)
       else:
          glabel = "GAN {}".format(labels[i])
@@ -718,8 +722,8 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       c1.Update()
       my.stat_pos(h2y)
       if stest:
-         ks = h1y.KolmogorovTest(h2y, "WW NORM")
-         ch2 = h1y.Chi2Test(h2y, "WW NORM")
+         ks = h1y.KolmogorovTest(h2y, "WW")
+         ch2 = h1y.Chi2Test(h2y, "WW")
          glabel = "GAN {} Y axis K = {:.4f} ch2={:.4f}".format(labels[i], ks, ch2)
          leg.AddEntry(h2y, glabel,"l")
                
@@ -735,8 +739,8 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
          h2z.Draw('sames hist')
       c1.Update()
       if stest:
-         ks = h1z.KolmogorovTest(h2z, "WW NORM")
-         ch2 = h1z.Chi2Test(h2z, "ww NORM")
+         ks = h1z.KolmogorovTest(h2z, "WW")
+         ch2 = h1z.Chi2Test(h2z, "WW")
          glabel = "GAN {} Z axis K = {:.4f} ch2={:.4f}".format(labels[i], ks, ch2)
          leg.AddEntry(h2z, glabel,"l")
       my.stat_pos(h2z)
@@ -855,8 +859,8 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       my.stat_pos(h2x)
       if stest:
          res=np.array
-         ks= h1x.KolmogorovTest(h2x, 'WW NORM')
-         ch2 = h1x.Chi2Test(h2x, 'WW NORM')
+         ks= h1x.KolmogorovTest(h2x, 'WW')
+         ch2 = h1x.Chi2Test(h2x, 'WW')
          glabel = "GAN {} X axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
       else:
          glabel = "GAN {} ".format(labels[i])
@@ -876,8 +880,8 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       my.stat_pos(h2y)
       if stest:
-         ks= h1y.KolmogorovTest(h2y, 'WW NORM')
-         ch2 = h1y.Chi2Test(h2y, 'WW NORM')
+         ks= h1y.KolmogorovTest(h2y, 'WW')
+         ch2 = h1y.Chi2Test(h2y, 'WW')
          glabel = "GAN {} Y axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
          leg.AddEntry(h2y, glabel,"l")
       canvas.Update()
@@ -896,8 +900,8 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       my.stat_pos(h2z)
       canvas.Update()
       if stest:
-         ks= h1z.KolmogorovTest(h2z, 'WW NORM')
-         ch2 = h1z.Chi2Test(h2z, 'WW NORM')
+         ks= h1z.KolmogorovTest(h2z, 'WW')
+         ch2 = h1z.Chi2Test(h2z, 'WW')
          glabel = "GAN {} Z axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
          leg.AddEntry(h2z, glabel,"l")
       canvas.Update()
@@ -1164,7 +1168,7 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
        correlationfile = 'Corr'
        start = time.time()
        if energy==0:
-          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), ang=ang)
+          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), ang=ang, stest=stest)
           plots+=1
           plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
           plots+=1
@@ -1261,7 +1265,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                            
       if energy==0:
          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], 
-                                    var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), p, ifpdf=ifpdf)
+                                    var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), p, ifpdf=ifpdf, stest=stest)
          plots+=1
          plot_ecal_relative_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], 
                                     var["energy" + str(energy)], labels, os.path.join(comdir, allecalrelativefile), p, ifpdf=ifpdf)
