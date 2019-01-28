@@ -600,7 +600,7 @@ def preproc(n, xscale=1):
 def postproc(n, xscale=1):
     return n/xscale
 
-def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0, angloss=1, addloss=0, concat=1, pre=preproc, post=postproc, tolerance2 = 0.1):
+def perform_calculations_angle(g, d, gweights, dweights, energies, angles, aindexes, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, angscales, flags, latent, events_per_file=10000, particle='Ele', Data=GetAngleData, angtype='theta', thresh=1e-6, offset=0.0, angloss=1, addloss=0, concat=1, power=1, pre=preproc, post=postproc, tolerance2 = 0.1):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     print( flags)
     # assign values to flags that decide if data is to be read from dataset or pre binned data
@@ -670,6 +670,10 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
          var["sumsx_act"+ str(energy) + "ang_" + str(index)] = var["sumsx_act"+ str(energy)][indexes]
          var["sumsy_act"+ str(energy) + "ang_" + str(index)] = var["sumsy_act"+ str(energy)][indexes]
          var["sumsz_act"+ str(energy) + "ang_" + str(index)] = var["sumsz_act"+ str(energy)][indexes]
+         var["momentX_act"+ str(energy) + "ang_" + str(index)] = var["momentX_act"+ str(energy)][indexes]
+         var["momentY_act"+ str(energy) + "ang_" + str(index)] = var["momentY_act"+ str(energy)][indexes]
+         var["momentZ_act"+ str(energy) + "ang_" + str(index)] = var["momentZ_act"+ str(energy)][indexes]
+                           
          print ('{} for angle bin {} total events were {}'.format(index, a, var["events_act" + str(energy) + "ang_" + str(index)].shape[0]))
 
     print ("{} events were put in {} bins".format(total, len(energies)))
@@ -724,6 +728,10 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
           var["sumsx_gan"+ str(energy)+ "ang_" + str(index)]={}
           var["sumsy_gan"+ str(energy)+ "ang_" + str(index)]={}
           var["sumsz_gan"+ str(energy)+ "ang_" + str(index)]={}
+          var["momentX_gan"+ str(energy)+ "ang_" + str(index)]={}
+          var["momentY_gan"+ str(energy)+ "ang_" + str(index)]={}
+          var["momentZ_gan"+ str(energy)+ "ang_" + str(index)]={}
+                              
 
        for gen_weights, disc_weights, scale, ascale, i in zip(gweights, dweights, xscales, angscales, np.arange(len(gweights))):
           gendir = gendirs + '/n_' + str(i)
@@ -759,7 +767,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
           else:
              d.load_weights(disc_weights)
              start = time.time()
-             disc_out_act = discriminate(d, pre(var["events_act" + str(energy)], scale))
+             disc_out_act = discriminate(d, pre(var["events_act" + str(energy)], power, scale))
              disc_out_gan =discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)])
              var["isreal_act" + str(energy)]['n_'+ str(i)]= np.array(disc_out_act[0])
              var["isreal_gan" + str(energy)]['n_'+ str(i)]= np.array(disc_out_gan[0])
@@ -789,7 +797,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
                      discout[key]=var[key]['n_'+ str(i)]
                save_discriminated(discout, energy, discdir, angloss, addloss, ang)
           print ('Calculations for ....', energy)
-          var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale)
+          var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], power, scale)
           var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0
           var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze((var["angle_act"+ str(energy)]['n_'+ str(i)]))/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/scale)
           var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["angle_gan"+ str(energy)]['n_'+ str(i)] )/ascale, np.squeeze(var["ecal_gan"+ str(energy)]['n_'+ str(i)]/scale)
@@ -817,6 +825,10 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, ainde
              var["ecal_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle_act" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle_gan" + str(energy)]['n_'+ str(i)][indexes]
+             var["momentX_gan"+ str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["momentX_gan"+ str(energy)]['n_'+ str(i)][indexes]
+             var["momentY_gan"+ str(energy)+ "ang_" + str(index)]['n_'+ str(i)] =var["momentY_gan"+ str(energy)]['n_'+ str(i)][indexes]
+             var["momentZ_gan"+ str(energy)+ "ang_" + str(index)]['n_'+ str(i)] =var["momentZ_gan"+ str(energy)]['n_'+ str(i)][indexes]
+                                       
              if angloss==2:
                var["angle2_act" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle2_act" + str(energy)]['n_'+ str(i)][indexes]
                var["angle2_gan" + str(energy)+ "ang_" + str(index)]['n_'+ str(i)] = var["angle2_gan" + str(energy)]['n_'+ str(i)][indexes]
