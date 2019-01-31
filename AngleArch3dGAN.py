@@ -18,16 +18,26 @@ import tensorflow as tf
 
 K.set_image_dim_ordering('tf')
 
-def ecal_sum(image, power=1):
-    if power !=1:
-      image = K.pow(image, 1./power)
+def ecal_sum(image, power):
+    image = K.pow(image, 1./power)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
-def ecal_angle(image, power=1):
+def count(image, power):
+    bin1 = K.sum(K.tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.03**power, image > 0.02**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.02**power, image > 0.0125**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0125**power, image > 0.008**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.008**power, image > 0.003**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.003**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
+    return bins
+
+def ecal_angle(image, power):
     image = K.squeeze(image, axis=4)
-    if power !=1:
-      image = K.pow(image, 1./power)
+    image = K.pow(image, 1./power)
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
@@ -87,7 +97,7 @@ def ecal_angle(image, power=1):
     ang = K.expand_dims(ang, 1)
     return ang
 
-def discriminator(power=1):
+def discriminator(power=1.0):
   
     image=Input(shape=(51, 51, 25, 1))
 
@@ -119,13 +129,14 @@ def discriminator(power=1):
     dnn.summary()
 
     dnn_out = dnn(image)
-
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ang = Lambda(ecal_angle)(image, power)
-    ecal = Lambda(ecal_sum)(image, power)
-    Model(input=[image], output=[fake, aux, ang, ecal]).summary()
-    return Model(input=[image], output=[fake, aux, ang, ecal])
+    #inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image    
+    ang = Lambda(ecal_angle, arguments={'power':power})(image)
+    ecal = Lambda(ecal_sum, arguments={'power':power})(image)
+    add_loss = Lambda(count, arguments={'power':power})(image)
+    Model(input=[image], output=[fake, aux, ang, ecal, add_loss]).summary()
+    return Model(input=[image], output=[fake, aux, ang, ecal, add_loss])
 
 
 def generator(latent_size=200, return_intermediate=False):
