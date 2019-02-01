@@ -206,14 +206,24 @@ class BatchNormalization(Layer):
                     axis=self.axis,
                     epsilon=self.epsilon)
 
-        # If the learning phase is *static* and set to inference:
-        #if training in {0, False}:
-        #    return normalize_inference()
-
-        # If the learning is either dynamic, or set to training:
         normed_training, mean, variance = K.normalize_batch_in_training(
             inputs, self.gamma, self.beta, reduction_axes,
             epsilon=self.epsilon)
+
+
+        self.add_update([K.moving_average_update(self.moving_mean,
+                                                 mean,
+                                                 self.momentum),
+                         K.moving_average_update(self.moving_variance,
+                                                 variance,
+                                                 self.momentum)]
+                         ,inputs)
+
+        
+        # If the learning phase is *static* and set to inference:
+        if training in {0, False}:
+            return normalize_inference()
+
 
         if K.backend() != 'cntk':
             sample_size = K.prod([K.shape(inputs)[axis]
@@ -224,14 +234,6 @@ class BatchNormalization(Layer):
 
             # sample variance - unbiased estimator of population variance
             variance *= sample_size / (sample_size - (1.0 + self.epsilon))
-
-        self.add_update([K.moving_average_update(self.moving_mean,
-                                                 mean,
-                                                 self.momentum),
-                         K.moving_average_update(self.moving_variance,
-                                                 variance,
-                                                 self.momentum)]
-                         ,inputs)
 
         # Pick the normalized form corresponding to the training phase.
         return K.in_train_phase(normed_training,
@@ -267,3 +269,13 @@ class BatchNormalization(Layer):
     @property
     def updates(self):
         return self._updates
+
+    def get_updates_for(self, inputs):
+        if inputs is not None:
+            inputs_hash = object_list_uid(inputs)
+        else:
+            inputs_hash = None
+        if inputs_hash in self._per_input_updates:
+            return self._per_input_updates[inputs_hash]
+        return []
+
