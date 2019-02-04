@@ -210,8 +210,9 @@ class BatchNormalization(Layer):
             inputs, self.gamma, self.beta, reduction_axes,
             epsilon=self.epsilon)
 
-
-        self.add_update([K.moving_average_update(self.moving_mean,
+        # if in train phase
+        if K.learning_phase:
+            self.add_update([K.moving_average_update(self.moving_mean,
                                                  mean,
                                                  self.momentum),
                          K.moving_average_update(self.moving_variance,
