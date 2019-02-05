@@ -307,7 +307,6 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
    for i, key in enumerate(ecal2):
       hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, 0, 1.5 * p[1]/50))
       hg= hgs[i]
-      hg.Sumw2()
       hg.SetLineColor(color)
       color+=1
       c1.Update()
@@ -315,6 +314,7 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
         my.fill_hist(hg, ecal2[key]/50.)
       else:
         my.fill_hist(hg, ecal2[key])
+      hg.Sumw2()
       hg =my.normalize(hg)
       hg.Draw('sames')
       hg.Draw('sames hist')
@@ -349,12 +349,13 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
    ROOT.gStyle.SetOptStat(111111)
    if log:
       ROOT.gPad.SetLogy()
-   hd = ROOT.TH1F("Geant4", "", 100, -8, 1)
+   hd = ROOT.TH1F("Geant4", "", 100, -12, 1)
    my.BinLogX(hd)
+   data1= event1.flatten()
+   #data1=data1[data1>0]
    if ang:
-      my.fill_hist(hd, event1.flatten()/50.)
-   else:
-      my.fill_hist(hd, event1.flatten())
+      data1= data1/50.
+   my.fill_hist(hd, data1)
    hd.Sumw2()
    hd =my.normalize(hd)
    if energy == 0:
@@ -371,14 +372,15 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
    hgs=[]
    pos = 0
    for i, key in enumerate(event2):
-      hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, -8, 1))
+      hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, -12, 1))
       hg = hgs[i]
       hg.Sumw2()
       my.BinLogX(hg)
+      data2= event2[key].flatten()
+      #data2=data2[data2>0]
       if ang:
-         my.fill_hist(hg, event2[key].flatten()/50.)
-      else:
-         my.fill_hist(hg, event2[key].flatten())
+         data2= data2/50.
+      my.fill_hist(hg, data2)
       hg =my.normalize(hg)
       #my.stat_pos(hg)
       hg.SetLineColor(color)
@@ -458,8 +460,6 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 100, 0, 600))
      hp= hps[i]
      hg= hgs[i]
-     hp.Sumw2()
-     hg.Sumw2()
      if i== 0:
        #hp.SetStats(0)
        hp.SetTitle(" Predicted Primary Energy for {}-{} GeV".format(p[0], p[1]))
@@ -482,6 +482,8 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
      #hg.SetStats(0)
      
      my.fill_hist(hg, 100 *aux2[key])
+     hp.Sumw2()
+     hg.Sumw2()
      hp =my.normalize(hp)
      hg =my.normalize(hg)             
      hg.SetLineColor(color)
@@ -514,8 +516,6 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 50, -0.4, 0.4))
      hp= hps[i]
      hg= hgs[i]
-     hp.Sumw2()
-     hg.Sumw2()
      if i== 0:
        #hp.SetStats(0)
        if energy == 0:
@@ -542,6 +542,9 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
      #hg.SetStats(0)
      #my.stat_pos(hg)
      my.fill_hist(hg,  (y - aux2[key]*100)/y)
+     hp.Sumw2()
+     hg.Sumw2()
+              
      hp =my.normalize(hp)
      hg =my.normalize(hg)
      hg.SetLineColor(color)
@@ -637,13 +640,12 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    h1x.SetLineColor(color)
    h1y.SetLineColor(color)
    h1z.SetLineColor(color)
-   h1x.Sumw2()
-   h1y.Sumw2()
-   h1z.Sumw2()
+   
    c1.cd(1)
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1x, array1[:,0])
+   h1x.Sumw2()
    h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
@@ -652,6 +654,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1y, array1[:,1])
+   h1y.Sumw2()
    h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
@@ -660,6 +663,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1z, array1[:,2])
+   h1z.Sumw2()
    h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
@@ -683,15 +687,13 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       h2x=h2xs[i]
       h2y=h2ys[i]
       h2z=h2zs[i]
-      h2x.Sumw2()
-      h2y.Sumw2()
-      h2z.Sumw2()
-
+      
       h2x.SetLineColor(color)
       h2y.SetLineColor(color)
       h2z.SetLineColor(color)
       c1.cd(1)
       my.fill_hist(h2x, array2[key][:,0])
+      h2x.Sumw2()
       h2x=my.normalize(h2x)
       if i==0:
          h2x.Draw()
@@ -711,6 +713,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       my.stat_pos(h2x)
       c1.cd(2)
       my.fill_hist(h2y, array2[key][:,1])
+      h2y.Sumw2()
       h2y=my.normalize(h2y)
       if i==0:
          h2y.Draw()
@@ -729,6 +732,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
                
       c1.cd(3)
       my.fill_hist(h2z, array2[key][:,2])
+      h2z.Sumw2()
       h2z=my.normalize(h2z)
       if i==0:
          h2z.Draw()
@@ -785,9 +789,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1x = ROOT.TH1F('G4x' + str(energy), '', x, 0, x)
    h1y = ROOT.TH1F('G4y' + str(energy), '', y, 0, y)
    h1z = ROOT.TH1F('G4z' + str(energy), '', z, 0, z)
-   h1x.Sumw2()
-   h1y.Sumw2()
-   h1z.Sumw2()
+
    h1x.SetLineColor(color)
    h1y.SetLineColor(color)
    h1z.SetLineColor(color)
@@ -796,6 +798,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1x, array1x)
+   h1x.Sumw2()
    h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
@@ -805,6 +808,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1y, array1y)
+   h1y.Sumw2()
    h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
@@ -814,6 +818,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1z, array1z)
+   h1z.Sumw2()
    h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
@@ -837,15 +842,12 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       h2x=h2xs[i]
       h2y=h2ys[i]
       h2z=h2zs[i]
-      h2x.Sumw2()
-      h2y.Sumw2()
-      h2z.Sumw2()
-
       h2x.SetLineColor(color)
       h2y.SetLineColor(color)
       h2z.SetLineColor(color)
       canvas.cd(1)
       my.fill_hist_wt(h2x, array2x[key])
+      h2x.Sumw2()
       h2x=my.normalize(h2x)
       if i==0:
         h2x.Draw()
@@ -868,6 +870,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(2)
       my.fill_hist_wt(h2y, array2y[key])
+      h2y.Sumw2()
       h2y=my.normalize(h2y)
       if i==0:
         h2y.Draw()
@@ -887,6 +890,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(3)
       my.fill_hist_wt(h2z, array2z[key])
+      h2z.Sumw2()
       h2z=my.normalize(h2z)
       if i==0:
         h2z.Draw()
@@ -959,11 +963,12 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], i
       hd.SetTitle("{} {} Moment Histogram for {} GeV".format(m+1, dim, energy) )
       hd.GetXaxis().SetTitle("{} Moment for {} axis".format(m+1, dim))
    my.fill_hist(hd, array1)
+   hd.Sumw2()
    hd =my.normalize(hd)
    hd.Draw()
    hd.Draw('sames hist')
    hd.SetLineColor(color)
-   hd.Sumw2()
+   
    c1.Update()
    legend.AddEntry(hd,"G4","l")
    c1.Update()
