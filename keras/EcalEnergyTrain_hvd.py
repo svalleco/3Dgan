@@ -369,7 +369,7 @@ if __name__ == '__main__':
     from keras.models import Model
     from keras.optimizers import Adadelta, Adam, RMSprop
     from keras.utils.generic_utils import Progbar
-    from sklearn.cross_validation import train_test_split
+    from sklearn.model_selection import train_test_split
 
     import tensorflow as tf
     import horovod.keras as hvd
