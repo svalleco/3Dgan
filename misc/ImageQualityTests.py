@@ -13,6 +13,7 @@ sys.path.insert(0,'../analysis')
 import utils.GANutils as gan
 import utils.ROOTutils as roo
 from skimage import measure
+import math
 from AngleArch3dGAN import generator, discriminator
 try:
   import setGPU
@@ -20,39 +21,91 @@ except:
   pass
 
 def main():
-  num_events =1000
-  latent = 256
-  labels =["G4", "GAN"]
-  filename = 'results/MSCN_hist_p75_shuffled.pdf'
+  latent = 256  #latent space
+  power=0.85    #power for cell energies used in training
+  thresh =0.0   #threshold used
+  get_shuffled= True # whether to make plots for shuffled
+  labels =["G4", "GAN"] # labels
+  plotsdir = 'results/IQA_p85_ep27' # dir for results
+  gan.safe_mkdir(plotsdir) 
   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path     
+  data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
+  energies =[0, 110, 150, 190]# energy bins
+  #angles=[math.radians(x) for x in [62, 90, 118]]
+  angles=[62, 90, 118]
+  g = generator(latent)       # build generator
+  gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_027.hdf5" # weights for generator
+  g.load_weights(gen_weight1) # load weights
+  sorted_data = gan.get_sorted_angle(data_files[24:], energies, thresh=thresh) # load data in a dict
 
-  g = generator(latent)
-  gen_weight1= "../weights/3dgan_weights_bins_pow/params_generator_epoch_059.hdf5"
-  g.load_weights(gen_weight1)
-  data_files = gan.GetDataFiles(datapath, ['Ele'])
-  images, y, ang = gan.GetAngleData(data_files[0], thresh=0., angtype='theta')
-  images, y, ang = images[:num_events], y[:num_events], ang[:num_events]
-  #generated_images, y, ang = gan.GetAngleData(data_files[1], thresh=0., angtype='theta')
-  #generated_images, y, ang = generated_images[:num_events], y[:num_events], ang[:num_events]
-  images = np.power(images, 0.75)
-  print( y.shape)
-  np.random.shuffle(y)
-  print( y.shape)
-  generated_images = gan.generate(g, num_events, [y, ang], latent, concat=1)
-  mscn_g4= MSCN_sparse(images)
-  mscn_gan= MSCN_sparse(generated_images)
-  #flattening
-  mscn_g4= mscn_g4.flatten()
-  mscn_gan=mscn_gan.flatten()
-  #removing zeros
-  mscn_g4= mscn_g4[mscn_g4!=0]
-  mscn_gan= mscn_gan[mscn_gan!=0]
-  data_range= np.amax(images)
-  ms_ssim=measure.compare_ssim(images, generated_images, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
-  print('SSIM={}'.format(ms_ssim))
-  psnr = measure.compare_psnr(images, generated_images, data_range=data_range)
-  print('PSNR={}'.format(psnr))
-  Draw1d(mscn_g4, mscn_gan, filename, labels, [ms_ssim, psnr])
+  # for each energy bin
+  for energy in energies:
+     for a in angles:
+       filename = path.join(plotsdir, "IQA_{}GeV_{}degree.pdf".format(energy, a)) # file name
+       indexes = np.where(((sorted_data["angle" + str(energy)]) > math.radians(a) - 0.1) & ((sorted_data["angle" + str(energy)]) < math.radians(a) + 0.1))
+       sorted_data["events_act" + str(energy) + "ang_" + str(a)] = sorted_data["events_act" + str(energy)][indexes]
+       sorted_data["energy" + str(energy) + "ang_" + str(a)] = sorted_data["energy" + str(energy)][indexes]
+       sorted_data["angle" + str(energy) + "ang_" + str(a)] = sorted_data["angle" + str(energy)][indexes]
+       
+       index= sorted_data["events_act" + str(energy)+ "ang_" + str(a)].shape[0]  # number of events in bin
+       # generate images
+       generated_images = gan.generate(g, index, [sorted_data["energy" + str(energy)+ "ang_" + str(a)]/100.
+                                    , sorted_data["angle" + str(energy)+ "ang_" + str(a)]]
+                                    , latent, concat=1)
+       # post processing
+       generated_images = np.power(generated_images, 1./power)
+
+       # Get MSCN Coefficients
+       mscn_g4= MSCN_sparse(sorted_data["events_act" + str(energy)+ "ang_" + str(a)])
+       mscn_gan= MSCN_sparse(generated_images)
+
+       #flattening
+       mscn_g4= mscn_g4.flatten()
+       mscn_gan=mscn_gan.flatten()
+
+       #removing zeros
+       mscn_g4= mscn_g4[mscn_g4!=0]
+       mscn_gan= mscn_gan[mscn_gan!=0]
+
+       #find other metrics
+       data_range= np.amax(sorted_data["events_act" + str(energy)+ "ang_" + str(a)])
+       ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
+       print('Energy={}'.format(energy))
+       print('SSIM={}'.format(ms_ssim))
+       psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, data_range=data_range)
+       print('PSNR={}'.format(psnr))
+       #make plot
+       Draw1d(mscn_g4, mscn_gan, filename, labels, [ms_ssim, psnr])
+
+       if get_shuffled:
+          # repeat for shuffled data
+          filename = path.join(plotsdir, "IQA_Data_shuffled{}GeV_{}degree.pdf".format(energy, a))
+          shuffled_data = sorted_data["events_act" + str(energy)+ "ang_" + str(a)]* 1.
+          np.random.shuffle(shuffled_data)
+          mscn_2 = MSCN_sparse(shuffled_data)
+          mscn_2 = mscn_2.flatten()
+          mscn_2 = mscn_2[mscn_2!=0]
+
+          ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
+          print('SSIM Data shuffled ={}'.format(ms_ssim))
+          psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, data_range=data_range)
+          print('PSNR Data shuffled ={}'.format(psnr))
+          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ms_ssim, psnr])
+
+          # repeat for shuffled GAN
+          filename = path.join(plotsdir, "IQA_GAN_shuffled{}GeV_{}degree.pdf".format(energy, a))
+          shuffled_gan= generated_images * 1.
+          np.random.shuffle(shuffled_gan)
+          mscn_2 = MSCN_sparse(shuffled_gan)
+          mscn_2 = mscn_2.flatten()
+          mscn_2 = mscn_2[mscn_2!=0]
+
+          ms_ssim=measure.compare_ssim(generated_images, shuffled_gan, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
+          print('SSIM GAN shuffled ={}'.format(ms_ssim))
+          psnr = measure.compare_psnr(generated_images, shuffled_gan, data_range=data_range)
+          print('PSNR GAN shuffled ={}'.format(psnr))
+          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ms_ssim, psnr])
+                              
 
 # MSCN original
 def MSCN(images):
@@ -60,6 +113,7 @@ def MSCN(images):
   x_shape= images.shape[1]
   y_shape= images.shape[2]
   z_shape= images.shape[3]
+  mscn = np.zeros_like(images)
   for x in np.arange(0, x_shape, 3):
     for y in np.arange(0, y_shape, 3):
       for z in np.arange(0, z_shape, 5):
@@ -68,8 +122,8 @@ def MSCN(images):
         slice_shape = images[:, x:x+3, y:y+3, z:z+5].shape
         mean = mean.reshape((mean.shape[0], 1, 1, 1))
         std = std.reshape((mean.shape[0], 1, 1, 1))
-        images[:, x:x+3, y:y+3, z:z+5]= (images[:, x:x+3, y:y+3, z:z+5] - mean)/(std + 1e-7)
-  return images
+        mscn[:, x:x+3, y:y+3, z:z+5]= (images[:, x:x+3, y:y+3, z:z+5] - mean)/(std + 1e-7)
+  return mscn
 
 # mean of non zero
 def mean_sparse(x):
@@ -98,6 +152,7 @@ def MSCN_sparse(images):
   x_shape= images.shape[1]
   y_shape= images.shape[2]
   z_shape= images.shape[3]
+  mscn=np.zeros_like(images)
   for x in np.arange(0, x_shape, 3):
     for y in np.arange(0, y_shape, 3):
       for z in np.arange(0, z_shape, 5):
@@ -109,8 +164,8 @@ def MSCN_sparse(images):
         indexes=np.where(image_slice ==0)
         image_slice= (image_slice-mean)/(std+1e-7)
         image_slice[indexes]=0
-        images[:, x:x+3, y:y+3, z:z+5]=image_slice
-  return images
+        mscn[:, x:x+3, y:y+3, z:z+5]=image_slice
+  return mscn
 
 def MS_SSIM(images1, images2):
   #images1 = np.squeeze(images1)
@@ -159,81 +214,5 @@ def Draw1d(array1, array2, filename, labels, metrics=[]):
   c.Print(filename)
   print (' The plot is saved in.....{}'.format(filename))
                   
-
-def _tf_fspecial_gauss(size, sigma):
-    """Function to mimic the 'fspecial' gaussian MATLAB function
-    """
-    x_data, y_data, z_data = np.mgrid[-size//2 + 1:size//2 + 1, -size//2 + 1:size//2 + 1, -size//4 + 1:size//4 + 1]
-
-    x_data = np.expand_dims(x_data, axis=-1)
-    x_data = np.expand_dims(x_data, axis=-1)
-
-    y_data = np.expand_dims(y_data, axis=-1)
-    y_data = np.expand_dims(y_data, axis=-1)
-    
-    z_data = np.expand_dims(y_data, axis=-1)
-    z_data = np.expand_dims(y_data, axis=-1)
-
-    x = tf.constant(x_data, dtype=tf.float32)
-    y = tf.constant(y_data, dtype=tf.float32)
-    z = tf.constant(z_data, dtype=tf.float32)
-    
-    g = tf.exp(-((x**2 + y**2 )/(2.0*sigma**2)))
-    return g / tf.reduce_sum(g)
-
-def tf_ssim(img1, img2, cs_map=False, mean_metric=True, size=5, sigma=1.5):
-    window = _tf_fspecial_gauss(size, sigma) # window shape [size, size]
-    print(window.shape)
-    K1 = 0.01
-    K2 = 0.03
-    L = 1  # depth of image (255 in case the image has a differnt scale)
-    C1 = (K1*L)**2
-    C2 = (K2*L)**2
-    mu1 = tf.nn.conv3d(img1, window, strides=[1,1,1,1,1], padding='VALID')
-    mu2 = tf.nn.conv3d(img2, window, strides=[1,1,1,1,1],padding='VALID')
-    mu1_sq = mu1*mu1
-    mu2_sq = mu2*mu2
-    mu1_mu2 = mu1*mu2
-    sigma1_sq = tf.nn.conv3d(img1*img1, window, strides=[1,1,1,1,1],padding='VALID') - mu1_sq
-    sigma2_sq = tf.nn.conv3d(img2*img2, window, strides=[1,1,1,1,1],padding='VALID') - mu2_sq
-    sigma12 = tf.nn.conv3d(img1*img2, window, strides=[1,1,1,1,1],padding='VALID') - mu1_mu2
-    if cs_map:
-        value = (((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*
-                    (sigma1_sq + sigma2_sq + C2)),
-                (2.0*sigma12 + C2)/(sigma1_sq + sigma2_sq + C2))
-    else:
-        value = ((2*mu1_mu2 + C1)*(2*sigma12 + C2))/((mu1_sq + mu2_sq + C1)*
-                    (sigma1_sq + sigma2_sq + C2))
-
-    if mean_metric:
-        value = tf.reduce_mean(value)
-    return value
-
-
-def tf_ms_ssim(img1, img2, mean_metric=True, level=2):
-    weight = tf.constant([0.0448, 0.2856, 0.3001, 0.2363, 0.1333], dtype=tf.float32)
-    mssim = []
-    mcs = []
-    print(K.int_shape(img1))
-    for l in range(level):
-        ssim_map, cs_map = tf_ssim(img1, img2, cs_map=True, mean_metric=False)
-        mssim.append(tf.reduce_mean(ssim_map))
-        mcs.append(tf.reduce_mean(cs_map))
-        filtered_im1 = tf.nn.avg_pool3d(img1, [1,2,2,2,1], [1,2,2,2,1], padding='SAME')
-        filtered_im2 = tf.nn.avg_pool3d(img2, [1,2,2,2,1], [1,2,2,2,1], padding='SAME')
-        img1 = filtered_im1
-        img2 = filtered_im2
-
-    # list to tensor of dim D+1
-    mssim = tf.pack(mssim, axis=0)
-    mcs = tf.pack(mcs, axis=0)
-
-    value = (tf.reduce_prod(mcs[0:level-1]**weight[0:level-1])*
-                            (mssim[level-1]**weight[level-1]))
-
-    if mean_metric:
-        value = tf.reduce_mean(value)
-    return value
-
 if __name__ == "__main__":
   main()
