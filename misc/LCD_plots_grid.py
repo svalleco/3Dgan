@@ -18,14 +18,14 @@ except:
 
 def main():
     #Architecture
-    from AngleArch3dGAN_add_loss_bins import generator, discriminator
+    from AngleArch3dGAN import generator, discriminator
 
     #Weights
-    disc_weight1="../weights/3dgan_weights_bins_pow/params_discriminator_epoch_026.hdf5"
-    gen_weight1= "../weights/3dgan_weights_bins_pow/params_generator_epoch_026.hdf5"
+    disc_weight1="../weights/3dgan_weights_bins_pow_p85/params_discriminator_epoch_059.hdf5"
+    gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_059.hdf5"
 
     #Path to store results
-    plotsdir = "results/LCD_paper_plots_grid_bins_pow/"
+    plotsdir = "results/LCD_paper_plots_grid_bins_pow_p85_ep59_states0/"
     safe_mkdir(plotsdir)
 
     #Parameters
@@ -45,9 +45,9 @@ def main():
     angtype = 'theta'# the angle data to be read from file
     particle='Ele'# partcile type
     thresh=0 # Threshold for ecal energies
-    power =0.75
+    power =0.85
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
-    states = 1
+    states = 0
     legs=1
     sortdir = 'SortedAngleData'  # if saving sorted data
     gendir = 'SortedAngleGen'  # if saving generated events
@@ -173,6 +173,7 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
         Eprofs.append(ROOT.TProfile("Eprof" + str(i), "", 100, int(p[0]), int(p[1])))
         Gprofs.append(ROOT.TProfile("Gprof" + str(i), "", 100, int(p[0]), int(p[1])))
         Eprof=Eprofs[i]
+        Gprof=Gprofs[i]
         if states==0:
             Eprof.SetStats(0)
             Gprof.SetStats(0)
@@ -191,7 +192,6 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
         Eprof.GetXaxis().SetTitleSize(0.051)
         Eprof.GetXaxis().SetTitleOffset()
         
-        Gprof = Gprofs[i]
         legs[pad-1].AddEntry(Eprof, "MAE={:.4f}".format(error), 'l')
         my.fill_profile(Gprof, 2 * ecal2[i]/penergy[i], penergy[i])
         Gprof.SetLineColor(4)
