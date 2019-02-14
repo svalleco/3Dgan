@@ -508,10 +508,13 @@ def generate(g, index, cond, latent=256, concat=1):
     energy_labels=np.expand_dims(cond[0], axis=1)
     if len(cond)> 1: # that means we also have angle
       angle_labels = cond[1]
-      if concat:
+      if concat==1:
         noise = np.random.normal(0, 1, (index, latent-1))  
         noise = energy_labels * noise
         gen_in = np.concatenate((angle_labels.reshape(-1, 1), noise), axis=1)
+      elif concat==2:
+        noise = np.random.normal(0, 1, (index, latent-2))
+        gen_in = np.concatenate((energy_labels, angle_labels.reshape(-1, 1), noise), axis=1)
       else:  
         noise = np.random.normal(0, 1, (index, 2, latent))
         angle_labels=np.expand_dims(angle_labels, axis=1)
