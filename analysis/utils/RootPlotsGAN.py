@@ -141,9 +141,11 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
    if y.shape[0]> ecal1["n_0"].shape[0]:
       y = y[:ecal1["n_0"].shape[0]]
    Eprof = ROOT.TProfile("Eprof", "Ratio of Ecal and Ep", 100, p[0], p[1])
+   Eprof.Sumw2()
    Eprof.SetStats(ROOT.kFALSE)
    Eprof.SetTitle("Ratio of Ecal and Ep for {}-{} GeV".format(p[0], p[1]))
    Eprof.GetXaxis().SetTitle("Ep GeV")
+
    # Since the Angle Data has energies multiplied by 50 for ecal depositions
    if ang:
      ratio1=ecal1["n_0"]/(50 *y)
@@ -165,6 +167,7 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
          ratio2=ecal2[key]/y
       Gprofs.append(ROOT.TProfile("Gprof" + str(i), "Gprof" + str(i), 100, int(p[0]), int(p[1])))
       Gprof = Gprofs[i]
+      Gprof.Sumw2()
       Gprof.SetStats(ROOT.kFALSE)
       my.fill_profile(Gprof, ratio2, y)
       error = np.mean(np.abs(ratio1 - ratio2 ))
@@ -195,6 +198,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
    if y.shape[0]> ecal1["n_0"].shape[0]:
       y = y[:ecal1["n_0"].shape[0]]
    Eprof = ROOT.TProfile("Eprof", "Relative error for Ecal sum vs. Ep", 50, p[0], p[1])
+   Eprof.Sumw2()
    Eprof.SetStats(ROOT.kFALSE)
    Eprof.SetTitle("Relative Error for sum of  Ecal energies and Ep {}-{} GeV".format(p[0], p[1]))
    my.fill_profile(Eprof, (ecal1["n_0"] - ecal1["n_0"])/ ecal1["n_0"], y)
@@ -210,6 +214,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
    for i, key in enumerate(ecal2):
       Gprofs.append(ROOT.TProfile("Gprof" + str(i), "Gprof" + str(i), 50, p[0], p[1]))
       Gprof = Gprofs[i]
+      Gprof.Sumw2()
       Gprof.SetStats(ROOT.kFALSE)
       error = (ecal1["n_0"]- ecal2[key])/ ecal1["n_0"]
       my.fill_profile(Gprof, error, y)
@@ -241,6 +246,8 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], ifpdf
      Gprofs.append(ROOT.TProfile("Gprof" + str(i),"Gprof" + str(i), 100, p[0], p[1]))
      Eprof= Eprofs[i]
      Gprof= Gprofs[i]
+     Eprof.Sumw2()
+     Gprof.Sumw2()
      if i== 0:
        Eprof.SetTitle("Relative Error for Primary Energy for {}-{} GeV".format(p[0], p[1]))
        Eprof.GetXaxis().SetTitle("Ep GeV")
@@ -284,12 +291,12 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
    c1.SetGrid()
    color=2
    hd = ROOT.TH1F("Geant4", "", 100, 0, 1.5 * p[1]/50)# energies for fixed angle has this rough relation to ecal sum
+   hd.Sumw2()
    hd.GetXaxis().SetTitle("Ecal Sum GeV")
    if ang:
       my.fill_hist(hd, ecal1['n_0']/50.)
    else:
       my.fill_hist(hd, ecal1['n_0'])
-   hd.Sumw2()
    hd = my.normalize(hd)              
    if energy == 0:
       hd.SetTitle("Ecal Sum Histogram for {}-{} GeV".format(p[0], p[1]))
@@ -307,6 +314,7 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
    for i, key in enumerate(ecal2):
       hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, 0, 1.5 * p[1]/50))
       hg= hgs[i]
+      hg.Sumw2()
       hg.SetLineColor(color)
       color+=1
       c1.Update()
@@ -314,7 +322,6 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
         my.fill_hist(hg, ecal2[key]/50.)
       else:
         my.fill_hist(hg, ecal2[key])
-      hg.Sumw2()
       hg =my.normalize(hg)
       hg.Draw('sames')
       hg.Draw('sames hist')
@@ -344,19 +351,19 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color =2
-   #ang=0
+
    ROOT.gPad.SetLogx()
    ROOT.gStyle.SetOptStat(111111)
    if log:
       ROOT.gPad.SetLogy()
    hd = ROOT.TH1F("Geant4", "", 100, -12, 1)
    my.BinLogX(hd)
+   hd.Sumw2()
    data1= event1.flatten()
    #data1=data1[data1>0]
    if ang:
       data1= data1/50.
    my.fill_hist(hd, data1)
-   hd.Sumw2()
    hd =my.normalize(hd)
    if energy == 0:
       hd.SetTitle("Cell energies Histogram for {:.2f}-{:.2f} GeV".format(p[0], p[1]))
@@ -374,15 +381,13 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
    for i, key in enumerate(event2):
       hgs.append(ROOT.TH1F("GAN" + str(i), "GAN" + str(i), 100, -12, 1))
       hg = hgs[i]
-      hg.Sumw2()
       my.BinLogX(hg)
+      hg.Sumw2()
       data2= event2[key].flatten()
-      #data2=data2[data2>0]
       if ang:
          data2= data2/50.
       my.fill_hist(hg, data2)
       hg =my.normalize(hg)
-      #my.stat_pos(hg)
       hg.SetLineColor(color)
       color+=2
       hg.Draw('sames')
@@ -405,6 +410,7 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], if
    c1.SetGrid()
    color = 2
    hd = ROOT.TH1F("Geant4", "", 50, 0, 500)
+   hd.Sumw2()
    if energy == 0:
       hd.SetTitle("Ecal Hits Histogram (above {} GeV) for {}-{} GeV Primary Energy".format(thresh, p[0], p[1]))
    else:
@@ -420,7 +426,6 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], if
    hd.Draw()
    hd.Draw('sames hist')
    hd.SetLineColor(color)
-   hd.Sumw2()
    color+=2
    hgs=[]
    pos = 0
@@ -460,6 +465,8 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 100, 0, 600))
      hp= hps[i]
      hg= hgs[i]
+     hp.Sumw2()
+     hg.Sumw2()
      if i== 0:
        #hp.SetStats(0)
        hp.SetTitle(" Predicted Primary Energy for {}-{} GeV".format(p[0], p[1]))
@@ -482,8 +489,6 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True):
      #hg.SetStats(0)
      
      my.fill_hist(hg, 100 *aux2[key])
-     hp.Sumw2()
-     hg.Sumw2()
      hp =my.normalize(hp)
      hg =my.normalize(hg)             
      hg.SetLineColor(color)
@@ -516,6 +521,8 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 50, -0.4, 0.4))
      hp= hps[i]
      hg= hgs[i]
+     hp.Sumw2()
+     hg.Sumw2()
      if i== 0:
        #hp.SetStats(0)
        if energy == 0:
@@ -542,8 +549,6 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
      #hg.SetStats(0)
      #my.stat_pos(hg)
      my.fill_hist(hg,  (y - aux2[key]*100)/y)
-     hp.Sumw2()
-     hg.Sumw2()
               
      hp =my.normalize(hp)
      hg =my.normalize(hg)
@@ -575,6 +580,8 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifp
      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 20, 0, 1.3))
      hp= hps[i]
      hg= hgs[i]
+     hp.Sumw2()
+     hg.Sumw2()
      if i== 0:
        #hp.SetStats(0)
        if energy == 0:
@@ -588,8 +595,6 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifp
        hp.Draw()
        hp.Draw('sames hist')
        c1.Update()
-       hp.Sumw2()
-       hg.Sumw2()
        #hp.GetYaxis().SetRangeUser(0, 0.5)
        hp.GetYaxis().SetTitle('count')
        hp.GetYaxis().CenterTitle()
@@ -640,12 +645,13 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    h1x.SetLineColor(color)
    h1y.SetLineColor(color)
    h1z.SetLineColor(color)
-   
+   h1x.Sumw2()
+   h1y.Sumw2()
+   h1z.Sumw2()
    c1.cd(1)
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1x, array1[:,0])
-   h1x.Sumw2()
    h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
@@ -654,7 +660,6 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1y, array1[:,1])
-   h1y.Sumw2()
    h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
@@ -663,7 +668,6 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist(h1z, array1[:,2])
-   h1z.Sumw2()
    h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
@@ -691,9 +695,13 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       h2x.SetLineColor(color)
       h2y.SetLineColor(color)
       h2z.SetLineColor(color)
+
+      h2x.Sumw2()
+      h2y.Sumw2()
+      h2z.Sumw2()
+      
       c1.cd(1)
       my.fill_hist(h2x, array2[key][:,0])
-      h2x.Sumw2()
       h2x=my.normalize(h2x)
       if i==0:
          h2x.Draw()
@@ -713,7 +721,6 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       my.stat_pos(h2x)
       c1.cd(2)
       my.fill_hist(h2y, array2[key][:,1])
-      h2y.Sumw2()
       h2y=my.normalize(h2y)
       if i==0:
          h2y.Draw()
@@ -732,7 +739,6 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
                
       c1.cd(3)
       my.fill_hist(h2z, array2[key][:,2])
-      h2z.Sumw2()
       h2z=my.normalize(h2z)
       if i==0:
          h2z.Draw()
@@ -793,12 +799,16 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1x.SetLineColor(color)
    h1y.SetLineColor(color)
    h1z.SetLineColor(color)
+
+   h1x.Sumw2()
+   h1y.Sumw2()
+   h1z.Sumw2()
+   
    color+=2
    canvas.cd(1)
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1x, array1x)
-   h1x.Sumw2()
    h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
@@ -808,7 +818,6 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1y, array1y)
-   h1y.Sumw2()
    h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
@@ -818,7 +827,6 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if log:
       ROOT.gPad.SetLogy()
    my.fill_hist_wt(h1z, array1z)
-   h1z.Sumw2()
    h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
@@ -842,12 +850,17 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       h2x=h2xs[i]
       h2y=h2ys[i]
       h2z=h2zs[i]
+      
+      h2x.Sumw2()
+      h2y.Sumw2()
+      h2z.Sumw2()
+      
       h2x.SetLineColor(color)
       h2y.SetLineColor(color)
       h2z.SetLineColor(color)
+
       canvas.cd(1)
       my.fill_hist_wt(h2x, array2x[key])
-      h2x.Sumw2()
       h2x=my.normalize(h2x)
       if i==0:
         h2x.Draw()
@@ -870,7 +883,6 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(2)
       my.fill_hist_wt(h2y, array2y[key])
-      h2y.Sumw2()
       h2y=my.normalize(h2y)
       if i==0:
         h2y.Draw()
@@ -890,7 +902,6 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(3)
       my.fill_hist_wt(h2z, array2z[key])
-      h2z.Sumw2()
       h2z=my.normalize(h2z)
       if i==0:
         h2z.Draw()
@@ -956,14 +967,14 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], i
    c1.SetGrid()
    color = 2
    legend = ROOT.TLegend(.7, .1, .9, .3)
-   hd = ROOT.TH1F("G4"+ dim + str(m), "", bins, minbin, maxbin)
+   hd = ROOT.TH1F("G4"+ dim + str(m)+str(energy), "", bins, minbin, maxbin)
+   hd.Sumw2()
    if energy == 0:
       hd.SetTitle("{} {} Moment Histogram for {}-{} GeV".format(m+1, dim, p[0], p[1]))
    else:
       hd.SetTitle("{} {} Moment Histogram for {} GeV".format(m+1, dim, energy) )
       hd.GetXaxis().SetTitle("{} Moment for {} axis".format(m+1, dim))
    my.fill_hist(hd, array1)
-   hd.Sumw2()
    hd =my.normalize(hd)
    hd.Draw()
    hd.Draw('sames hist')
@@ -975,11 +986,11 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], i
    color+=2
    hgs=[]
    for i, key in enumerate(array2):
-      hgs.append(ROOT.TH1F("GAN"+ dim + str(m)+str(i), "GAN"+ dim + str(m)+str(i), bins, minbin, maxbin))
+      hgs.append(ROOT.TH1F("GAN"+ dim + str(m)+str(energy) + str(i), "GAN"+ dim + str(m)+str(i), bins, minbin, maxbin))
       hg= hgs[i]
+      hg.Sumw2()
       my.fill_hist(hg, array2[key][:, m])
       hg.SetLineColor(color)
-      hg.Sumw2()
       hg =my.normalize(hg)
       color+=1
       hg.Draw('sames')
@@ -1011,7 +1022,7 @@ def plot_ang_hist(ang1, ang2, out_file, angle, angtype, labels, p, ifpdf=True):
    legend = ROOT.TLegend(.7, .1, .9, .3)
    hp=ROOT.TH1F("G4" ,"G4", 50, 0, 3)
    hp.Sumw2()
-   hp.SetTitle("Angle Histogram for {:.2f} {}".format(angle, angtype) )
+   hp.SetTitle("Angle Histogram for {} degrees({:.4f} rad) {}".format(angle, np.radians(angle),  angtype) )
    hp.GetXaxis().SetTitle(angtype + ' (radians)')
    hp.GetYaxis().SetTitle('Count')
    hp.GetYaxis().CenterTitle()
@@ -1068,7 +1079,7 @@ def plot_angle_error_hist(ang1, ang2, y, out_file, angle, angtype, labels, p, if
       hg.Sumw2()
       if i== 0:
          #hp.SetStats(0)
-         hp.SetTitle("Angle Relative Error Histogram for {:.2f} {}".format(angle, angtype) )
+         hp.SetTitle("Angle Relative Error Histogram for {} Degrees ({:.4f}rad) {}".format(angle, np.radians(angle), angtype) )
          hp.GetXaxis().SetTitle(angtype + " radians")
          hp.GetYaxis().SetTitle("(angle_{act} - angle_{pred})/angle_{act}")
          hp.GetYaxis().CenterTitle()
@@ -1226,7 +1237,7 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
 
 ##################################### Get plots for variable angle #####################################################################
 
-def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes, m, n, ifpdf=True, stest=True, angloss=1, addloss=0, cell=0, corr=0):
+def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifpdf=True, stest=True, angloss=1, addloss=0, cell=0, corr=0):
    actdir = plots_dir + 'Actual'
    safe_mkdir(actdir)
    discdir = plots_dir + 'disc_outputs'
@@ -1365,10 +1376,10 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
       safe_mkdir(eactdir)
       egendir = os.path.join(gendir, 'energy_' + str(energy))
       safe_mkdir(egendir)
-      for a, angle in zip(aindexes, angles):
+      for index, a in enumerate(angles):
          #alabels = ['ang_' + str() for _ in aindexes]
-         alabels = ['angle_{:.2f}{}'.format(angle, _) for _ in labels]
-         a2labels = ['angle2_{:.2f}{}'.format(angle, _) for _ in labels]
+         alabels = ['angle_{}{}'.format(a, _) for _ in labels]
+         a2labels = ['angle2_{}{}'.format(a, _) for _ in labels]
          plot_energy_hist_root(var["sumsx_act"+ str(energy) + "ang_" + str(a)], var["sumsy_act"+ str(energy)+ "ang_" + str(a)],
                                   var["sumsz_act"+ str(energy) + "ang_" + str(a)], var["sumsx_gan"+ str(energy)+ "ang_" + str(a)],
                                   var["sumsy_gan"+ str(energy)+ "ang_" + str(a)], var["sumsz_gan"+ str(energy)+ "ang_" + str(a)],
@@ -1382,24 +1393,24 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,
                                os.path.join(ecomdir, histfile+ 'logang_' + str(a)), energy, alabels, log=1, p=p, stest=stest, ifpdf=ifpdf)
          plots+=1
          plot_ang_hist(var["angle_act" + str(energy) + "ang_" + str(a)], var["angle_gan" + str(energy) + "ang_" + str(a)] ,
-                       os.path.join(ediscdir, "ang_" + str(a)), angle, angtype, alabels, p=p, ifpdf=ifpdf)
+                       os.path.join(ediscdir, "ang_" + str(a)), a, angtype, alabels, p=p, ifpdf=ifpdf)
          plots+=1
          plot_angle_error_hist(var["angle_act" + str(energy) + "ang_" + str(a)], var["angle_gan" + str(energy) + "ang_" + str(a)],
                                var["angle" + str(energy) + "ang_" + str(a)], os.path.join(ediscdir, aerrorfile + "ang2_" + str(a)),
-                               angle, angtype, alabels, p=p, ifpdf=ifpdf)
+                               a, angtype, alabels, p=p, ifpdf=ifpdf)
          plots+=1
 
          if angloss == 2:
             plot_ang_hist(var["angle2_act" + str(energy) + "ang_" + str(a)], var["angle2_gan" + str(energy) + "ang_" + str(a)] ,
-                          os.path.join(ediscdir, "ang2_" + str(a)), angle, angtype, a2labels, p=p, ifpdf=ifpdf)
+                          os.path.join(ediscdir, "ang2_" + str(a)), a, angtype, a2labels, p=p, ifpdf=ifpdf)
             plots+=1
             plot_angle_error_hist(var["angle2_act" + str(energy) + "ang_" + str(a)], var["angle2_gan" + str(energy) + "ang_" + str(a)],
                                   var["angle" + str(energy) + "ang_" + str(a)], os.path.join(ediscdir, aerrorfile + "ang2_" + str(a)),
-                                  angle, angtype, a2labels, p=p, ifpdf=ifpdf)
+                                  a, angtype, a2labels, p=p, ifpdf=ifpdf)
             plots+=1
                                              
          plot_realfake_hist(var["isreal_act" + str(energy) + "ang_" + str(a)], var["isreal_gan" + str(energy)+ "ang_" + str(a)],
-                            os.path.join(ediscdir, realfile  + "ang_" + str(a)), angle, alabels, p, ifpdf=ifpdf)
+                            os.path.join(ediscdir, realfile  + "ang_" + str(a)), a, alabels, p, ifpdf=ifpdf)
          plots+=1
          plot_primary_error_hist(var["aux_act" + str(energy) + "ang_" + str(a)], var["aux_gan" + str(energy) + "ang_" + str(a)],
                       var["energy" + str(energy) + "ang_" + str(a)], os.path.join(ediscdir, 'error_' + energyfile + "ang_" + str(a)),
