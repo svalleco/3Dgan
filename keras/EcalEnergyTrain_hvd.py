@@ -23,6 +23,7 @@ import random
 import psutil
 import socket
 import time
+from tensorflow.python.client import timeline
 from keras.callbacks import CallbackList
 import analysis.utils.GANutils as gan # some common functions for gan
 
@@ -137,7 +138,7 @@ def randomize(a, b, c):
     return shuffled_a, shuffled_b, shuffled_c
 
 
-def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=True):
+def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=True):
     start_init = time.time()
     # verbose = False
     if hvd.rank()==0:
@@ -146,7 +147,7 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
     discriminator.compile(
         optimizer=opt,
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ecal_weight]
+        loss_weights=[gen_weight, aux_weight, ecal_weight],options=run_options,run_metadata=run_metadata
     )
 
     # build the generator
@@ -155,7 +156,7 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
     #generator.summary()
     generator.compile(
         optimizer=opt,
-        loss='binary_crossentropy'
+        loss='binary_crossentropy',options=run_options,run_metadata=run_metadata
     )
  
     # build combined Model
@@ -173,7 +174,7 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=opt,
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=[gen_weight, aux_weight, ecal_weight]
+        loss_weights=[gen_weight, aux_weight, ecal_weight],options=run_options,run_metadata=run_metadata
     )
 
     gcb = CallbackList( \
@@ -241,7 +242,7 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
     nb_test = X_test.shape[0]
     assert X_train.shape[0] == EventsperFile * len(Trainfiles), "# Total events in training files"
     nb_train = X_train.shape[0]# Total events in training files
-    total_batches = nb_train / global_batch_size
+    total_batches = int(nb_train / global_batch_size)
     if hvd.rank()==0:
         print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
@@ -268,9 +269,9 @@ def GanTrain(discriminator, generator, opt, global_batch_size, warmup_epochs, da
 
         for index in range(total_batches):
             start = time.time()         
-            image_batch = image_batches.next()
-            energy_batch = energy_batches.next()
-            ecal_batch = ecal_batches.next()
+            image_batch = next(image_batches)
+            energy_batch = next(energy_batches)
+            ecal_batch = next(ecal_batches)
 
             noise = np.random.normal(0, 1, (batch_size, latent_size))
             sampled_energies = np.random.uniform(0.1, 5,( batch_size, 1))
@@ -340,8 +341,8 @@ def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--model', '-m', action='store', type=str, default='EcalEnergyGan', help='Model architecture to use.')
     parser.add_argument('--nbepochs', action='store', type=int, default=25, help='Number of epochs to train for.')
-    parser.add_argument('--batchsize', action='store', type=int, default=126, help='batch size per update')
-    parser.add_argument('--latentsize', action='store', type=int, default=128, help='size of random N(0, 1) latent space to sample')
+    parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
+    parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/eos/project/d/dshep/LCD/V1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
@@ -369,7 +370,8 @@ if __name__ == '__main__':
     from keras.models import Model
     from keras.optimizers import Adadelta, Adam, RMSprop
     from keras.utils.generic_utils import Progbar
-    from sklearn.cross_validation import train_test_split
+    #from sklearn.cross_validation import train_test_split
+    from sklearn.model_selection import train_test_split
 
     import tensorflow as tf
     import horovod.keras as hvd
@@ -397,7 +399,10 @@ if __name__ == '__main__':
     os.environ['OMP_NUM_THREADS'] = str(params.intraop)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
     K.set_session(tf.Session(config=config))
-   
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
+
+
     # Initialize Horovod.
     hvd.init()
 
@@ -431,5 +436,9 @@ if __name__ == '__main__':
     d=discriminator(keras_dformat=d_format)
     g=generator(latent_size,keras_dformat=d_format)
     
-    GanTrain(d, g, opt, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, weightdir, resultfile, energies, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale, verbose=verbose, keras_dformat=d_format, analysis=analysis)
- 
+    GanTrain(d, g, opt, run_options, run_metadata, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, weightdir, resultfile, energies, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size=latent_size, gen_weight=8, aux_weight=0.2, ecal_weight=0.1, xscale = xscale, verbose=verbose, keras_dformat=d_format, analysis=analysis )
+    to = timeline.Timeline(run_metadata.step_stats)
+    trace = to.generate_chrome_trace_format()
+    with open('full_train_trace.json', 'w') as out:
+          out.write(trace)
+
