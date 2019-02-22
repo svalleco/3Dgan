@@ -22,14 +22,18 @@ sys.path.insert(0,'../')
 
 def main():
    #Architecture 
-   from AngleArch3dGAN_newbins import generator, discriminator
+   from AngleArch3dGAN import generator, discriminator
+   if tlab:
+     #Weights
+     disc_weight1="/gkhattak/weights/3Dweights_newbins2/params_discriminator_epoch_059.hdf5"
+     gen_weight1= "/gkhattak/weights/3Dweights_newbins2/params_generator_epoch_059.hdf5"
    
-   #Weights
-   disc_weight1="/gkhattak/weights/3Dweights_newbins2/params_discriminator_epoch_059.hdf5"
-   gen_weight1= "/gkhattak/weights/3Dweights_newbins2/params_generator_epoch_059.hdf5"
+   else:
+     disc_weight1="../weights/3dgan_weights_bins_pow_p85/params_discriminator_epoch_054.hdf5"
+     gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_054.hdf5"
       
    #Path to store results
-   plots_dir = "results/analysis_newbins2_ep59/"
+   plots_dir = "results/analysis_bins_pow_p85_ep54/"
 
    #Parameters
    latent = 256 # latent space

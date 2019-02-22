@@ -32,7 +32,7 @@ def main():
    plotsdir = 'results/genplots_newbins2_ep59' # name of folder to save results
    
    # generator model
-   from AngleArch3dGAN_newbins import generator
+   from AngleArch3dGAN import generator
 
    # some variables that need to be adjusted according to training configuration
    latent = 256 # latent space for generator

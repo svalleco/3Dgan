@@ -29,7 +29,7 @@ sys.path.insert(0,'../')
 
 def main():
     # All of the following needs to be adjusted
-    from AngleArch3dGAN_newbins import generator # architecture
+    from AngleArch3dGAN import generator # architecture
     weightdir = '3Dweights_newbins2/params_generator*.hdf5'
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
