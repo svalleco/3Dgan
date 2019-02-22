@@ -2,23 +2,34 @@
 ## This script loads weights into architectures for generator and discriminator. Different Physics quantities are then calculated and plotted for a 100-200 GeV events from LCD variable angle dataset##
 from utils.GANutils import perform_calculations_angle  # to calculate different Physics quantities
 from utils.RootPlotsGAN import get_plots_angle         # to make plots with ROOT
+import os
 import h5py
 import numpy as np
-import setGPU
 import math
 import sys
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
+if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used        
+    tlab = True
+else:
+    tlab= False
+
+try:
+    import setGPU #if Caltech                                                                                
+except:
+    pass
+
+
+sys.path.insert(0,'../')
 
 def main():
    #Architecture 
-   from AngleArch3dGAN import generator, discriminator
-
+   from AngleArch3dGAN_newbins import generator, discriminator
+   
    #Weights
-   disc_weight1="../weights/3dgan_weights_bins_pow_p85/params_discriminator_epoch_054.hdf5"
-   gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_054.hdf5"
+   disc_weight1="/gkhattak/weights/3Dweights_newbins2/params_discriminator_epoch_059.hdf5"
+   gen_weight1= "/gkhattak/weights/3Dweights_newbins2/params_generator_epoch_059.hdf5"
       
    #Path to store results
-   plots_dir = "results/analysis_bins_pow_p85_ep54/"
+   plots_dir = "results/analysis_newbins2_ep59/"
 
    #Parameters
    latent = 256 # latent space
@@ -37,8 +48,11 @@ def main():
    particle='Ele'# partcile type
    thresh=0 # Threshold for ecal energies
    #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-   #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # imperium
-   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+   if tlab:
+      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
+   else:
+      datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+   
    sortdir = 'SortedAngleData'  # if saving sorted data
    gendir = 'SortedAngleGen'  # if saving generated events
    discdir = 'SortedAngleDisc' # if saving disc outputs
