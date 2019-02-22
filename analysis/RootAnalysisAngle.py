@@ -14,11 +14,11 @@ def main():
    from AngleArch3dGAN import generator, discriminator
 
    #Weights
-   disc_weight1="../weights/3dgan_weights_bins_pow_p85/params_discriminator_epoch_059.hdf5"
-   gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_059.hdf5"
+   disc_weight1="../weights/3dgan_weights_bins_pow_p85/params_discriminator_epoch_054.hdf5"
+   gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_054.hdf5"
       
    #Path to store results
-   plots_dir = "results/analysis_p85_ep59_new/"
+   plots_dir = "results/analysis_bins_pow_p85_ep54/"
 
    #Parameters
    latent = 256 # latent space
