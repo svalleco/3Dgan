@@ -51,7 +51,7 @@ from keras.utils.generic_utils import Progbar
 def main():
     #Architectures to import
     if keras.__version__ == '1.2.2':
-        from AngleArch3dGAN_newbins import generator, discriminator
+        from AngleArch3dGAN import generator, discriminator
     else:
         from AngleArch3dGAN_k2 import generator, discriminator
 
@@ -115,24 +115,20 @@ def get_parser():
     parser.add_argument('--hist_weight', action='store', type=float, default=0.1, help='loss weight for additional bin count loss')
     parser.add_argument('--thresh', action='store', type=int, default=0., help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
-    parser.add_argument('--name', action='store', type=str, default='newbins', help='Identifier for training.')
+    parser.add_argument('--name', action='store', type=str, default='newtrain', help='Identifier for training.')
     return parser
 
-# A histogram fucntion that counts cells in different bins
 def hist_count(x, p=1):
-    bin1 = np.sum(np.where(x>(0.08**p) , 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<(0.08**p)) & (x>(0.05**p)), 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<(0.05**p)) & (x>(0.035**p)), 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<(0.035**p)) & (x>(0.025**p)), 1, 0), axis=(1, 2, 3))
-    bin5 = np.sum(np.where((x<(0.025**p)) & (x>(0.018**p)), 1, 0), axis=(1, 2, 3))
-    bin6 = np.sum(np.where((x<(0.018**p)) & (x>(0.0122**p)), 1, 0), axis=(1, 2, 3))
-    bin7 = np.sum(np.where((x<(0.0122**p)) & (x>(0.009**p)), 1, 0), axis=(1, 2, 3))
-    bin8 = np.sum(np.where((x<(0.009**p)) & (x>(0.006**p)), 1, 0), axis=(1, 2, 3))    
-    bin9 = np.sum(np.where((x<(0.006**p)) & (x>(0.0025**p)), 1, 0), axis=(1, 2, 3))
-    bin10 = np.sum(np.where((x<(0.0025**p)) & (x>0.), 1, 0), axis=(1, 2, 3))
-    bin11 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
-    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8, bin9, bin10, bin11], axis=1)
-    bins[np.where(bins==0)]=1 # so that an empty bin will be assigned a count of 1 to avoid unstability
+    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=(1, 2, 3))
+    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=(1, 2, 3))
+    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=(1, 2, 3))
+    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=(1, 2, 3))
+    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=(1, 2, 3))
+    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=(1, 2, 3))
+    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=(1, 2, 3))
+    bin8 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
+    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
+    bins[np.where(bins==0)]=1
     return bins
 
 #get data for training
@@ -302,7 +298,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
             epoch_gen_loss.append(generator_loss)
             index +=1
-
+            if epoch==1:
+                print('batch = {}'.format(nb_batches))
             # Used at design time for debugging
             #print('real_batch_loss', real_batch_loss)
             #print ('fake_batch_loss', fake_batch_loss)
