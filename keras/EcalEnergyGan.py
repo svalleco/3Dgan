@@ -92,3 +92,4 @@ def generator(latent_size=200, return_intermediate=False, keras_dformat='channel
      Model(inputs=[latent], outputs=fake_image).summary()
      return Model(inputs=[latent], outputs=fake_image)
 
+
