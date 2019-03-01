@@ -62,7 +62,7 @@ def generator(latent_size=200, return_intermediate=False, keras_dformat='channel
         dim = (7,7,8,8)
      else:
         dim = (8, 7, 7,8)
-     
+
      loc = Sequential([
          Dense(64 * 7* 7, input_dim=latent_size),
          Reshape(dim),

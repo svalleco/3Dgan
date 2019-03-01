@@ -62,7 +62,6 @@ def FillHist2D_wt(hist, array):
 #Hits above a threshold
 def get_hits(events, thresh=0.0002):
    hit_array = events>thresh
-   print(hit_array.shape)
    hits = np.sum(hit_array, axis=(1, 2, 3))
    return hits
 
