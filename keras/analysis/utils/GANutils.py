@@ -23,7 +23,7 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
 
 #Divide files in train and test lists     
 def DivideFiles(FileSearch="/data/LCD/*/*.h5",
-                Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
+                Fractions=[.9,.1],datasetnames=["ECAL"],Particles=["Ele"],MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
     print ("Found {} files. ".format(len(Files)))
@@ -97,7 +97,7 @@ def GetData(datafile):
     x=np.array(f.get('ECAL'))
     y=(np.array(y[:,1]))
     x[x < 1e-6] = 0
-    x = np.expand_dims(x, axis=-1)
+    #x = np.expand_dims(x, axis=-1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
     return x, y
@@ -261,8 +261,9 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     return ang
 
 # short version of analysis                                                                                                                      
-def OptAnalysisShort(var, generated_images, energies, ang=1):
+def OptAnalysisShort(var, generated_images, energies, ang=1, dformat='channels_last'):
     m=2
+    generated_images= np.squeeze(generated_images)
     x = generated_images.shape[1]
     y = generated_images.shape[2]
     z = generated_images.shape[3]
@@ -299,7 +300,7 @@ def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2
     for index, datafile in enumerate(datafiles):
         data = GetData(datafile)
         X = data[0]
-        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
+        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3)) #remove events with 0 deposition 
         indexes= np.where(sumx>0)
         X=X[indexes]
         Y = data[1]
@@ -648,10 +649,10 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
           save_sorted(var, energies, sortdir, ang) # saving sorted data in a directory
 
     total = 0
-
+      
     # For each energy bin
     for energy in energies:
-      # Getting dimensions of ecal images  
+      # Getting dimensions of ecal images         
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
       z =var["events_act"+ str(energy)].shape[3]
@@ -659,7 +660,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
       #calculations for data events
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0] # number of events in bin
       total += var["index" + str(energy)] # total events 
-      ecal =np.sum(var["events_act"+ str(energy)], axis=(1, 2, 3))# sum actual events for moment calculations
+      ecal =np.sum(var["events_act"+ str(energy)], axis=daxis)# sum actual events for moment calculations
       var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)]) # get position of maximum deposition
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)]) # get sums along different axis
       var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)],
@@ -849,7 +850,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
     return var
 
 
-def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, flags, latent, events_per_file=10000, particle='Ele'):
+def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, thresh, flags, latent, events_per_file=10000, particle='Ele', dformat='channels_last'):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     Test = flags[0]
     save_data = flags[1]
@@ -870,14 +871,18 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
        # Getting Data                                                                                                                                                                                              
        events_per_file = 10000
        Filesused = int(math.ceil(num_data/events_per_file))
+       print(Filesused)
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
        Trainfiles = Trainfiles[: Filesused]
        Testfiles = Testfiles[: Filesused]
+       print(len(Trainfiles))
+       print(len(Testfiles))
        if Test:
           data_files = Testfiles
        else:
           data_files = Trainfiles
        start = time.time()
+       print(data_files)
        var = get_sorted(data_files, energies, True, num_events1, num_events2)
        data_time = time.time() - start
        print ("{} events were loaded in {} seconds".format(num_data, data_time))
@@ -930,6 +935,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              g.load_weights(gen_weights)
              start = time.time()
              var["events_gan" + str(energy)]['n_'+ str(i)] = generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100], latent)
+             var["events_gan" + str(energy)]['n_'+ str(i)] = np.squeeze(var["events_gan" + str(energy)]['n_'+ str(i)])
              if save_gen:
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], var["energy" + str(energy)], energy, gendir)
              gen_time = time.time() - start
@@ -940,11 +946,19 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
           else:
              d.load_weights(disc_weights)
              start = time.time()
+             if dformat=='channels_last':
+               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
+               var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=-1)
+             else:
+               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
+               var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=1)
+
              var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_act" + str(energy)] * scale)
              var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)] )
              disc_time = time.time() - start
              print ("Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)]))
-
+             var["events_act" + str(energy)]= np.squeeze(var["events_act" + str(energy)])
+             var["events_gan" + str(energy)]['n_'+ str(i)]= np.squeeze(var["events_gan" + str(energy)]['n_'+ str(i)])
              if save_disc:
                discout = {}
                for key in var:

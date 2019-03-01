@@ -20,13 +20,9 @@ sys.path.insert(1, os.path.join(sys.path[0], '..'))
 def main():
 
    #Architectures 
-   if keras.__version__ == '1.2.2':
-      from EcalEnergyGan_k1 import generator, discriminator
-   else:
-      from EcalEnergyGan import generator, discriminator
+   from EcalEnergyGan import generator, discriminator
 
    import keras.backend as K
-   K.set_image_dim_ordering('tf')
 
    parser = get_parser()
    params = parser.parse_args()
@@ -58,17 +54,20 @@ def main():
    yscale= params.yscale
    energies= params.energies
    thresh = params.thresh
+   dformat = params.dformat
    labels=['']
    
    if tlab:
       datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
-      gweights = ['/gkhattak/EnergyWeights/3dganWeights/params_generator_epoch_027.hdf5']
-      dweights = ['/gkhattak/EnergyWeights/3dganWeights/params_discriminator_epoch_027.hdf5']
+      gweights = ['/gkhattak/weights/EnergyWeights/3dganWeights/params_generator_epoch_049.hdf5']
+      dweights = ['/gkhattak/weights/EnergyWeights/3dganWeights/params_discriminator_epoch_049.hdf5']
       
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
-   d = discriminator()
-   g = generator(latent)
-   var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, nbEvents, binevents, moments, xscales, flags, latent, particle)
+   d = discriminator(keras_dformat=dformat)
+   g = generator(latent, keras_dformat=dformat)
+   
+   var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data=nbEvents
+         , num_events=binevents, m=moments, scales=xscales, thresh=thresh, flags=flags, latent=latent, particle=particle, dformat=dformat)
    pl.get_plots_multi(var, labels, plotsdir, energies, moments, len(gweights), ifpdf, stest, cell)
 
 def get_parser():
@@ -101,6 +100,7 @@ def get_parser():
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--energies', action='store', type=int, default=[0, 50, 100, 200, 250, 300, 400, 500], help='Energy bins for analysis')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
+    parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
     return parser
 
 
