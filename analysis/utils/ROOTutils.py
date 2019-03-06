@@ -67,11 +67,25 @@ def get_hits(events, thresh=0.0002):
 
 # making ratio of first layer to total
 def ratio1_total(events):
-   mid= int(events.shape[3]/2)
-   print 'mid={}'.format(mid)
+   mid= int(events.shape[3]/3)
    array1=np.sum(events[:, :, :, :mid], axis=(1, 2, 3))
    total=np.sum(events[:, :, :, :], axis=(1, 2, 3))
    return array1/total
+
+# making ratio of first layer to total
+def ratio2_total(events):
+   mid= int(events.shape[3]/3)
+   array2=np.sum(events[:, :, :, mid:2 *mid], axis=(1, 2, 3))
+   total=np.sum(events[:, :, :, :], axis=(1, 2, 3))
+   return array2/total
+
+# making ratio of first layer to total
+def ratio3_total(events):
+   mid= int(events.shape[3]/3)
+   array3=np.sum(events[:, :, :, 2 *mid:], axis=(1, 2, 3))
+   total=np.sum(events[:, :, :, :], axis=(1, 2, 3))
+   return array3/total
+
 
 # Position of state box
 def stat_pos(a, pos=0):
