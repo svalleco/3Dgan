@@ -13,7 +13,16 @@ import ROOTutils as my # common utility functions for root
 from GANutils import safe_mkdir, get_sums
 
 ##################################### Plots used in detailed analysis ######################################################
-
+def flip(m, axis):
+   if not hasattr(m, 'ndim'):
+      m = asarray(m)
+   indexer = [slice(None)] * m.ndim
+   try:
+      indexer[axis] = slice(None, None, -1)
+   except IndexError:
+      raise ValueError("axis=%i is invalid for the %i-dimensional input array"
+                       % (axis, m.ndim))
+   return m[tuple(indexer)]
 
 # computes correlation of a set of features and returns Fisher's Transform and names of features
 def get_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hits, ratio):
@@ -38,8 +47,25 @@ def get_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, h
    cor= np.corrcoef(array, rowvar=False)
    cor= get_dia(cor)
    fisher= np.arctanh(cor)
-   return np.flip(fisher, axis=0), names
+   return flip(fisher, axis=0), names
 
+# computes correlation of a set of features and returns Fisher's Transform and names of features
+def get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3):
+   names = ['']
+   m=2
+   for i in range(m):
+      if i==0:
+         array = np.hstack((momentx[:, i].reshape(-1, 1), momenty[:, i].reshape(-1, 1), momentz[:, i].reshape(-1, 1)))
+      else:
+         array = np.hstack((array, momentx[:, i].reshape(-1, 1), momenty[:, i].reshape(-1, 1), momentz[:, i].reshape(-1, 1)))
+      names = names + ['momentx' + str(i), 'momenty' + str(i), 'momentz' + str(i)]
+   array = np.hstack((array, ecal.reshape(-1, 1), energy.reshape(-1, 1)))
+   array = np.hstack((array, hits.reshape(-1, 1), ratio1.reshape(-1, 1), ratio2.reshape(-1, 1), ratio3.reshape(-1, 1)))
+   names = names + ['ecal sum', 'p energy', 'hits', 'ratio1_total', 'ratio2_total', 'ratio3_total']
+   cor= np.corrcoef(array, rowvar=False)
+   cor = get_dia2(cor)
+   return flip(cor, axis=0), names
+                                                                                             
 #Get the lower triangular matrix of given array
 def get_dia(array):
    darray = np.zeros_like(array)
@@ -47,6 +73,15 @@ def get_dia(array):
       for j in np.arange(i):
          darray[i, j]=array[i, j]
    return darray
+
+#Get the triangular matrix of given array including diagonal
+def get_dia2(array):
+   darray = np.zeros_like(array)
+   for i in np.arange(array.shape[0]):
+      for j in np.arange(i+1):
+         darray[i, j]=array[i, j]
+   return darray
+                              
 
 # Compute and plot correlation
 def plot_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, gsumx, gsumy, gsumz, gmomentx, gmomenty, gmomentz, gecal, energy, events1, events2, out_file, labels):
@@ -58,6 +93,18 @@ def plot_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, gsumx, g
              gecal[key], energy, my.get_hits(events2[key]), my.ratio1_total(events2[key]), 
              out_file, 'GAN{}_{}'.format(labels[i], i), compare=True, gprev=actcorr)
 
+# Compute and plot correlation
+def plot_correlation_small(momentx, momenty, momentz, ecal, gmomentx, gmomenty, gmomentz, gecal, energy, events1, events2, out_file, labels):
+   ecal = ecal["n_0"]
+   hits = my.get_hits(events1)
+   actcorr = plot_corr_python_small(momentx, momenty, momentz, ecal, energy, my.get_hits(events1), my.ratio1_total(events1), my.ratio2_total(events1), my.ratio3_total(events1), out_file, 'Data')
+   for i, key in enumerate(gmomentx):
+      gcorr = plot_corr_python_small(gmomentx[key], gmomenty[key], gmomentz[key],
+               gecal[key], energy, my.get_hits(events2[key]), my.ratio1_total(events2[key]), my.ratio2_total(events2[key]), my.ratio3_total(events2[key]),
+               out_file, 'GAN{}_{}'.format(labels[i], i), compare=False, gprev=actcorr)
+                       
+
+                                                                              
 #Fills a 2D TGraph object
 def fill_graph2D(graph, array):
    x = array.shape[0]
@@ -91,6 +138,39 @@ def plot_corr_python(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, 
    plt.savefig(out_file + '_python' + label + '.pdf')
    return corr
 
+#plot correlation using Python
+def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, out_file, label, compare=False, gprev=None):
+   corr, names = get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3)
+   x = np.arange(corr.shape[0]+ 1)
+   y = np.arange(corr.shape[1]+ 1)
+   X, Y = np.meshgrid(x, y)
+   if compare:
+      num_squares = corr.shape[0]*(corr.shape[0]-1)/2
+      error = (gprev - corr)
+      mean_error = np.sum(np.absolute(error))/num_squares
+      print ('mae={}'.format(mean_error))
+      dlabel='{} MAE = {:.4f} '.format(label, mean_error)
+   else:
+      dlabel=label
+   plt.figure()
+   plt.pcolor(X, Y, corr, label=dlabel, vmin = -1, vmax = 1)
+   plt.xticks(x, names, rotation='vertical', fontsize=6)
+   plt.yticks(x, names[::-1], fontsize=5)
+   plt.margins(0.1)
+   plt.colorbar()
+   plt.legend()
+   plt.savefig(out_file + '_python' + label + '.pdf')
+   if not gprev==None:
+     plt.figure()
+     plt.pcolor(X, Y, corr-gprev, label=dlabel, vmin = -1, vmax = 1)
+     plt.xticks(x, names, rotation='vertical', fontsize=5)
+     plt.yticks(x, names[::-1], fontsize=6)
+     plt.margins(0.1)
+     plt.colorbar()
+     plt.legend()
+     plt.savefig(out_file + '_diff_python' + label + '.pdf')
+   return corr
+                                                                                              
 #plot correlation using root
 def plot_corr_root(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hits, ratio, out_file, label, compare=False, stest=True, gprev=0):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                
@@ -405,11 +485,11 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
    else:
       c1.Print(out_file + '.C')
 
-def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True, thresh=0.004, ang=1):
+def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True, thresh=3e-4, ang=1):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
    color = 2
-   hd = ROOT.TH1F("Geant4", "", 50, 0, 500)
+   hd = ROOT.TH1F("Geant4", "", 50, 0, 2000)
    hd.Sumw2()
    if energy == 0:
       hd.SetTitle("Ecal Hits Histogram (above {} GeV) for {}-{} GeV Primary Energy".format(thresh, p[0], p[1]))
@@ -432,7 +512,7 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], if
    legend = ROOT.TLegend(.7, .1, .9, .3)
    legend.AddEntry(hd,"G4","l")
    for i, key in enumerate(event2):
-      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 50, 0, 500))
+      hgs.append(ROOT.TH1F("GAN" + labels[i], "GAN" + labels[i], 50, 0, 2000))
       hg = hgs[i]
       hg.Sumw2()
       my.fill_hist(hg, my.get_hits(event2[key], thresh))
@@ -1188,23 +1268,27 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
           plots+=1
           plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
           plots+=1
-          if corr:
+          if corr==1:
              plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
              plots+=1
-          if cell:
-             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          elif corr==2:
+             plot_correlation_small(var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile+ "small"), labels)
              plots+=1
-             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, log=1)
+                                                                              
+          if cell:
+             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, ang=ang)
+             plots+=1
+             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, log=1, ang=ang)
              plots+=1
        plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy, labels, stest=stest, ang=ang)
        plots+=1
        if cell>1:
-          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, ang=ang)
           plots+=1
-          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, ang=ang)
           plots+=1
                     
-       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy, labels, thresh = 0.0002)
+       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy, labels, ang=ang)
        plots+=1
        plot_aux_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)] , os.path.join(discdir, energyfile), energy, labels)
        plots+=1
@@ -1289,7 +1373,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
          plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], 
                                    var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels, p, ifpdf=ifpdf)
          plots+=1
-         if corr:                                                                                                                
+         if corr==1:                                                                                                                
            plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)],    
                            var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)],                                  
                            var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)],                               
@@ -1299,6 +1383,12 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
                            var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)],                                  
                            var["energy" + str(energy)], var["events_act" + str(energy)],                                     
                            var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
+         elif corr>1:
+           plot_correlation_small(var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["momentX_gan" + str(energy)],
+                                  var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)],
+                                  var["events_gan" + str(energy)], os.path.join(comdir, correlationfile+ "small"), labels)
+           plots+=1
+                                         
          if cell:
            plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], 
                          os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, p=p, log=1, ifpdf=ifpdf)
@@ -1311,10 +1401,10 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
                      os.path.join(discdir, ecalfile), energy, labels, p, stest=stest, ifpdf=ifpdf)
       plots+=1
       if cell>1:
-         plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)], 
+         plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], 
                                 os.path.join(comdir, 'flat' + 'log' + ecalfile), energy, labels, p=p, log=1, ifpdf=ifpdf)
          plots+=1     
-         plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], var["energy" + str(energy)], 
+         plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], 
                                 os.path.join(comdir, 'flat' + ecalfile), energy, labels, p=p, ifpdf=ifpdf)  
       plots+=1                                                                                                             
       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)],
@@ -1416,16 +1506,22 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
                       var["energy" + str(energy) + "ang_" + str(a)], os.path.join(ediscdir, 'error_' + energyfile + "ang_" + str(a)),
                                  energy, alabels, p, ifpdf=ifpdf)
          plots+=1
-         if cell==2:
+         if cell==3:
             plot_ecal_flatten_hist(var["events_act" + str(energy) + "ang_" + str(a)], var["events_gan" + str(energy) + "ang_" + str(a)],
-                                   var["energy" + str(energy) + "ang_" + str(a)],
                                    os.path.join(ecomdir, 'flat' + 'log' + ecalfile + "ang_" + str(a)), energy, labels, p=p, log=1, ifpdf=ifpdf)
             plots+=1
             plot_ecal_flatten_hist(var["events_act" + str(energy) + "ang_" + str(a)], var["events_gan" + str(energy) + "ang_" + str(a)],
-                                   var["energy" + str(energy) + "ang_" + str(a)],
                                    os.path.join(ecomdir, 'flat' + ecalfile + "ang_" + str(a)), energy, labels, p=p, ifpdf=ifpdf)
             plots+=1
-                                                   
+         if corr==3:
+            plot_correlation_small(var["momentX_act" + str(energy)+ "ang_" + str(a)], var["momentY_act" + str(energy)+ "ang_" + str(a)],
+                                   var["momentZ_act" + str(energy)+ "ang_" + str(a)], var["ecal_act" + str(energy)+ "ang_" + str(a)],
+                                   var["momentX_gan" + str(energy)+ "ang_" + str(a)], var["momentY_gan" + str(energy)+ "ang_" + str(a)],
+                                   var["momentZ_gan" + str(energy)+ "ang_" + str(a)], var["ecal_gan" + str(energy)+ "ang_" + str(a)],
+                                   var["energy" + str(energy)+ "ang_" + str(a)], var["events_act" + str(energy)+ "ang_" + str(a)],
+                                   var["events_gan" + str(energy)+ "ang_" + str(a)], os.path.join(ecomdir, correlationfile+ "small"+ "ang_" + str(a)), labels)
+            plots+=1
+                       
    print ('Plots are saved in ', plots_dir)
    plot_time= time.time()- start
    print ('{} Plots are generated in {} seconds'.format(plots, plot_time))

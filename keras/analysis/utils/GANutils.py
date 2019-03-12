@@ -23,7 +23,7 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
 
 #Divide files in train and test lists     
 def DivideFiles(FileSearch="/data/LCD/*/*.h5",
-                Fractions=[.9,.1],datasetnames=["ECAL"],Particles=["Ele"],MaxFiles=-1):
+                Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     print ("Searching in :",FileSearch)
     Files =sorted( glob.glob(FileSearch))
     print ("Found {} files. ".format(len(Files)))
@@ -89,15 +89,16 @@ def GetDataFiles(FileSearch="/data/LCD/*/*.h5",
     return Sample
 
 # get data for fixed angle
-def GetData(datafile):
+def GetData(datafile, thresh=0):
    #get data for training
     print( 'Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     y=f.get('target')
     x=np.array(f.get('ECAL'))
     y=(np.array(y[:,1]))
-    x[x < 1e-6] = 0
-    #x = np.expand_dims(x, axis=-1)
+    if thresh>0:
+       x[x < thresh] = 0
+    x = np.expand_dims(x, axis=-1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
     return x, y
@@ -261,9 +262,8 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     return ang
 
 # short version of analysis                                                                                                                      
-def OptAnalysisShort(var, generated_images, energies, ang=1, dformat='channels_last'):
+def OptAnalysisShort(var, generated_images, energies, ang=1):
     m=2
-    generated_images= np.squeeze(generated_images)
     x = generated_images.shape[1]
     y = generated_images.shape[2]
     z = generated_images.shape[3]
@@ -300,7 +300,7 @@ def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2
     for index, datafile in enumerate(datafiles):
         data = GetData(datafile)
         X = data[0]
-        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3)) #remove events with 0 deposition 
+        sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
         indexes= np.where(sumx>0)
         X=X[indexes]
         Y = data[1]
@@ -649,10 +649,10 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
           save_sorted(var, energies, sortdir, ang) # saving sorted data in a directory
 
     total = 0
-      
+
     # For each energy bin
     for energy in energies:
-      # Getting dimensions of ecal images         
+      # Getting dimensions of ecal images  
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
       z =var["events_act"+ str(energy)].shape[3]
@@ -660,7 +660,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
       #calculations for data events
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0] # number of events in bin
       total += var["index" + str(energy)] # total events 
-      ecal =np.sum(var["events_act"+ str(energy)], axis=daxis)# sum actual events for moment calculations
+      ecal =np.sum(var["events_act"+ str(energy)], axis=(1, 2, 3))# sum actual events for moment calculations
       var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)]) # get position of maximum deposition
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)]) # get sums along different axis
       var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)],
@@ -825,8 +825,8 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
              var["isreal_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["isreal_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["aux_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_act" + str(energy)]['n_'+ str(i)][indexes]
              var["aux_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
-             var["ecal_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_act" + str(energy)]['n_'+ str(i)][indexes]
-             var["ecal_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
+             var["ecal_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["ecal_act" + str(energy)]['n_'+ str(i)][indexes]
+             var["ecal_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["ecal_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["angle_act" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["angle_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["momentX_gan"+ str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["momentX_gan"+ str(energy)]['n_'+ str(i)][indexes]
@@ -848,7 +848,6 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
       for energy in energies:
          print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["max_pos_gan" + str(energy)]['n_'+ str(i)], axis=0), np.mean(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["momentX_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentY_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentZ_gan"+ str(energy)]['n_'+ str(i)][:, 1])))
     return var
-
 
 def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, thresh, flags, latent, events_per_file=10000, particle='Ele', dformat='channels_last'):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
@@ -947,12 +946,13 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              d.load_weights(disc_weights)
              start = time.time()
              if dformat=='channels_last':
-               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
+               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
                var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=-1)
              else:
-               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
+               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
                var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=1)
-
+             discout= discriminate(d, var["events_act" + str(energy)] * scale)
+             print(len(discout))
              var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_act" + str(energy)] * scale)
              var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)] )
              disc_time = time.time() - start
