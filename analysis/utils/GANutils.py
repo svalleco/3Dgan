@@ -89,14 +89,15 @@ def GetDataFiles(FileSearch="/data/LCD/*/*.h5",
     return Sample
 
 # get data for fixed angle
-def GetData(datafile):
+def GetData(datafile, thresh=0):
    #get data for training
     print( 'Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     y=f.get('target')
     x=np.array(f.get('ECAL'))
     y=(np.array(y[:,1]))
-    x[x < 1e-6] = 0
+    if thresh>0:
+       x[x < thresh] = 0
     x = np.expand_dims(x, axis=-1)
     x = x.astype(np.float32)
     y = y.astype(np.float32)
@@ -824,8 +825,8 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
              var["isreal_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["isreal_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["aux_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_act" + str(energy)]['n_'+ str(i)][indexes]
              var["aux_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
-             var["ecal_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_act" + str(energy)]['n_'+ str(i)][indexes]
-             var["ecal_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["aux_gan" + str(energy)]['n_'+ str(i)][indexes]
+             var["ecal_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["ecal_act" + str(energy)]['n_'+ str(i)][indexes]
+             var["ecal_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["ecal_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["angle_act" + str(energy)]['n_'+ str(i)][indexes]
              var["angle_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["angle_gan" + str(energy)]['n_'+ str(i)][indexes]
              var["momentX_gan"+ str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["momentX_gan"+ str(energy)]['n_'+ str(i)][indexes]
@@ -848,8 +849,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
          print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}".format(energy, var["index" +str(energy)], np.amax(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["max_pos_gan" + str(energy)]['n_'+ str(i)], axis=0), np.mean(var["events_gan" + str(energy)]['n_'+ str(i)]), np.mean(var["momentX_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentY_gan"+ str(energy)]['n_'+ str(i)][:, 1]), np.mean(var["momentZ_gan"+ str(energy)]['n_'+ str(i)][:, 1])))
     return var
 
-
-def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, flags, latent, events_per_file=10000, particle='Ele'):
+def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, scales, thresh, flags, latent, events_per_file=10000, particle='Ele', dformat='channels_last'):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     Test = flags[0]
     save_data = flags[1]
@@ -870,14 +870,18 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
        # Getting Data                                                                                                                                                                                              
        events_per_file = 10000
        Filesused = int(math.ceil(num_data/events_per_file))
+       print(Filesused)
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
        Trainfiles = Trainfiles[: Filesused]
        Testfiles = Testfiles[: Filesused]
+       print(len(Trainfiles))
+       print(len(Testfiles))
        if Test:
           data_files = Testfiles
        else:
           data_files = Trainfiles
        start = time.time()
+       print(data_files)
        var = get_sorted(data_files, energies, True, num_events1, num_events2)
        data_time = time.time() - start
        print ("{} events were loaded in {} seconds".format(num_data, data_time))
@@ -930,6 +934,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              g.load_weights(gen_weights)
              start = time.time()
              var["events_gan" + str(energy)]['n_'+ str(i)] = generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100], latent)
+             var["events_gan" + str(energy)]['n_'+ str(i)] = np.squeeze(var["events_gan" + str(energy)]['n_'+ str(i)])
              if save_gen:
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], var["energy" + str(energy)], energy, gendir)
              gen_time = time.time() - start
@@ -940,11 +945,20 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
           else:
              d.load_weights(disc_weights)
              start = time.time()
+             if dformat=='channels_last':
+               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
+               var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=-1)
+             else:
+               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
+               var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=1)
+             discout= discriminate(d, var["events_act" + str(energy)] * scale)
+             print(len(discout))
              var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_act" + str(energy)] * scale)
              var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= discriminate(d, var["events_gan" + str(energy)]['n_'+ str(i)] )
              disc_time = time.time() - start
              print ("Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)]))
-
+             var["events_act" + str(energy)]= np.squeeze(var["events_act" + str(energy)])
+             var["events_gan" + str(energy)]['n_'+ str(i)]= np.squeeze(var["events_gan" + str(energy)]['n_'+ str(i)])
              if save_disc:
                discout = {}
                for key in var:
