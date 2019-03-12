@@ -25,7 +25,7 @@ def main():
     gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_059.hdf5"
 
     #Path to store results
-    plotsdir = "results/LCD_plots_5march_add0/"
+    plotsdir = "results/LCD_plots_grid_paper/"
     safe_mkdir(plotsdir)
     #Parameters
     latent = 256 # latent space
@@ -80,7 +80,9 @@ def main():
 
 
     states = 0
-    legs=0
+    legs=1
+    norm=1
+    
     for energy in energies:
         edir = os.path.join(plotsdir, 'energy_{}'.format(energy))
         safe_mkdir(edir)
@@ -142,11 +144,11 @@ def main():
                               
            energy_act.append(var["energy"+ str(energy) + "ang_" + str(theta)])
         thetas = [0, 62, 90, 118]
-        PlotSamplingGrid(ecal_act, ecal_gan, energy_act, hits_act, hits_gan, os.path.join(edir, 'samplig_grid{}'.format(energy)), energy, thetas, states=states,legs=legs)
-        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid{}'.format(energy)), energy, thetas, states=states,legs=legs)
-        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid_log{}'.format(energy)), energy, thetas, log=1, states=states,legs=legs)
-        PlotMomentHistGrid(momentx_act, momenty_act, momentz_act, momentx_gan, momenty_gan, momentz_gan, os.path.join(edir, 'moment_grid{}'.format(energy)), energy, thetas, states=states, legs=legs)
-        PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, os.path.join(edir, 'ratio_grid{}'.format(energy)), energy, thetas, states=states, legs=legs)        
+        PlotSamplingGrid(ecal_act, ecal_gan, energy_act, hits_act, hits_gan, os.path.join(edir, 'samplig_grid{}'.format(energy)), energy, thetas, states=states,legs=legs, norm=norm)
+        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid{}'.format(energy)), energy, thetas, states=states,legs=legs, norm=norm)
+        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid_log{}'.format(energy)), energy, thetas, log=1, states=states,legs=legs, norm=norm)
+        PlotMomentHistGrid(momentx_act, momenty_act, momentz_act, momentx_gan, momenty_gan, momentz_gan, os.path.join(edir, 'moment_grid{}'.format(energy)), energy, thetas, states=states, legs=legs, norm=norm)
+        PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, os.path.join(edir, 'ratio_grid{}'.format(energy)), energy, thetas, states=states, legs=legs, norm=norm)        
 
 def taking_power(n, scale=1.0, power=1.0):
     return(np.power(n * scale, power))
@@ -154,8 +156,8 @@ def taking_power(n, scale=1.0, power=1.0):
 def inv_power(n, scale=1.0, power=1.0):
     return(np.power(n, 1.0/power))/scale
       
-def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1):
-    canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,400) #make
+def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1, norm=0):
+    canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,300) #make
     canvas.SetGrid()
 
     legs=[]
@@ -168,7 +170,7 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
 
     for i, theta in enumerate(thetas):
         #theta = int(np.degrees(theta))
-        legs.append(ROOT.TLegend(0.6,0.1,0.9,0.2))
+        legs.append(ROOT.TLegend(0.45,0.1,0.9,0.3))
         legs[pad-1].SetHeader('Sampling Fraction', "C")
         canvas.cd(pad)
         if theta==0:
@@ -203,11 +205,12 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         Eprof.Draw()
         Eprof.SetLineColor(2)
         Eprof.GetYaxis().SetTitleOffset()
-        Eprof.GetYaxis().SetTitleSize(0.053)
+        Eprof.GetYaxis().SetTitleSize(0.051)
         Eprof.GetXaxis().SetTitleSize(0.051)
         Eprof.GetXaxis().SetTitleOffset()
-
-        legs[pad-1].AddEntry(Eprof, "MAE={:.4f}".format(error), 'l')
+        legs[pad-1].AddEntry(Eprof, "G4", 'l')
+        legs[pad-1].AddEntry(Gprof, "GAN", 'l')
+        #legs[pad-1].AddEntry(Eprof, "MAE={:.4f}".format(error), 'l')
         my.fill_profile(Gprof, ecal2[i]/(50 * penergy[i]), penergy[i])
         Gprof.SetLineColor(4)
         Gprof.Draw('sames')
@@ -228,7 +231,7 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
             ROOT.gPad.SetLogy()
         h_act.append(ROOT.TH1F('G4_hits{:d}theta_{:d}GeV'.format(theta, energy), '', 50, 0, 2000))
         h_gan.append(ROOT.TH1F('GAN_hits{:d}theta_{:d}GeV'.format(theta, energy), '', 50, 0, 2000))
-        legs.append(ROOT.TLegend(0.75,0.1,0.9,0.2))
+        legs.append(ROOT.TLegend(0.65,0.1,0.9,0.3))
         h_act[i].Sumw2()
         h_gan[i].Sumw2()
         h_act[i].SetLineColor(2)
@@ -237,10 +240,11 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         my.fill_hist(h_act[i], hits_act[i])
         my.fill_hist(h_gan[i], hits_gan[i])
         if states==0:
-            h_act[i].SetStats(states)
-            h_gan[i].SetStats(states)
-        h_act[i]=my.normalize(h_act[i], 1)
-        h_gan[i]=my.normalize(h_gan[i], 1)
+           h_act[i].SetStats(states)
+           h_gan[i].SetStats(states)
+        if norm:
+           h_act[i]=my.normalize(h_act[i], 1)
+           h_gan[i]=my.normalize(h_gan[i], 1)
         h_act[i].GetXaxis().SetTitle("Hits above 3e-4 GeV")
         h_act[i].GetYaxis().SetTitle("normalized count")
         h_act[i].GetYaxis().CenterTitle()
@@ -253,10 +257,12 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         h_act[i].Draw('')
         h_act[i].Draw('sames hist')
         canvas.Update()
-
         h_gan[i].Draw('sames')
         h_gan[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(h_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(h_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -269,7 +275,7 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         canvas.Print(out_file + '.C')
                         
 
-def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1):
+def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1, norm=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,400) #make
     canvas.SetGrid()
    
@@ -296,29 +302,33 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
         x_shape=sumx_act[0].shape[1]
         h1x.append(ROOT.TH1F('G4x{:d}theta_{:d}GeV'.format(theta, energy), '', x_shape, 0, x_shape))
         h2x.append(ROOT.TH1F('GANx{:d}theta_{:d}GeV'.format(theta, energy), '', x_shape, 0, x_shape))
-        legs.append(ROOT.TLegend(0.65,0.8,0.9,0.9))
+        legs.append(ROOT.TLegend(0.65,0.6,0.9,0.9))
         h1x[i].SetLineColor(2)
         h2x[i].SetLineColor(4)
         h1x[i].Sumw2()
         h2x[i].Sumw2()
-        legs[pad-1].SetHeader('Shower Shapes', "C")
+        legs[pad-1].SetHeader('Shower X', "C")
         my.fill_hist_wt(h1x[i], sumx_act[i])
         my.fill_hist_wt(h2x[i], sumx_gan[i])
         if states==0:
             h1x[i].SetStats(states)
             h2x[i].SetStats(states)
-        h1x[i]=my.normalize(h1x[i], 1)
-        h2x[i]=my.normalize(h2x[i], 1)
+        if norm:
+            h1x[i]=my.normalize(h1x[i], 1)
+            h2x[i]=my.normalize(h2x[i], 1)
         h1x[i].SetTitle(title)
         h1x[i].GetXaxis().SetTitle("Position along X axis")
-        h1x[i].GetYaxis().SetTitle("normalized energy")
+        if log:
+            h1x[i].GetYaxis().SetTitle("normalized energy [log]")
+        else:
+            h1x[i].GetYaxis().SetTitle("normalized energy")
         h1x[i].GetYaxis().CenterTitle()
         h1x[i].GetYaxis().SetTitleOffset()
         h1x[i].GetYaxis().SetTitleSize(0.053)
         h1x[i].GetXaxis().SetTitleSize(0.051)
         h1x[i].GetXaxis().SetTitleOffset()
-        if not log:
-          h1x[i].GetYaxis().SetRangeUser(0, 0.5)
+        #if not log:
+          #h1x[i].GetYaxis().SetRangeUser(0, 0.5)
         canvas.Update()
         h1x[i].Draw('')
         h1x[i].Draw('sames hist')
@@ -326,7 +336,10 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
 
         h2x[i].Draw('sames')
         h2x[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(h1x[i], "G4", 'l')
+            legs[pad-1].AddEntry(h2x[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -343,21 +356,25 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
         y_shape=sumy_act[0].shape[1]
         h1y.append(ROOT.TH1F('G4y{:d}theta_{:d}GeV'.format(theta, energy), '', y_shape, 0, y_shape))
         h2y.append(ROOT.TH1F('GANy{:d}theta_{:d}GeV'.format(theta, energy), '', y_shape, 0, y_shape))
-        legs.append(ROOT.TLegend(0.65,0.8,0.9,0.9))
+        legs.append(ROOT.TLegend(0.65,0.6,0.9,0.9))
         h1y[i].SetLineColor(2)
         h2y[i].SetLineColor(4)
         h1y[i].Sumw2()
         h2y[i].Sumw2()
-        legs[pad-1].SetHeader('Shower Shapes', "C")
+        legs[pad-1].SetHeader('Shower Y', "C")
         my.fill_hist_wt(h1y[i], sumy_act[i])
         my.fill_hist_wt(h2y[i], sumy_gan[i])
         if states==0:
             h1y[i].SetStats(states)
             h2y[i].SetStats(states)
-        h1y[i]=my.normalize(h1y[i], 1)
-        h2y[i]=my.normalize(h2y[i], 1)
+        if norm:
+            h1y[i]=my.normalize(h1y[i], 1)
+            h2y[i]=my.normalize(h2y[i], 1)
         h1y[i].GetXaxis().SetTitle("Position along Y axis")
-        h1y[i].GetYaxis().SetTitle("normalized energy")
+        if log:
+            h1y[i].GetYaxis().SetTitle("normalized energy [log]")
+        else:
+            h1y[i].GetYaxis().SetTitle("normalized energy")
         h1y[i].GetYaxis().CenterTitle()
         h1y[i].GetYaxis().SetTitleOffset()
         h1y[i].GetYaxis().SetTitleSize(0.053)
@@ -371,7 +388,10 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
 
         h2y[i].Draw('sames')
         h2y[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(h1y[i], "G4", 'l')
+            legs[pad-1].AddEntry(h2y[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -388,21 +408,25 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
         z_shape=sumz_act[0].shape[1]
         h1z.append(ROOT.TH1F('G4z{:d}theta_{:d}GeV'.format(theta, energy), '', z_shape, 0, z_shape))
         h2z.append(ROOT.TH1F('GANz{:d}theta_{:d}GeV'.format(theta, energy), '', z_shape, 0, z_shape))
-        legs.append(ROOT.TLegend(0.65,0.8,0.9,0.9))
+        legs.append(ROOT.TLegend(0.65,0.6,0.9,0.9))
         h1z[i].Sumw2()
         h2z[i].Sumw2()
         h1z[i].SetLineColor(2)
         h2z[i].SetLineColor(4)
-        legs[pad-1].SetHeader('Shower Shapes', "C")
+        legs[pad-1].SetHeader('Shower Z', "C")
         my.fill_hist_wt(h1z[i], sumz_act[i])
         my.fill_hist_wt(h2z[i], sumz_gan[i])
         if states==0:
             h1z[i].SetStats(states)
             h2z[i].SetStats(states)
-        h1z[i]=my.normalize(h1z[i], 1)
-        h2z[i]=my.normalize(h2z[i], 1)
+        if norm:
+            h1z[i]=my.normalize(h1z[i], 1)
+            h2z[i]=my.normalize(h2z[i], 1)
         h1z[i].GetXaxis().SetTitle("Position along Z axis")
-        h1z[i].GetYaxis().SetTitle("normalized energy")
+        if log:
+            h1z[i].GetYaxis().SetTitle("normalized energy [log]")
+        else:
+            h1z[i].GetYaxis().SetTitle("normalized energy")
         h1z[i].GetYaxis().CenterTitle()
         h1z[i].GetYaxis().SetTitleOffset()
         h1z[i].GetYaxis().SetTitleSize(0.053)
@@ -416,7 +440,10 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
 
         h2z[i].Draw('sames')
         h2z[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(h1z[i], "G4", 'l')
+            legs[pad-1].AddEntry(h2z[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -429,7 +456,7 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
     if ifC:
         canvas.Print(out_file + '.C')
                         
-def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1):
+def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1, norm=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,500) #make
     canvas.SetGrid()
     label = "Weighted Histograms for {} GeV".format(energy)
@@ -444,18 +471,13 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
     pad=1
 
     for i, theta in enumerate(thetas):
-        #theta = int(np.degrees(theta))
         if theta==0:
             title = "theta=60-120 degrees"
         else:
             title = "theta={} degrees".format(theta)
         bins = 50
         canvas.cd(pad)
-        legs.append(ROOT.TLegend(0.7,0.8,0.9,0.9))
-        #maxbin = np.amax(ratio1_act[i])+ 2
-        #if maxbin > 50:
-        #    maxbin=50
-        #minbin = min(0, np.amin(mx_act[i]))
+        legs.append(ROOT.TLegend(0.5,0.7,0.9,0.9))
         r1_act.append(ROOT.TH1F('G4{:d}r1_theta_{:d}'.format(theta, energy), '', bins, 0, 1))
         r1_gan.append(ROOT.TH1F('GAN{:d}r1_theta_{:d}GeV'.format(theta, energy), '', bins, 0, 1))
         r1_act[i].SetLineColor(2)
@@ -465,15 +487,16 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if states==0:
             r1_act[i].SetStats(states)
             r1_gan[i].SetStats(states)
-        r1_act[i]=my.normalize(r1_act[i], 1)
-        r1_gan[i]=my.normalize(r1_gan[i], 1)
+        if norm:
+           r1_act[i]=my.normalize(r1_act[i], 1)
+           r1_gan[i]=my.normalize(r1_gan[i], 1)
         r1_act[i].GetXaxis().SetTitle("Ratio first/total")
         r1_act[i].GetYaxis().SetTitle("normalized count")
         r1_act[i].GetYaxis().CenterTitle()
         r1_act[i].GetYaxis().SetTitleOffset()
         r1_act[i].GetYaxis().SetTitleSize(0.055)
         r1_act[i].GetXaxis().SetTitleSize(0.05)
-        r1_act[i].GetYaxis().SetRangeUser(0., 0.3)
+        if norm:  r1_act[i].GetYaxis().SetRangeUser(0., 0.3)
         r1_act[i].SetTitle(title)
         legs[pad-1].SetHeader('Ratio first/total', "C")
         canvas.Update()
@@ -483,7 +506,10 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
 
         r1_gan[i].Draw('sames')
         r1_gan[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(r1_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(r1_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -492,15 +518,10 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         pad+=1
 
     for i, theta in enumerate(thetas):
-        #theta = int(np.degrees(theta))
         bins = 50
         canvas.cd(pad)
-        legs.append(ROOT.TLegend(0.7,0.8,0.9,0.9))
-        legs[pad-1].SetHeader('Y2 moment', "C")
-        #maxbin = np.amax(my_act[i])+ 2
-        #if maxbin > 50:
-        #   maxbin=50
-        #minbin = min(0, np.amin(my_act[i]))
+        legs.append(ROOT.TLegend(0.1,0.7,0.5,0.9))
+        legs[pad-1].SetHeader('Ratio mid/total', "C")
         r2_act.append(ROOT.TH1F('G4{:d}r2_theta_{:d}'.format(theta, energy), '', bins, 0, 1))
         r2_gan.append(ROOT.TH1F('GAN{:d}r2_theta_{:d}GeV'.format(theta, energy), '', bins, 0, 1))
         r2_act[i].SetLineColor(2)
@@ -510,16 +531,17 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if states==0:
             r2_act[i].SetStats(states)
             r2_gan[i].SetStats(states)
-        r2_act[i]=my.normalize(r2_act[i], 1)
-        r2_gan[i]=my.normalize(r2_gan[i], 1)
+        if norm:
+            r2_act[i]=my.normalize(r2_act[i], 1)
+            r2_gan[i]=my.normalize(r2_gan[i], 1)
+            r2_act[i].GetYaxis().SetRangeUser(0., 0.3)
         r2_act[i].GetXaxis().SetTitle("Ratio mid/total")
         r2_act[i].GetYaxis().SetTitle("normalized count")
         r2_act[i].GetYaxis().CenterTitle()
         r2_act[i].GetYaxis().SetTitleOffset()
         r2_act[i].GetYaxis().SetTitleSize(0.055)
         r2_act[i].GetXaxis().SetTitleSize(0.05)
-        r2_act[i].GetYaxis().SetRangeUser(0., 0.3)
-
+      
         canvas.Update()
         r2_act[i].Draw('')
         r2_act[i].Draw('sames hist')
@@ -527,7 +549,11 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
 
         r2_gan[i].Draw('sames')
         r2_gan[i].Draw('sames hist')
+        canvas.Update()
+        
         if legs:
+            legs[pad-1].AddEntry(r2_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(r2_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -537,15 +563,11 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         canvas.Update()
 
     for i, theta in enumerate(thetas):
-        #theta = int(np.degrees(theta))
         bins = 50
         canvas.cd(pad)
-        legs.append(ROOT.TLegend(0.7,0.8,0.9,0.9))
-        legs[pad-1].SetHeader('Z2 moment', "C")
-        #maxbin = np.amax(mz_act[i])+ 2
-        #if maxbin > 50:
-        #    maxbin=50
-        #minbin = min(0, np.amin(mz_act[i]))
+        legs.append(ROOT.TLegend(0.5,0.7,0.9,0.9))
+        legs[pad-1].SetHeader('Ratio third/total', "C")
+      
         r3_act.append(ROOT.TH1F('G4y{:d}r3_theta_{:d}'.format(theta, energy), '', bins, 0, 1))
         r3_gan.append(ROOT.TH1F('GANy{:d}r3_theta_{:d}GeV'.format(theta, energy), '', bins, 0, 1))
         r3_act[i].SetLineColor(2)
@@ -555,16 +577,17 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if states==0:
             r3_act[i].SetStats(states)
             r3_gan[i].SetStats(states)
-        r3_act[i]=my.normalize(r3_act[i], 1)
-        r3_gan[i]=my.normalize(r3_gan[i], 1)
+        if norm:
+            r3_act[i]=my.normalize(r3_act[i], 1)
+            r3_gan[i]=my.normalize(r3_gan[i], 1)
+            r3_act[i].GetYaxis().SetRangeUser(0., 0.2)
         r3_act[i].GetXaxis().SetTitle("Ratio third/total")
         r3_act[i].GetYaxis().SetTitle("normalized count")
         r3_act[i].GetYaxis().CenterTitle()
         r3_act[i].GetYaxis().SetTitleOffset()
         r3_act[i].GetYaxis().SetTitleSize(0.055)
         r3_act[i].GetXaxis().SetTitleSize(0.05)
-        #mmtz_act[i].GetXaxis().SetTitleOffset()
-        r3_act[i].GetYaxis().SetRangeUser(0., 0.2)
+        
         canvas.Update()
         r3_act[i].Draw('')
         r3_act[i].Draw('sames hist')
@@ -572,7 +595,11 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
 
         r3_gan[i].Draw('sames')
         r3_gan[i].Draw('sames hist')
+        canvas.Update()
+        
         if legs:
+            legs[pad-1].AddEntry(r3_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(r3_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -585,7 +612,7 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
     if ifC:
         canvas.Print(out_file + '.C')
 
-def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1):
+def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, legs=1, norm=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,500) #make
     canvas.SetGrid()
     label = "Weighted Histograms for {} GeV".format(energy)
@@ -600,14 +627,13 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
     pad=1
 
     for i, theta in enumerate(thetas):
-        #theta = int(np.degrees(theta))
         if theta==0:
             title = "theta=60-120 degrees"
         else:
             title = "theta={} degrees".format(theta)
         bins = 50
         canvas.cd(pad)
-        legs.append(ROOT.TLegend(0.7,0.8,0.9,0.9))
+        legs.append(ROOT.TLegend(0.6,0.7,0.9,0.9))
         maxbin = np.amax(mx_act[i])+ 2
         if maxbin > 50:
             maxbin=50
@@ -621,15 +647,16 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if states==0:
             mmtx_act[i].SetStats(states)
             mmtx_gan[i].SetStats(states)
-        mmtx_act[i]=my.normalize(mmtx_act[i], 1)
-        mmtx_gan[i]=my.normalize(mmtx_gan[i], 1)
-        mmtx_act[i].GetXaxis().SetTitle("X2moment")
+        if norm:
+            mmtx_act[i]=my.normalize(mmtx_act[i], 1)
+            mmtx_gan[i]=my.normalize(mmtx_gan[i], 1)
+            mmtx_act[i].GetYaxis().SetRangeUser(0., 0.9)
+        mmtx_act[i].GetXaxis().SetTitle("2nd X moment")
         mmtx_act[i].GetYaxis().SetTitle("normalized count")
         mmtx_act[i].GetYaxis().CenterTitle()
         mmtx_act[i].GetYaxis().SetTitleOffset()
         mmtx_act[i].GetYaxis().SetTitleSize(0.055)
         mmtx_act[i].GetXaxis().SetTitleSize(0.05)
-        mmtx_act[i].GetYaxis().SetRangeUser(0., 0.9)
         mmtx_act[i].SetTitle(title)
         legs[pad-1].SetHeader('X2 moment', "C")
         canvas.Update()
@@ -639,7 +666,10 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
 
         mmtx_gan[i].Draw('sames')
         mmtx_gan[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(mmtx_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(mmtx_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -648,10 +678,9 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         pad+=1
 
     for i, theta in enumerate(thetas):
-        #theta = int(np.degrees(theta))
         bins = 50
         canvas.cd(pad)
-        legs.append(ROOT.TLegend(0.7,0.8,0.9,0.9))
+        legs.append(ROOT.TLegend(0.6,0.7,0.9,0.9))
         legs[pad-1].SetHeader('Y2 moment', "C")
         maxbin = np.amax(my_act[i])+ 2
         if maxbin > 50:
@@ -666,16 +695,17 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if states==0:
             mmty_act[i].SetStats(states)
             mmty_gan[i].SetStats(states)
-        mmty_act[i]=my.normalize(mmty_act[i], 1)
-        mmty_gan[i]=my.normalize(mmty_gan[i], 1)
-        mmty_act[i].GetXaxis().SetTitle("Y2moment")
+        if norm:
+            mmty_act[i]=my.normalize(mmty_act[i], 1)
+            mmty_gan[i]=my.normalize(mmty_gan[i], 1)
+            mmty_act[i].GetYaxis().SetRangeUser(0., 0.4)
+        mmty_act[i].GetXaxis().SetTitle("2nd Y moment")
         mmty_act[i].GetYaxis().SetTitle("normalized count")
         mmty_act[i].GetYaxis().CenterTitle()
         mmty_act[i].GetYaxis().SetTitleOffset()
         mmty_act[i].GetYaxis().SetTitleSize(0.055)
         mmty_act[i].GetXaxis().SetTitleSize(0.05)
-        mmty_act[i].GetYaxis().SetRangeUser(0., 0.4)
-     
+             
         canvas.Update()
         mmty_act[i].Draw('')
         mmty_act[i].Draw('sames hist')
@@ -683,7 +713,10 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
 
         mmty_gan[i].Draw('sames')
         mmty_gan[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(mmty_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(mmty_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -693,10 +726,9 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         canvas.Update()
              
     for i, theta in enumerate(thetas):
-        #theta = int(np.degrees(theta))
         bins = 50
         canvas.cd(pad)
-        legs.append(ROOT.TLegend(0.7,0.8,0.9,0.9))
+        legs.append(ROOT.TLegend(0.6,0.7,0.9,0.9))
         legs[pad-1].SetHeader('Z2 moment', "C")
         maxbin = np.amax(mz_act[i])+ 2
         if maxbin > 50:
@@ -711,16 +743,17 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if states==0:
             mmtz_act[i].SetStats(states)
             mmtz_gan[i].SetStats(states)
-        mmtz_act[i]=my.normalize(mmtz_act[i], 1)
-        mmtz_gan[i]=my.normalize(mmtz_gan[i], 1)
-        mmtz_act[i].GetXaxis().SetTitle("Z2moment")
+        if norm:
+            mmtz_act[i]=my.normalize(mmtz_act[i], 1)
+            mmtz_gan[i]=my.normalize(mmtz_gan[i], 1)
+            mmtz_act[i].GetYaxis().SetRangeUser(0., 0.2)
+        mmtz_act[i].GetXaxis().SetTitle("2nd Z moment")
         mmtz_act[i].GetYaxis().SetTitle("normalized count")
         mmtz_act[i].GetYaxis().CenterTitle()
         mmtz_act[i].GetYaxis().SetTitleOffset()
         mmtz_act[i].GetYaxis().SetTitleSize(0.055)
         mmtz_act[i].GetXaxis().SetTitleSize(0.05)
-        #mmtz_act[i].GetXaxis().SetTitleOffset()
-        mmtz_act[i].GetYaxis().SetRangeUser(0., 0.2)
+        
         canvas.Update()
         mmtz_act[i].Draw('')
         mmtz_act[i].Draw('sames hist')
@@ -728,7 +761,10 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
 
         mmtz_gan[i].Draw('sames')
         mmtz_gan[i].Draw('sames hist')
+        canvas.Update()
         if legs:
+            legs[pad-1].AddEntry(mmtz_act[i], "G4", 'l')
+            legs[pad-1].AddEntry(mmtz_gan[i], "GAN", 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
