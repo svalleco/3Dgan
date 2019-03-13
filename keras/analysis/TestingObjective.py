@@ -13,7 +13,8 @@ import numpy.core.umath_tests as umath
 import time
 import math
 import ROOT
-
+import keras.backend as K
+K.set_image_data_format('channels_last')
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
     tlab = True
 else:
@@ -29,32 +30,33 @@ sys.path.insert(0,'../')
 
 def main():
     # All of the following needs to be adjusted
-    from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_oldtrain2/params_generator*.hdf5'
+    from EcalEnergyGan import generator # architecture
+    weightdir = '3dganWeights_train/params_generator*.hdf5'
     if tlab:
-      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
-      genpath = '/gkhattak/weights/' + weightdir
+      datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
+      genpath = '/gkhattak/weights/EnergyWeights/' + weightdir
     else:
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/angle_optimization_oldtrain2' # plot directory
+    plotsdir = 'results/angle_optimization_keras2' # plot directory
     particle = "Ele" 
-    scale = 1
-    threshold = 0
-    ang = 1
+    scale = 100
+    threshold = 1e-6
+    ang = 0
     concat=1
-    power=0.85
-    g= generator(latent_size=256)
-    start = 5
+    power=1
+    latent=200
+    g= generator(latent_size=latent)
+    start = 0
     stop = 60
     gen_weights=[]
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
+    
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    #gen_weights=gen_weights[:stop]
     epoch = []
     for i in np.arange(len(gen_weights)):
       name = os.path.basename(gen_weights[i])
@@ -63,7 +65,7 @@ def main():
     print("{} weights are found".format(len(gen_weights)))
     result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle
                         , scale, power=power, thresh=threshold, ang=ang, concat=concat
-            , preproc = taking_power, postproc=inv_power
+            , preproc = taking_power, postproc=inv_power, latent=latent
              )
     PlotResultsRoot(result, plotsdir, start, epoch, fits, ang=ang)
 
@@ -199,15 +201,15 @@ def postproc(n, scale=1):
     return n/scale
         
 # results are obtained using metric and saved to a log file
-def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc):
+def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc, latent=256):
     resultfile = os.path.join(resultdir,  'result_log.txt')
     file = open(resultfile,'w')
     result = []
     for i in range(len(gen_weights)):
        if i==0:
-         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc)) # For the first time when sorted data is not saved we can make use opposite flags
+         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc, latent=latent)) # For the first time when sorted data is not saved we can make use opposite flags
        else:
-         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc))
+         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc, latent=latent))
        #file.write(len(result[i]) * '{:.4f}\t'.format(*result[i]))
        file.write('\t'.join(str(r) for r in result[i]))
        file.write('\n')
@@ -248,13 +250,12 @@ def postproc(n, scale=1):
     return n/scale
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc):
+def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc, latent=256):
    print ("Started")
    num_events=2000
    num_data = 140000
    ascale = 1
    Test = True
-   latent= 256
    m = 2
    var = {}
    energies = [110, 150, 190]
@@ -273,7 +274,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
        data_files = Trainfiles + Testfiles
      start = time.time()
      #energies = [50, 100, 200, 250, 300, 400, 500]
-     var = gan.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
+     var = gan.get_sorted(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
      data_time = time.time() - start
      print ("{} events were loaded in {} seconds".format(num_data, data_time))
      if save_data:
@@ -291,7 +292,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      if ang:
         var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100, var["angle" + str(energy)] * ascale], concat=concat, latent=latent)
      else:
-        var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100], concat=concat, latent=latent, ang=ang) 
+        var["events_gan" + str(energy)] = gan.generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100], concat=concat, latent=latent) 
      var["events_gan" + str(energy)] = postproc(var["events_gan" + str(energy)], xscale=xscale, power=power)
    gen_time = time.time() - start
    print ("{} events were generated in {} seconds".format(total, gen_time))
@@ -320,7 +321,7 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
    metrice = 0
    metrica = 0
    metrics = 0
-   cut =10
+   cut =0
    for energy in energies:
      #Relative error on mean moment value for each moment and each axis
      x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
