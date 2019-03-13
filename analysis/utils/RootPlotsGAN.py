@@ -1719,6 +1719,59 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees', label="
    canvas.Update()
    canvas.Print(out_file)
 
+def PlotEventFixed(event, energy, out_file, n, opt="", label="", log=0):
+   canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make
+   canvas.Divide(2,2)
+   x = event.shape[0]
+   y = event.shape[1]
+   z = event.shape[2]
+   leg = ROOT.TLegend(0.1,0.4,0.8,0.9)
+   leg.SetTextSize(0.05)
+   leg.SetHeader("#splitline{Weighted Histograms for energies}{deposited in x, y and z planes}", "C")
+   hx = ROOT.TH2F('x_{:.2f}GeV'.format(energy), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('y_{:.2f}GeV'.format(energy), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('z_{:.2f}GeV'.format(energy), '', x, 0, x, y, 0, y)
+   hx.SetStats(0)
+   hy.SetStats(0)
+   hz.SetStats(0)
+   if log:
+      ROOT.gPad.SetLogz()
+   ROOT.gStyle.SetPalette(1)
+   event = np.expand_dims(event, axis=0)
+   my.FillHist2D_wt(hx, np.sum(event, axis=1))
+   my.FillHist2D_wt(hy, np.sum(event, axis=2))
+   my.FillHist2D_wt(hz, np.sum(event, axis=3))
+   canvas.cd(1)
+   hx.Draw(opt)
+   hx.GetXaxis().SetTitle("Y axis")
+   hx.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   #my.stat_pos(hx)
+   canvas.Update()
+   canvas.cd(2)
+   hy.Draw(opt)
+   hy.GetXaxis().SetTitle("X axis")
+   hy.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   #my.stat_pos(hy)
+   canvas.Update()
+   canvas.cd(3)
+   hz.Draw(opt)
+   hz.GetXaxis().SetTitle("X axis")
+   hz.GetYaxis().SetTitle("Y axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   canvas.cd(4)
+   leg.AddEntry(hx, 'Single {} event'.format(label),"l")
+   leg.AddEntry(hy, 'Energy Input = {:.2f} GeV'.format(energy),"l")
+   
+   leg.Draw()
+   #my.stat_pos(hz)
+   canvas.Update()
+   canvas.Print(out_file)
+
 def PlotEventCut(event, energy, theta, out_file, n, opt="", unit='degrees', label=""):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make
    canvas.Divide(2,2)
@@ -1774,7 +1827,7 @@ def PlotEventCut(event, energy, theta, out_file, n, opt="", unit='degrees', labe
    canvas.Update()
    canvas.cd(4)
    leg.AddEntry(hx, 'Single {} event at:'.format(label),"l")
-   leg.AddEntry(hy, 'Energy Input = {:.2f} GeV'.format(100 * energy),"l")
+   leg.AddEntry(hy, 'Energy Input = {:.2f} GeV'.format(energy),"l")
    leg.AddEntry(hz, 'Theta Input  = {:.2f} {}'.format(theta, unit),"l")
    #leg.AddEntry(hz, 'Computed Theta (mean)     = {:.2f} {}'.format(ang1[0], unit),"l")
    #leg.AddEntry(hz, 'Computed Theta (weighted) = {:.2f} {}'.format(ang2[0], unit),"l")
@@ -1783,6 +1836,61 @@ def PlotEventCut(event, energy, theta, out_file, n, opt="", unit='degrees', labe
    canvas.Update()
    canvas.Print(out_file)
                         
+def PlotEventCutFixed(event, energy, out_file, n, opt="", label=""):
+   canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make
+   canvas.Divide(2,2)
+   x = event.shape[0]
+   y = event.shape[1]
+   z = event.shape[2]
+   x2 = event.shape[0]/2
+   y2 = event.shape[1]/2
+   z2 = event.shape[2]/2
+   leg = ROOT.TLegend(0.1,0.4,0.8,0.9)
+   leg.SetTextSize(0.05)
+   leg.SetHeader("#splitline{Weighted Histograms for energies deposited}{in sections through x, y, z}", 'C')
+   hx = ROOT.TH2F('x_{:.2f}GeV'.format(energy), '', y, 0, y, z, 0, z)
+   hy = ROOT.TH2F('y_{:.2f}GeV'.format(energy), '', x, 0, x, z, 0, z)
+   hz = ROOT.TH2F('z_{:.2f}GeV'.format(energy), '', x, 0, x, y, 0, y)
+   hx.SetStats(0)
+   hy.SetStats(0)
+   hz.SetStats(0)
+   #ROOT.gPad.SetLogz()
+   ROOT.gStyle.SetPalette(1)
+   event = np.expand_dims(event, axis=0)
+   my.FillHist2D_wt(hx, event[:,x2,:,:])
+   my.FillHist2D_wt(hy, event[:,:,y2,:])
+   my.FillHist2D_wt(hz, event[:,:,:,z2])
+   canvas.cd(1)
+   hx.Draw(opt)
+   hx.GetXaxis().SetTitle("Y axis")
+   hx.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   #my.stat_pos(hx)
+   canvas.Update()
+   canvas.cd(2)
+   hy.Draw(opt)
+   hy.GetXaxis().SetTitle("X axis")
+   hy.GetYaxis().SetTitle("Z axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   #my.stat_pos(hy)
+   canvas.Update()
+   canvas.cd(3)
+   hz.Draw(opt)
+   hz.GetXaxis().SetTitle("X axis")
+   hz.GetYaxis().SetTitle("Y axis")
+   hx.GetYaxis().CenterTitle()
+   canvas.Update()
+   canvas.cd(4)
+   leg.AddEntry(hx, 'Single {} event at:'.format(label),"l")
+   leg.AddEntry(hy, 'Energy Input = {:.2f} GeV'.format(energy),"l")
+   
+   leg.Draw()
+   #my.stat_pos(hz)
+   canvas.Update()
+   canvas.Print(out_file)
+
 def PlotAngleCut(events, ang, out_file, opt=""):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500)
    canvas.Divide(2,2)
