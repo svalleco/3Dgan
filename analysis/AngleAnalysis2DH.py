@@ -28,8 +28,8 @@ def main():
    if tlab:
      genweight= "/gkhattak/weights/3Dweights_newbins2/params_generator_epoch_059.hdf5"
    else:
-     genweight = "../weights/3Dweights_newbins2/params_generator_epoch_059.hdf5"
-   plotsdir = 'results/genplots_newbins2_ep59' # name of folder to save results
+     genweight = "../weights/3dgan_weights_oldtrain/params_generator_epoch_059.hdf5"
+   plotsdir = 'results/genplots_oldtrain_ep59' # name of folder to save results
    
    # generator model
    from AngleArch3dGAN import generator
@@ -42,7 +42,7 @@ def main():
    num=10 # random events generated
    thetamin = np.radians(60)  # min theta
    thetamax = np.radians(120) # maximum theta
-   energies=[100, 150, 200] # energy bins
+   energies=[100, 150, 200, 300, 400] # energy bins
    thetas = [62, 90, 118] # angle bins
    ang = 1 # use all calculation for variable angle
    xscale = 1.0 # scaling of images
