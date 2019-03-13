@@ -11,8 +11,8 @@ except ImportError:
 
 def main():
    #pkl file name and plots dir
-   lossfile =  '../results/3dgan_history_bins.pkl'
-   outdir = 'results/loss_plots_bins'
+   lossfile =  '../results/3dgan_history_oldtrain2.pkl'
+   outdir = 'results/loss_plots_oldtrain2'
 
    # limits for plots. Adjust according to current plots
    ymax = [20, 5, 5, 40, 1, 3.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
@@ -63,6 +63,10 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
            '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
                          '#bcbd22', '#17becf']
    loop = np.arange(len(lossnames))
+   #gen_test= gen_test[:21]
+   #gen_train =gen_train[:21]
+   #disc_test =disc_test[:21]
+   #disc_train=disc_train[:21]
 
    #Plots for Testing and Training Losses
    plt.figure(fig)
@@ -125,7 +129,8 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.figure(fig)
    plt.title('{} losses for Generator'.format(losstype[1]))
    epochs = np.arange(start_epoch, gen_train.shape[0])
-   plt.plot(epochs, gen_train[start_epoch:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
+   min_loss = np.amin(gen_train[start_epoch:,1])
+   plt.plot(epochs, gen_train[start_epoch:,1], label='Gen {} ({}) min={:.4f}'.format(lossnames[1], losstype[1], min_loss))
    fit = np.polyfit(epochs, gen_train[start_epoch:,1], order)
    plt.plot(epochs, np.polyval(fit, epochs), label='Gen fit ({} degree polynomial)'.format(order), linestyle='--')
    plt.legend()
