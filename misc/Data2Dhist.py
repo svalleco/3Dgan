@@ -16,8 +16,8 @@ import utils.RootPlotsGAN as hist
 
 
 def main():
-   #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Training data path
-   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # path to data
+   datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' # Fixed Training data path
+   #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # path to data
    numdata = 20000 # events read from data
    energies=[110, 150, 190] # energy bins
    thetas = [62, 90, 118]   # angle bins
@@ -28,11 +28,11 @@ def main():
    thresh = 0
    angtype = 'theta'
    opt = 'colz' # drawing option
-   plotsdir = 'results/angle_data_plots_sqrt'  # results location 
+   plotsdir = 'results/fixed_angle_2D'  # results location 
    gan.safe_mkdir(plotsdir)               # make directory
       
-   datafiles = gan.GetDataFiles(datapath, numdata, Particles=['Ele']) # get list of files
-   x, y, theta= gan.GetAllDataAngle(datafiles, numdata, thresh, angtype) # get all data
+   datafiles = gan.GetDataFiles(datapath, Particles=['Ele']) # get list of files
+   x, y, theta= gan.GetAllDataAngle(datafiles[28], numdata, thresh, angtype) # get all data
  
    # The sorted dict contains events as 'events', the quantity to sort as 'y' and if there is a third it is named 'z'
    yvar = gan.sort([x, y, theta], energies, num_events=1000)  # sort according to energy
