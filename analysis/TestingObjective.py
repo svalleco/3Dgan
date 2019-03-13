@@ -30,7 +30,7 @@ sys.path.insert(0,'../')
 def main():
     # All of the following needs to be adjusted
     from AngleArch3dGAN import generator # architecture
-    weightdir = '3Dweights_newbins2/params_generator*.hdf5'
+    weightdir = '3dgan_weights_oldtrain/params_generator*.hdf5'
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
       genpath = '/gkhattak/weights/' + weightdir
@@ -38,7 +38,7 @@ def main():
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/angle_optimization_bin_pow_p85' # plot directory
+    plotsdir = 'results/angle_optimization_oldtrain' # plot directory
     particle = "Ele" 
     scale = 1
     threshold = 0
@@ -109,21 +109,23 @@ def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
     for i, item in enumerate(result):
       epoch[i] = epochs[i]  
       total[i]=item[0]
+      mmt_e[i]=item[1]
+      energy_e[i]=item[2]
+      sf_e[i]=item[3]
       if item[0]< mint:
          mint = item[0]
          mint_n = epoch[i]
-      mmt_e[i]=item[1]
       if item[1]< minm:
          minm = item[1]
          minm_n = epoch[i]
-      energy_e[i]=item[2]
       if item[2]< mine:
          mine = item[2]
          mine_n = epoch[i]
       if item[3]< mins:
          mins = item[3]
          mins_n = epoch[i]
-      if ang:   
+      if ang:
+         ang_e[i]=item[4]
          if item[4]< mina:
            mina = item[4]
            mina_n = epoch[i]
@@ -318,6 +320,7 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
    metrice = 0
    metrica = 0
    metrics = 0
+   cut =10
    for energy in energies:
      #Relative error on mean moment value for each moment and each axis
      x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
@@ -342,8 +345,8 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
      var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
      var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
      #Take absolute of error and mean for all events
-     var["eprofilex_total"+ str(energy)]= np.sum(np.absolute(var["eprofilex_error"+ str(energy)]))/x
-     var["eprofiley_total"+ str(energy)]= np.sum(np.absolute(var["eprofiley_error"+ str(energy)]))/y
+     var["eprofilex_total"+ str(energy)]= np.sum(np.absolute(var["eprofilex_error"+ str(energy)][cut:x-cut]))/(x-(2*cut))
+     var["eprofiley_total"+ str(energy)]= np.sum(np.absolute(var["eprofiley_error"+ str(energy)][cut:y-cut]))/(y-(2*cut))
      var["eprofilez_total"+ str(energy)]= np.sum(np.absolute(var["eprofilez_error"+ str(energy)]))/z
      
      var["eprofile_total"+ str(energy)]= (var["eprofilex_total"+ str(energy)] + var["eprofiley_total"+ str(energy)] + var["eprofilez_total"+ str(energy)])/3
