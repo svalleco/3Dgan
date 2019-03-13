@@ -295,10 +295,10 @@ def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
                                                                                    
 
 # sort data for fixed angle
-def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance=5):
+def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance=5, thresh=1e-6):
     srt = {}
     for index, datafile in enumerate(datafiles):
-        data = GetData(datafile)
+        data = GetData(datafile, thresh)
         X = data[0]
         sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
         indexes= np.where(sumx>0)
