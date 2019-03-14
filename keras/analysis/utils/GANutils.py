@@ -295,10 +295,10 @@ def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
                                                                                    
 
 # sort data for fixed angle
-def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance=5):
+def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance=5, thresh=1e-6):
     srt = {}
     for index, datafile in enumerate(datafiles):
-        data = GetData(datafile)
+        data = GetData(datafile, thresh)
         X = data[0]
         sumx = np.sum(np.squeeze(X), axis=(1, 2, 3))
         indexes= np.where(sumx>0)
@@ -890,6 +890,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
     total = 0
     for energy in energies:
     #calculations for data events
+      var["events_act"+ str(energy)]= np.squeeze(var["events_act"+ str(energy)])
       # Getting dimensions of ecal images
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
@@ -946,10 +947,10 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              d.load_weights(disc_weights)
              start = time.time()
              if dformat=='channels_last':
-               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
+               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
                var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=-1)
              else:
-               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
+               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
                var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=1)
              discout= discriminate(d, var["events_act" + str(energy)] * scale)
              print(len(discout))

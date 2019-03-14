@@ -9,6 +9,7 @@ from utils.GANutils import perform_calculations_multi, safe_mkdir #Common functi
 import keras
 import argparse
 import utils.RootPlotsGAN as pl
+import keras.backend as K
 
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
     tlab = True
@@ -56,14 +57,21 @@ def main():
    thresh = params.thresh
    dformat = params.dformat
    labels=['']
-   
+   K.set_image_data_format(dformat)   
    if tlab:
       datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
-      gweights = ['/gkhattak/weights/EnergyWeights/3dganWeights/params_generator_epoch_049.hdf5']
-      dweights = ['/gkhattak/weights/EnergyWeights/3dganWeights/params_discriminator_epoch_049.hdf5']
+      gweights = ['/gkhattak/weights/EnergyWeights/3dganWeights_channel_first/params_generator_epoch_000.hdf5']
+      dweights = ['/gkhattak/weights/EnergyWeights/3dganWeights_channel_first/params_discriminator_epoch_000.hdf5']
       
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    d = discriminator(keras_dformat=dformat)
+   for layer in d.layers[1:]:
+       if hasattr(layer, 'layers'):
+          for l in layer.layers:
+            l.trainable=False
+       else:
+          layer.trainable=False
+
    g = generator(latent, keras_dformat=dformat)
    
    var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data=nbEvents
@@ -76,7 +84,7 @@ def get_parser():
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
-    parser.add_argument('--plotsdir', action='store', type=str, default='results/Analysis_plots/', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotsdir', action='store', type=str, default='results/Analysis_plots_ch_first/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
@@ -100,7 +108,7 @@ def get_parser():
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--energies', action='store', type=int, default=[0, 50, 100, 200, 250, 300, 400, 500], help='Energy bins for analysis')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
-    parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
+    parser.add_argument('--dformat', action='store', type=str, default='channels_first', help='keras image format')
     return parser
 
 
