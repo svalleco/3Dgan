@@ -257,7 +257,8 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
       Gprof.SetLineColor(color)
       Gprof.Draw('sames')
       c1.Update()
-      legend.AddEntry(Gprof, "GAN {} (MAE={:.6f})".format(labels[i], error), "l")
+      #legend.AddEntry(Gprof, "GAN {} (MAE={:.6f})".format(labels[i], error), "l")
+      legend.AddEntry(Gprof, "GAN {}".format(labels[i]), "l")
       if stest:
          ks = Eprof.KolmogorovTest(Gprof, 'UU')
          ch2 = Eprof.Chi2Test(Gprof, 'UU')
@@ -795,9 +796,8 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
          ks = h1x.KolmogorovTest(h2x, "WW")
          ch2 = h1x.Chi2Test(h2x, "WW")
          glabel = "GAN {} X axis K = {:.4f} ch2={:.4f}".format(labels[i], ks, ch2)
-      else:
-         glabel = "GAN {}".format(labels[i])
-      leg.AddEntry(h2x, glabel,"l")
+         leg.AddEntry(h2x, glabel,"l")
+      
       my.stat_pos(h2x)
       c1.cd(2)
       my.fill_hist(h2y, array2[key][:,1])
@@ -866,6 +866,186 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    else:
       c1.Print(out_file3 + '.C')
 
+def plot_energy_hist_root2(array1x, array1y, array1z, array2x, array2y, array2z, x, y, z, out_file1, out_file2, out_file3, energy, labels, log=0, p=[2, 500], ifpdf=True, stest=True):
+   canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
+   canvas.SetTitle('Weighted Histogram for energy deposition along x, y, z axis')
+   canvas.SetGrid()
+   color = 2
+   canvas.Divide(2,2)
+   h1x = ROOT.TH1F('G4x' + str(energy), '', x, 0, x)
+   h1y = ROOT.TH1F('G4y' + str(energy), '', y, 0, y)
+   h1z = ROOT.TH1F('G4z' + str(energy), '', z, 0, z)
+
+   h1x.SetLineColor(color)
+   h1y.SetLineColor(color)
+   h1z.SetLineColor(color)
+
+   h1x.Sumw2()
+   h1y.Sumw2()
+   h1z.Sumw2()
+   h1x.SetStats(0)
+   h1y.SetStats(0)
+   h1z.SetStats(0)
+   color+=2
+   canvas.cd(1)
+   if log:
+      ROOT.gPad.SetLogy()
+   my.fill_hist_wt(h1x, array1x)
+   h1x=my.normalize(h1x)
+   h1x.Draw()
+   h1x.Draw('sames hist')
+   h1x.GetXaxis().SetTitle("position along x axis")
+   h1x.GetYaxis().SetTitle("energy deposition")
+   canvas.cd(2)
+   if log:
+      ROOT.gPad.SetLogy()
+   my.fill_hist_wt(h1y, array1y)
+   h1y=my.normalize(h1y)
+   h1y.Draw()
+   h1y.Draw('sames hist')
+   h1y.GetXaxis().SetTitle("position along y axis")
+   h1y.GetYaxis().SetTitle("energy deposition")
+   canvas.cd(3)
+   if log:
+      ROOT.gPad.SetLogy()
+   my.fill_hist_wt(h1z, array1z)
+   h1z=my.normalize(h1z)
+   h1z.Draw()
+   h1z.Draw('sames hist')
+   h1z.GetXaxis().SetTitle("position along z axis")
+   h1z.GetYaxis().SetTitle("energy deposition")
+   canvas.cd(4)
+   canvas.Update()
+   if ifpdf:
+      canvas.Print(out_file1 + '.pdf')
+   else:
+      canvas.Print(out_file1 + '.C')
+   leg = ROOT.TLegend(0.1,0.7,0.3,0.9)
+   leg.AddEntry(h1x, 'G4 {}GeV'.format(energy),"l")
+   #leg.SetTextSize(0.06)
+   h2xs=[]
+   h2ys=[]
+   h2zs=[]
+   for i, key in enumerate(array2x):
+      h2xs.append(ROOT.TH1F('GANx' + str(energy)+ labels[i], '', x, 0, x))
+      h2ys.append(ROOT.TH1F('GANy' + str(energy)+ labels[i], '', y, 0, y))
+      h2zs.append(ROOT.TH1F('GANz' + str(energy)+ labels[i], '', z, 0, z))
+      h2x=h2xs[i]
+      h2y=h2ys[i]
+      h2z=h2zs[i]
+
+      h2x.Sumw2()
+      h2y.Sumw2()
+      h2z.Sumw2()
+
+      h2x.SetLineColor(color)
+      h2y.SetLineColor(color)
+      h2z.SetLineColor(color)
+
+      h2x.SetStats(0)
+      h2y.SetStats(0)
+      h2z.SetStats(0)
+      canvas.cd(1)
+      my.fill_hist_wt(h2x, array2x[key])
+      h2x=my.normalize(h2x)
+      if i==0:
+        h2x.Draw()
+        h2x.Draw('sames hist')
+        h2x.GetXaxis().SetTitle("position along x axis")
+        h2x.GetYaxis().SetTitle("energy deposition")
+      else:
+        h2x.Draw('sames')
+        h2x.Draw('sames hist')
+      canvas.Update()
+      #my.stat_pos(h2x)
+      if stest:
+         res=np.array
+         ks= h1x.KolmogorovTest(h2x, 'WW')
+         ch2 = h1x.Chi2Test(h2x, 'WW')
+         glabel = "GAN {} X axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
+         leg.AddEntry(h2x, glabel,"l")
+      leg.AddEntry(h2x, 'GAN {}GeV'.format(energy),"l")
+      canvas.Update()
+      canvas.cd(2)
+      my.fill_hist_wt(h2y, array2y[key])
+      h2y=my.normalize(h2y)
+      if i==0:
+        h2y.Draw()
+        h2y.Draw('sames hist')
+        h2y.GetXaxis().SetTitle("position along y axis")
+        h2y.GetYaxis().SetTitle("energy deposition")
+      else:
+        h2y.Draw('sames')
+        h2y.Draw('sames hist')
+      canvas.Update()
+      #my.stat_pos(h2y)
+      if stest:
+         ks= h1y.KolmogorovTest(h2y, 'WW')
+         ch2 = h1y.Chi2Test(h2y, 'WW')
+         glabel = "GAN {} Y axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
+         leg.AddEntry(h2y, glabel,"l")
+      canvas.Update()
+      canvas.cd(3)
+      my.fill_hist_wt(h2z, array2z[key])
+      h2z=my.normalize(h2z)
+      if i==0:
+        h2z.Draw()
+        h2z.Draw('sames hist')
+        h2z.GetXaxis().SetTitle("position along z axis")
+        h2z.GetYaxis().SetTitle("energy deposition")
+      else:
+        h2z.Draw('sames')
+        h2z.Draw('sames hist')
+      canvas.Update()
+      #my.stat_pos(h2z)
+      canvas.Update()
+      if stest:
+         ks= h1z.KolmogorovTest(h2z, 'WW')
+         ch2 = h1z.Chi2Test(h2z, 'WW')
+         glabel = "GAN {} Z axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
+         leg.AddEntry(h2z, glabel,"l")
+      canvas.Update()
+      color+=2
+   canvas.Update()
+   if ifpdf:
+      canvas.Print(out_file2 + '.pdf')
+   else:
+      canvas.Print(out_file2 + '.C')
+   canvas.cd(1)
+   h1x.Draw('sames')
+   h1x.Draw('sames hist')
+   canvas.Update()
+   leg.Draw()
+   canvas.Update()
+   canvas.cd(2)
+   h1y.Draw('sames')
+   h1y.Draw('sames hist')
+   canvas.Update()
+   leg.Draw()
+   canvas.Update()
+
+   canvas.cd(3)
+   h1z.Draw('sames')
+   h1z.Draw('sames hist')
+   canvas.Update()
+   leg.Draw()
+   canvas.Update()
+
+   canvas.cd(4)
+   """
+   leg.AddEntry(h1x, "G4","l")
+   leg.SetHeader("Shower Shapes", "C")
+   if not stest:
+      for i, h in enumerate(h2xs):
+        leg.AddEntry(h, 'GAN ' + labels[i],"l")
+   """
+   #leg.Draw()
+   canvas.Update()
+   if ifpdf:
+      canvas.Print(out_file3 + '.pdf')
+   else:
+      canvas.Print(out_file3 + '.C')
+
 def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, x, y, z, out_file1, out_file2, out_file3, energy, labels, log=0, p=[2, 500], ifpdf=True, stest=True):
    canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
    canvas.SetTitle('Weighted Histogram for energy deposition along x, y, z axis')
@@ -883,7 +1063,9 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    h1x.Sumw2()
    h1y.Sumw2()
    h1z.Sumw2()
-   
+   h1x.SetStats(0)
+   h1y.SetStats(0)
+   h1z.SetStats(0)
    color+=2
    canvas.cd(1)
    if log:
@@ -938,7 +1120,10 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       h2x.SetLineColor(color)
       h2y.SetLineColor(color)
       h2z.SetLineColor(color)
-
+      
+      h2x.SetStats()
+      h2y.SetStats()
+      h2z.SetStats()
       canvas.cd(1)
       my.fill_hist_wt(h2x, array2x[key])
       h2x=my.normalize(h2x)
@@ -951,15 +1136,13 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
         h2x.Draw('sames')
         h2x.Draw('sames hist')
       canvas.Update()
-      my.stat_pos(h2x)
+      #my.stat_pos(h2x)
       if stest:
          res=np.array
          ks= h1x.KolmogorovTest(h2x, 'WW')
          ch2 = h1x.Chi2Test(h2x, 'WW')
          glabel = "GAN {} X axis K= {:.4f}  ch2={:.4f}".format(labels[i], ks, ch2)
-      else:
-         glabel = "GAN {} ".format(labels[i])
-      leg.AddEntry(h2x, glabel,"l")
+         leg.AddEntry(h2x, glabel,"l")
       canvas.Update()
       canvas.cd(2)
       my.fill_hist_wt(h2y, array2y[key])
@@ -973,7 +1156,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
         h2y.Draw('sames')
         h2y.Draw('sames hist')
       canvas.Update()
-      my.stat_pos(h2y)
+      #my.stat_pos(h2y)
       if stest:
          ks= h1y.KolmogorovTest(h2y, 'WW')
          ch2 = h1y.Chi2Test(h2y, 'WW')
@@ -992,7 +1175,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
         h2z.Draw('sames')
         h2z.Draw('sames hist')
       canvas.Update()
-      my.stat_pos(h2z)
+      #my.stat_pos(h2z)
       canvas.Update()
       if stest:
          ks= h1z.KolmogorovTest(h2z, 'WW')
@@ -1297,8 +1480,6 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
        plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxlfile), os.path.join(gendir, maxlfile), os.path.join(comdir, 'log' + maxlfile), energy, labels, log=1, stest=stest)
        plots+=1
        plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histfile), os.path.join(gendir,histfile), os.path.join(comdir, histfile), energy, labels, stest=stest)
-       plots+=1
-       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, labels, log=1, stest=stest)
        plots+=1
        plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, labels, log=1, stest=stest)
        plots+=1
