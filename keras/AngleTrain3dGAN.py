@@ -51,10 +51,7 @@ from keras.utils.generic_utils import Progbar
 
 def main():
     #Architectures to import
-    if keras.__version__ == '1.2.2':
-        from AngleArch3dGAN_add_loss_bins import generator, discriminator
-    else:
-        from AngleArch3dGAN_k2 import generator, discriminator
+    from AngleArch3dGAN import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
@@ -76,18 +73,14 @@ def main():
     energies =params.energies # Bins
     resultfile = params.resultfile # analysis result
     loss_weights=params.lossweights
-    #gen_weight = params.lossweights[0]  # weight for generation loss
-    #aux_weight= params.lossweights[1]  # weight for primary energy regression loss
-    #ang_weight= params.lossweights[2]   # weight for angle loss
-    #ecal_weight = params.lossweights[3] # weight for ecal loss
-    #add_loss_weight = params.lossweights[4]
     thresh = params.thresh # threshold for data
     angtype = params.angtype
 
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
-      weightdir = '/gkhattak/weights/3Dweights'
+      weightdir = '/gkhattak/weights/3dgan_weights'
       pklfile = '/gkhattak/results/3dgan_history.pkl'
+      resultfile = '/gkhattak/results/3dgan_analysis.pkl'
 
     print(params)
 
@@ -115,7 +108,7 @@ def get_parser():
     parser.add_argument('--xpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
-    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis_bins_pow_p85.pkl', help='File to save losses.')
+    parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
     parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
