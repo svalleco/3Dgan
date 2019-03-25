@@ -1,23 +1,40 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 ## This script loads weights into architectures for generator and discriminator. Different Physics quantities are then calculated and plotted for a 100-200 GeV events from LCD variable angle dataset##
 from utils.GANutils import perform_calculations_angle  # to calculate different Physics quantities
 from utils.RootPlotsGAN import get_plots_angle         # to make plots with ROOT
+import os
 import h5py
 import numpy as np
-import setGPU
+print(np.__version__)
 import math
 import sys
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
+if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used        
+    tlab = True
+else:
+    tlab= False
+
+try:
+    import setGPU #if Caltech                                                                                
+except:
+    pass
+
+sys.path.insert(0,'../')
 
 def main():
    #Architecture 
-   from AngleArch3dGAN_sqrt import generator, discriminator
-
-   #Weights
-   disc_weight1="../weights/params_discriminator_epoch_073.hdf5"
-   gen_weight1= "../weights/params_generator_epoch_073.hdf5"
+   from AngleArch3dGAN import generator, discriminator
+   if tlab:
+     #Weights
+     disc_weight1="/gkhattak/weights/3dgan_weights/params_discriminator_epoch_059.hdf5"
+     gen_weight1= "/gkhattak/weights/3dgan_weights/params_generator_epoch_059.hdf5"
+   
+   else:
+     disc_weight1="../weights/3dgan_weights/params_discriminator_epoch_059.hdf5"
+     gen_weight1= "../weights/3dgan_weights/params_generator_epoch_059.hdf5"
       
    #Path to store results
-   plots_dir = "results/lrp0001/"
+   plots_dir = "results/analysis_results/"
 
    #Parameters
    latent = 256 # latent space
@@ -25,25 +42,29 @@ def main():
    num_events = 2000
    events_per_file = 5000
    m = 3  # number of moments 
-   nloss= 4 # total number of losses...4 or 5
+   angloss= 1 # total number of losses...1 or 2
+   addloss= 1 # additional loss like count loss
    concat = 1 # if concatenting angle to latent space
-   cell=1 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
-   corr=0 # if making correlation plots
-   energies=[0, 110, 150, 190] # energy bins
-   angles = [math.radians(x) for x in [62, 85, 90, 105, 118]] # angle bins
-   aindexes = [0, 1, 2, 3, 4] # numbers corressponding to different angle bins
+   cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
+   corr=0 # 0: none, 1: Large plot, 2:small plot , 3:small for all energies
+   #energies=[0, 110, 150, 190] # energy bins
+   energies=[0, 50, 100, 150, 200, 300, 400, 500]
+   angles = [62, 90, 118] #[math.radians(x) for x in [62, 90, 118]] # angle bins
    angtype = 'theta'# the angle data to be read from file
-   particle='Ele'# partcile type
+   particle='Ele'# particle type
    thresh=0 # Threshold for ecal energies
-   #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-   #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # imperium
-   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+   
+   if tlab:
+      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
+   else:
+      datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+   
    sortdir = 'SortedAngleData'  # if saving sorted data
    gendir = 'SortedAngleGen'  # if saving generated events
    discdir = 'SortedAngleDisc' # if saving disc outputs
       
    Test = True # use test data
-   stest = False # K and chi2 test
+   stest = True # K and chi2 test
    
    #following flags are used to save sorted and GAN data and to load from sorted data. These are used while development and should be False for one time analysis
    save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
@@ -58,18 +79,19 @@ def main():
    dweights = [disc_weight1]#, disc_weight2]
    gweights = [gen_weight1]#, gen_weight2]
    xscales = [1]#, 1]
+   xpowers = [0.85]
    ascales = [1]#, 1]
    labels = ['']#, 'epoch 40']
-   d = discriminator()
+   d = discriminator(xpowers[0])
    g = generator(latent)
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
-                aindexes, datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, 
-                ascales, flags, latent, events_per_file, particle, thresh=thresh, angtype=angtype, offset=0.0,
-                nloss=nloss, concat=concat
-                , pre =sqrt, post =square  # Adding other preprocessing, Default is simple scaling                 
+                datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, xpowers,
+                ascales, flags, latent, events_per_file, particle, thresh=thresh*50., angtype=angtype, offset=0.0,
+                angloss=angloss, addloss=addloss, concat=concat
+                , pre =taking_power, post =inv_power  # Adding other preprocessing, Default is simple scaling                 
    )
    
-   get_plots_angle(var, labels, plots_dir, energies, angles, angtype, aindexes,  m, len(gweights), ifpdf, stest, nloss=nloss, cell=cell, corr=corr)
+   get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, len(gweights), ifpdf, stest, angloss=angloss, addloss=addloss, cell=cell, corr=corr)
 
 def sqrt(n, scale=1):
    return np.sqrt(n * scale)
@@ -77,6 +99,12 @@ def sqrt(n, scale=1):
 def square(n, scale=1):
    return np.square(n)/scale
         
+def taking_power(n, scale=1.0, power=1.0):
+   return(np.power(n * scale, power))
+
+def inv_power(n, scale=1.0, power=1.0):
+   return(np.power(n, 1.0/power))/scale
+   
 # If using reduced Ecal 25x25x25 then use the following function as argument to perform_calculations_angle, Data=GetAngleDataEta_reduced
 def GetAngleDataEta_reduced(datafile, thresh=1e-6):
     #get data for training                                                                                        
