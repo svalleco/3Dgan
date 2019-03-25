@@ -15,14 +15,15 @@ from keras.models import Model, Sequential
 import math
 from tensorflow import py_func, float32, Tensor
 import tensorflow as tf
-
 K.set_image_dim_ordering('tf')
 
+# Summming celle energies
 def ecal_sum(image, power):
     image = K.pow(image, 1./power)
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
+# counting entries for different energy bins
 def count(image, power):
     bin1 = K.sum(K.tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
     bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
@@ -35,6 +36,7 @@ def count(image, power):
     bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
     return bins
 
+# Calculating angle from image
 def ecal_angle(image, power):
     image = K.squeeze(image, axis=4)
     image = K.pow(image, 1./power)
@@ -97,6 +99,7 @@ def ecal_angle(image, power):
     ang = K.expand_dims(ang, 1)
     return ang
 
+# Discriminator
 def discriminator(power=1.0):
   
     image=Input(shape=(51, 51, 25, 1))
@@ -131,14 +134,13 @@ def discriminator(power=1.0):
     dnn_out = dnn(image)
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    #inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image    
     ang = Lambda(ecal_angle, arguments={'power':power})(image)
     ecal = Lambda(ecal_sum, arguments={'power':power})(image)
     add_loss = Lambda(count, arguments={'power':power})(image)
     Model(input=[image], output=[fake, aux, ang, ecal, add_loss]).summary()
     return Model(input=[image], output=[fake, aux, ang, ecal, add_loss])
 
-
+# Generator
 def generator(latent_size=200, return_intermediate=False):
     
     loc = Sequential([
@@ -168,6 +170,7 @@ def generator(latent_size=200, return_intermediate=False):
     Model(input=[latent], output=[fake_image]).summary()
     return Model(input=[latent], output=[fake_image])
 
+# useful at design time
 def main():
     g= generator()
     d=discriminator()
