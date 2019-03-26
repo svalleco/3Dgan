@@ -42,7 +42,7 @@ def main():
    num=10 # random events generated
    thetamin = np.radians(60)  # min theta
    thetamax = np.radians(120) # maximum theta
-   energies=[100, 150, 200, 300, 400] # energy bins
+   energies=[110, 150, 190] # energy bins
    thetas = [62, 90, 118] # angle bins
    ang = 1 # use all calculation for variable angle
    xscale = 1.0 # scaling of images

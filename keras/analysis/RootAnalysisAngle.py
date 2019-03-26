@@ -47,8 +47,7 @@ def main():
    concat = 1 # if concatenting angle to latent space
    cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
    corr=0 # 0: none, 1: Large plot, 2:small plot , 3:small for all energies
-   #energies=[0, 110, 150, 190] # energy bins
-   energies=[0, 50, 100, 150, 200, 300, 400, 500]
+   energies=[0, 110, 150, 190] # energy bins
    angles = [62, 90, 118] #[math.radians(x) for x in [62, 90, 118]] # angle bins
    angtype = 'theta'# the angle data to be read from file
    particle='Ele'# particle type
@@ -76,12 +75,12 @@ def main():
    ifpdf = True # True if pdf are required. If false .C files will be generated
  
    flags =[Test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
-   dweights = [disc_weight1]#, disc_weight2]
-   gweights = [gen_weight1]#, gen_weight2]
-   xscales = [1]#, 1]
+   dweights = [disc_weight1]
+   gweights = [gen_weight1]
+   xscales = [1]
    xpowers = [0.85]
-   ascales = [1]#, 1]
-   labels = ['']#, 'epoch 40']
+   ascales = [1]
+   labels = ['']
    d = discriminator(xpowers[0])
    g = generator(latent)
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 

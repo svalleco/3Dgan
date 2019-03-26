@@ -94,7 +94,6 @@ def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
     color4 = 6
     color5 = 7
     num = len(result)
-    print(num)
     total = np.zeros((num))
     energy_e = np.zeros((num))
     mmt_e = np.zeros((num))
@@ -249,7 +248,7 @@ def postproc(n, scale=1):
     return n/scale
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc):
+def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc, energies=[110, 150, 190]):
    print ("Started")
    num_events=2000
    num_data = 140000
@@ -258,10 +257,8 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    latent= 256
    m = 2
    var = {}
-   #energies = [110, 150, 190]
-   energies = [50, 100, 200, 300, 400]
    sorted_path= sorted_path 
-   #g =generator(latent)
+   
    if read_data:
      start = time.time()
      var = gan.load_sorted(sorted_path + "/*.h5", energies, ang = ang)
@@ -274,7 +271,6 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      else:
        data_files = Trainfiles + Testfiles
      start = time.time()
-     #energies = [50, 100, 200, 250, 300, 400, 500]
      var = gan.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
      data_time = time.time() - start
      print ("{} events were loaded in {} seconds".format(num_data, data_time))
@@ -357,7 +353,6 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
         var["angle_error"+ str(energy)] = np.mean(np.absolute((var["mtheta_act" + str(energy)] - var[ "mtheta_gan" + str(energy)])/var["mtheta_act" + str(energy)]))
         metrica += var["angle_error"+ str(energy)]
      #sampling fraction relative error
-     #sf_error = np.mean(np.absolute(np.divide(var["sf_act"+ str(energy)] - var["sf_gan"+ str(energy)], var["sf_act"+ str(energy)] )))
      mean_sf_g4 = np.mean(var["sf_act"+ str(energy)])
      mean_sf_gan = np.mean(var["sf_gan"+ str(energy)])
      sf_error = np.absolute(np.divide(mean_sf_g4 - mean_sf_gan, mean_sf_g4))
