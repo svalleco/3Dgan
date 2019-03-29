@@ -11,28 +11,32 @@ except ImportError:
 
 def main():
    #pkl file name and plots dir
-   lossfile =  '../results/3dgan_history_oldtrain2.pkl'
-   outdir = 'results/loss_plots_oldtrain2'
+   lossfile =  '../results/3dgan_history_filter.pkl'
+   outdir = 'results/loss_plots_concat2_filter'
 
-   # limits for plots. Adjust according to current plots
+   #limits for plots. Adjust according to current plots
    ymax = [20, 5, 5, 40, 1, 3.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
 
-   start_epoch =0 # removing initial epochs to check for overfitting of Generation loss
+   #configuration
+   start_epoch =0 # initial epochs can be removed when plotting the generator BCE loss  
    fit_order = 3 # order of fit used
    num_ang_losses = 1 # number of angle losses
    num_add_loss = 1 # any additional loss used
 
-   #Getting losses in arrays
+   #Types of losses 
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
    bloss= 'Binary cross entropy'
    angtype = 'theta'
+
+   #loss weights
    gen_weight = 3   # weight of generation loss
    aux_weight = 0.1 # weight of auxilliary regression loss
    ecal_weight = 0.1 # weight of ecal sum loss
    ang_weight = 25 # weight of angle loss
    add_weight = 0.1 # weight of any additional loss
 
+   #generating names according to given configuration
    if num_ang_losses==1:
        weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
        losstypes = ['Weighted sum', bloss, ploss, aloss, ploss]
@@ -47,12 +51,13 @@ def main():
        losstypes.append(ploss)
        lossnames.append('bin')
 
-   safe_mkdir(outdir)
-   plot_loss(lossfile, ymax, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order)
+   safe_mkdir(outdir) #create directory to store results
+   plot_loss(lossfile, ymax, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order) #plot losses
    print('Loss Plots are saved in {}'.format(outdir))
-   
+
+#this script opens the pkl file, loads the loss history and generate differnt plots
 def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3):
-                             
+   #read loss history                             
    with open(lossfile, 'rb') as f:
     			x = pickle.load(f)
    gen_test = np.asarray(x['test']['generator'])
@@ -63,10 +68,6 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
            '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
                          '#bcbd22', '#17becf']
    loop = np.arange(len(lossnames))
-   #gen_test= gen_test[:21]
-   #gen_train =gen_train[:21]
-   #disc_test =disc_test[:21]
-   #disc_train=disc_train[:21]
 
    #Plots for Testing and Training Losses
    plt.figure(fig)
