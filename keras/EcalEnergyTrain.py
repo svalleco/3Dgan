@@ -67,7 +67,7 @@ def main():
     dformat = params.dformat
     nEvents = params.nbEvents#Total events for training
     fitmod = params.mod# Fit to use
-    weightdir = 'weights/3dganWeights' + params.name # weight dir
+    weightdir = 'weights/3dgan_weights' + params.name # weight dir
     xscale = params.xscale #scaling of data
     thresh = params.thresh#threshold for energies
     pklfile = 'results/3dgan_history'+ params.name + '.pkl' # loss history
@@ -78,7 +78,7 @@ def main():
     resultfile = 'results/3dgan_analysis' + params.name + '.pkl' # analysis result
     if tlab:
        datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
-       weightdir = '/gkhattak/weights/EnergyWeights/3dganWeights' + params.name
+       weightdir = '/gkhattak/weights/EnergyWeights/3dgan_weights' + params.name
        pklfile = '/gkhattak/results/3dgan_history' + params.name + '.pkl'
        resultfile = '/gkhattak/results/3dgan_analysis'  + params.name + '.pkl'
     
@@ -86,14 +86,11 @@ def main():
     gan.safe_mkdir(weightdir)
     print(weightdir)
     # Building discriminator and generator
+    K.set_image_data_format(dformat) #setting data format)
     d=discriminator(keras_dformat=dformat)
     g=generator(latent_size=latent_size, keras_dformat=dformat)
     Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size 
                , loss_weights=lossweights, xscale = xscale, thresh=thresh, analysis=analysis, energies=energies, tf_flags=tf_flags, dformat=dformat)
-
-def freeze(model):
-    for i, layer in enumerate(model.layers[1].layers):
-       layer.trainable=False
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -113,7 +110,7 @@ def get_parser():
     parser.add_argument('--ecal_weight', action='store', type=float, default=0.1, help='loss weight for ecal sum loss')
     parser.add_argument('--analyse', action='store_true', default=True, help='Whether or not to perform analysis')
     parser.add_argument('--energies', action='store', type=int, default=[100, 200, 300, 400], help='Energy bins for analysis')
-    parser.add_argument('--name', action='store', type=str, default='_train', help='Identifier for current training')
+    parser.add_argument('--name', action='store', type=str, default='train', help='Identifier for current training')
     parser.add_argument('--thresh', action='store', type=int, default=1e-6, help='energy threshold for be used')
     return parser
 
@@ -170,21 +167,11 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         optimizer=RMSprop(),
         loss='binary_crossentropy'
     )
- 
+    print('disc updates for trainable', discriminator.updates)
     # build combined Model
     latent = Input(shape=(latent_size, ), name='combined_z')   
     fake_image = generator( latent)
-    #discriminator.trainable=False
-    # instead of discriminator.trainable=false, the layers are made trainable.
-    # this is done so that layer updates for custom BN layer can be effective
-    
-    for layer in discriminator.layers[1:]:
-       if hasattr(layer, 'layers'):  
-          for l in layer.layers:
-            l.trainable=False
-       else:
-          layer.trainable=False
-    
+    discriminator.trainable=False
     fake, aux, ecal = discriminator(fake_image)
     combined = Model(
         input=[latent],
@@ -192,12 +179,12 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         name='combined_model'
     )
     combined.compile(
-        #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
         optimizer=RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
-    #discriminator.trainable=True
+    # the discriminator is made trainable again so that non-trainable updates are applied (keras 2 bug)
+    discriminator.trainable=True
     log_path = './logs/' + time.strftime("%Y%m%d-%H%M%S")
     callback = TensorBoard(log_path)
     callback.set_model(combined)
@@ -206,10 +193,8 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
     print('The total data was divided in {} Train files and {} Test files'.format(len(Trainfiles), len(Testfiles)))
     nb_test = int(nEvents * f[1])
-    print(batch_size, nb_test)
     if nb_test % batch_size >0:
       nb_test = (nb_test/batch_size) * batch_size
-    print(nb_test)     
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
@@ -280,10 +265,11 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
       
             #ecal sum from fit
             ecal_ip = gan.GetEcalFit(sampled_energies, particle,mod, xscale)
-            generated_images = generator.predict(generator_ip, verbose=0)        
+            generated_images = generator.predict(generator_ip, verbose=0)
+    
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
-            #print('batch = {}'.format(index))
+            
             #print("BN weights after training disc.........")
             #for _ in discriminator.layers[1].layers[7].get_weights(): print('BN 1 = {}'.format(str(_)))
             #for _ in discriminator.layers[1].layers[12].get_weights(): print('BN 2 = {}'.format(str(_)))
@@ -379,12 +365,10 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, time.time()-test_start, WeightsDir))
         pickle.dump({'train': train_history, 'test': test_history}, open(pklfile, 'wb'))
         if analysis:
-            X_test, ecal_test= np.squeeze(X_test), np.squeeze(ecal_test)
-            var = gan.sortEnergy([X_test, Y_test], ecal_test, energies, ang=0)
+            var = gan.sortEnergy([np.squeeze(X_test), Y_test], np.squeeze(ecal_test), energies, ang=0)
             noise = np.random.normal(0.1, 1, (nb_test, latent_size))
             generator_ip = np.multiply(Y_test.reshape((-1, 1)), noise)
             generated_images = generator.predict(generator_ip, verbose=False, batch_size=batch_size)
-            #generated_images = np.squeeze(generated_images)                        
             result = gan.OptAnalysisShort(var, generated_images, energies, ang=0)
             print('Analysing............')
             # All of the results correspond to mean relative errors on different quantities
