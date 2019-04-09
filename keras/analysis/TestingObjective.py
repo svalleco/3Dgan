@@ -30,8 +30,8 @@ sys.path.insert(0,'../')
 
 def main():
     # All of the following needs to be adjusted
-    from EcalEnergyGan import generator # architecture
-    weightdir = '3dganWeights_channel_first/params_generator*.hdf5'
+    from EcalEnergyGan_ep import generator # architecture
+    weightdir = '3dgan_weights_train/params_generator*.hdf5'
     if tlab:
       datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
       genpath = '/gkhattak/weights/EnergyWeights/' + weightdir
@@ -39,15 +39,15 @@ def main():
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/angle_optimization_ch_first' # plot directory
+    plotsdir = 'results/angle_optimization_test' # plot directory
     particle = "Ele"
-    dformat= 'channels_first'
-    K.set_image_data_format(dformat) 
-    scale = 100
-    threshold = 1e-6
-    ang = 0
-    concat=1
-    power=1
+    dformat= 'channels_last'
+    K.set_image_data_format(dformat) # setting global format flag
+    scale = 100 # scaling fatcor for energies
+    threshold = 1e-6 # threshold for cell energies
+    ang = 0 # angle not included
+    concat=1 # effective only for variable angle 
+    power=1 # effective only for variable angle
     latent=200
     g= generator(latent_size=latent, keras_dformat=dformat)
     start = 0
