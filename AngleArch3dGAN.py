@@ -23,6 +23,21 @@ def ecal_sum(image, power):
     sum = K.sum(image, axis=(1, 2, 3))
     return sum
    
+def count2(image, power):
+    bin1 = K.sum(K.tf.where(image > 0.08**power, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.08**power, image > 0.05**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.035**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.035**power, image > 0.025**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.025**power, image > 0.018**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.018**power, image > 0.0122**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0122**power, image > 0.009**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin8 = K.sum(K.tf.where(K.tf.logical_and(image < 0.009**power, image > 0.006**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin9 = K.sum(K.tf.where(K.tf.logical_and(image < 0.006**power, image > 0.0025**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin10 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0025**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bin11 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
+    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8, bin9, bin10, bin11], axis=1), -1)
+    return bins
+
 def count(image, power):
     bin1 = K.sum(K.tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
     bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
@@ -34,6 +49,7 @@ def count(image, power):
     bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
     bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
     return bins
+                                        
 
 def ecal_angle(image, power):
     image = K.squeeze(image, axis=4)
@@ -144,22 +160,22 @@ def generator(latent_size=200, return_intermediate=False):
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
         Reshape((9, 9, 8, 8)),
-
-        Conv3D(64, 6, 6, 8, border_mode='same', init='he_uniform'),
-        LeakyReLU(),
+        UpSampling3D(size=(6, 6, 4)),
+        
+        Conv3D(8, 4, 4, 8, border_mode='valid', init='he_uniform'),
+        Activation('relu'),
         BatchNormalization(),
-        UpSampling3D(size=(3, 3, 2)),
-
-        ZeroPadding3D((2, 3, 1)),
-        Conv3D(6, 5, 8, 8, init='he_uniform'),
-        LeakyReLU(),
+        
+        #ZeroPadding3D((2, 3, 1)),
+        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        Activation('relu'),
         BatchNormalization(),
-        UpSampling3D(size=(2, 2, 3)),
-
-        ZeroPadding3D((0, 2,0)),
-        Conv3D(6, 3, 5, 8, init='he_uniform'),
-        LeakyReLU(),
-        Conv3D(1, 2, 2, 2, init='glorot_normal'),
+        
+        #ZeroPadding3D((0, 2,0)),
+        Conv3D(6, 2, 2, 3, border_mode='same', init='he_uniform'),
+        Activation('relu'),
+        
+        Conv3D(1, 2, 2, 2,  border_mode='same', init='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
