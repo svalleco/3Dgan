@@ -170,6 +170,18 @@ def generator(latent_size=200, return_intermediate=False):
         Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
         Activation('relu'),
         BatchNormalization(),
+
+        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(),
+
+        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(),
+
+        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(),
         
         #ZeroPadding3D((0, 2,0)),
         Conv3D(6, 2, 2, 3, border_mode='same', init='he_uniform'),
