@@ -1495,9 +1495,9 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
           plot_moment(var["momentZ_act" + str(energy)], var["momentZ_gan" + str(energy)], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt, labels)
           plots+=1
 
-    print 'Plots are saved in ', plots_dir
+    print('Plots are saved in ', plots_dir)
     plot_time= time.time()- start
-    print '{} Plots are generated in {} seconds'.format(plots, plot_time)
+    print('{} Plots are generated in {} seconds'.format(plots, plot_time))
 
 
 ##################################### Get plots for variable angle #####################################################################
