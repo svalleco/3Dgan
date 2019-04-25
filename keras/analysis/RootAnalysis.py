@@ -25,6 +25,11 @@ def main():
 
    import keras.backend as K
 
+   if tlab:
+      datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
+      gweights = ['/gkhattak/weights/EnergyWeights/3dgan_weights_train/params_generator_epoch_049.hdf5']
+      dweights = ['/gkhattak/weights/EnergyWeights/3dgan_weights_train/params_discriminator_epoch_049.hdf5']
+
    parser = get_parser()
    params = parser.parse_args()
 
@@ -49,8 +54,8 @@ def main():
    save_disc= params.save_disc
    read_disc= params.read_disc
    ifpdf= params.ifpdf
-   gweights= params.gweights
-   dweights= params.dweights
+   gweights= [params.gweights]
+   dweights= [params.dweights]
    xscales= params.xscales
    yscale= params.yscale
    energies= params.energies
@@ -58,15 +63,10 @@ def main():
    dformat = params.dformat
    labels=['']
    K.set_image_data_format(dformat)# setting global flag   
-   if tlab:
-      datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
-      gweights = ['/gkhattak/weights/EnergyWeights/3dgan_weights_train/params_generator_epoch_049.hdf5']
-      dweights = ['/gkhattak/weights/EnergyWeights/3dgan_weights_train/params_discriminator_epoch_049.hdf5']
       
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    d = discriminator(keras_dformat=dformat)
    g = generator(latent, keras_dformat=dformat)
-   
    var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data=nbEvents
          , num_events=binevents, m=moments, scales=xscales, thresh=thresh, flags=flags, latent=latent, particle=particle, dformat=dformat)
    pl.get_plots_multi(var, labels, plotsdir, energies, moments, len(gweights), ifpdf, stest, cell)
