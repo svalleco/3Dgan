@@ -18,43 +18,47 @@ from utils.RootPlotsGAN import flip
 import setGPU
 
 def main():
-   datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
-   #datapath2 = "/data/shared/LCDLargeWindow/fixedangle/EleEscan/EleEscan_1_1.h5"
+   #datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
+   datapath = "/data/shared/LCDLargeWindow/varangle/EleEscan/EleEscan_RandomAngle_8_2.h5"
    #datapath3 = '/bigdata/shared/LCD/NewV1/EleEscan/EleEscan_1_1.h5'
-   genweight = "/nfshome/gkhattak/3Dgan/weights/3dgan_weights_bins_pow_p85/params_generator_epoch_059.hdf5"
-   out_file='sparsity_minmax'
-   from AngleArch3dGAN import generator
+   genweight = "/nfshome/gkhattak/3Dgan/weights/3dgan_weights_newarch_layers_all/params_generator_epoch_007.hdf5"
+   out_file='results/sparsity_newarch_layers_ep20_all'
+   from AngleArch3dGAN_newarch_layers import generator
 
+   # data post processing to GeV
    numdata = 1000
-   scale=1
-   outdir = 'results/ecal_tails_bulk_norm0/'
-   gan.safe_mkdir(outdir)
-   outfile = os.path.join(outdir, 'Ecal')
-   x, y, ang=GetAngleData(datapath, numdata)
+   x, y, ang=GetAngleData(datapath, numdata, angtype='theta')
    x = x/50.0 # convert to GeV
    print('The angle data varies from {} to {}'.format(np.amin(x[x>0]), np.amax(x)))
 
+   # GAN related params
    power=0.85
    latent = 256 # latent space for generator
    g=generator(latent) # build generator
    g.load_weights(genweight) # load weights        
-   x_gen = np.squeeze(gan.generate(g, numdata, [y/100, ang], latent))
+   x_gen = np.squeeze(gan.generate(g, numdata, [y/100, ang], latent, concat=2))
    x_gen = (1./50.) * np.power(x_gen, 1./0.85)
-   thresh=np.arange(-10, 2, 1)
+
+   # Thresholds to use
+   thresh=np.arange(-13, 1, 1)
    entries_g4 = np.zeros((thresh.shape[0], x.shape[0]))
    entries_gan =np.zeros((thresh.shape[0], x.shape[0]))
    size = np.float64(x[0].size)
-   print(size)
 
+   # Plots related parameters
    labels=['G4', 'GAN']
+   mono = False
+   leg= True
    energy = 0
+
+   # calculating entries for different threshold applied
    for i in np.arange(thresh.shape[0]):
       t_val = np.power(10.0, thresh[i])
       x_t = np.where(x>t_val, 1, 0)
       entries_g4[i] = np.divide(np.sum(x_t, axis=(1, 2, 3)), size)
       x_gen_t = np.where(x_gen > t_val, 1, 0)
       entries_gan[i] = np.divide(np.sum(x_gen_t, axis=(1, 2, 3)), size)
-   plot_sparsity(entries_g4, entries_gan, thresh, out_file, energy, labels, logy=0, min_max=1, ifpdf=True)
+   plot_sparsity(entries_g4, entries_gan, thresh, out_file, energy, labels, logy=0, min_max=0, ifpdf=True, mono=mono, legend=leg)
    
 def GetAngleData(datafile, numevents, ftn=0, scale=1, angtype='theta'):
    #get data for training
@@ -87,12 +91,12 @@ def GetData2(datafile, numevents, scale=1, thresh=1e-6):
    x = x * scale
    return x, y
                      
-def plot_sparsity(entries1, entries2, thresh, out_file, energy, labels, logy=0, min_max=0, ifpdf=True):
+def plot_sparsity(entries1, entries2, thresh, out_file, energy, labels, logy=0, min_max=0, ifpdf=True, mono=False, legend=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
 
    title = "Sparsity for electrons with 100-200 GeV primary energy"
-   leg = ROOT.TLegend(.7, .8, .9, .9)
+   leg = ROOT.TLegend(.8, .8, .9, .9)
    color =2
    if logy:
       ROOT.gPad.SetLogy()
@@ -121,7 +125,7 @@ def plot_sparsity(entries1, entries2, thresh, out_file, energy, labels, logy=0, 
    else:
       area1 = np.concatenate((mean1+std1, flip(mean1-std1, 0)), axis=0)
       area2 = np.concatenate((mean2+std2, flip(mean2-std2, 0)), axis=0)
-      ylim = 0.03
+      ylim = 0.04
    thresh2=np.concatenate((thresh, flip(thresh, 0)), axis=0)
       
    r.fill_graph(sparsity1b, thresh2, area1)
@@ -133,6 +137,7 @@ def plot_sparsity(entries1, entries2, thresh, out_file, energy, labels, logy=0, 
    sparsity1.Draw('APL')
    sparsity1.GetYaxis().SetRangeUser(0, ylim)
    sparsity2.SetLineColor(color+2)
+   if mono: sparsity2.SetLineStyle(2)   
    sparsity2.Draw('PL')
 
    sparsity1b.SetFillColorAlpha(color, 0.35)
@@ -144,8 +149,9 @@ def plot_sparsity(entries1, entries2, thresh, out_file, energy, labels, logy=0, 
    leg.AddEntry(sparsity1,labels[0] ,"l")
    leg.AddEntry(sparsity2,labels[1] ,"l")
    c1.Update()
-   leg.Draw()
-   c1.Update()
+   if legend:
+     leg.Draw()
+     c1.Update()
    if ifpdf:
       c1.Print(out_file + '.pdf')
    else:
