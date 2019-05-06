@@ -264,6 +264,7 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
 # short version of analysis                                                                                                                      
 def OptAnalysisShort(var, generated_images, energies, ang=1):
     m=2
+    
     x = generated_images.shape[1]
     y = generated_images.shape[2]
     z = generated_images.shape[3]
@@ -280,6 +281,30 @@ def OptAnalysisShort(var, generated_images, energies, ang=1):
       if ang: var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
     return metric(var, energies, m, angtype='angle', x=x, y=y, z=z, ang=ang)
                                                                                                      
+def OptAnalysisAngle(var, g, energies, ascale=None, xscale=None, yscale=100, xpower=None, latent=256, concat=1):
+    m=2
+    for energy in energies:
+        if ascale: var["angle"+ str(energy)]= var["angle"+ str(energy)] * ascale
+        if yscale: var["energy" + str(energy)]=var["energy" + str(energy)]/yscale
+        num = var["events_act" + str(energy)].shape[0]
+        x = var["events_act" + str(energy)].shape[1]
+        y = var["events_act" + str(energy)].shape[2]
+        z = var["events_act" + str(energy)].shape[3]
+        var["events_gan" + str(energy)] = generate(g, num, [var["energy" + str(energy)], (var["angle"+ str(energy)])], latent, concat)
+        var["events_gan" + str(energy)] = np.squeeze(var["events_gan" + str(energy)])
+        if xpower: var["events_gan" + str(energy)] = np.power(var["events_gan" + str(energy)], 1.0/xpower)
+        if xscale: var["events_gan" + str(energy)] = var["events_gan" + str(energy)]/xscale
+        
+        var["ecal_act"+ str(energy)] = np.sum(var["events_act" + str(energy)], axis = (1, 2, 3))
+        var["ecal_gan"+ str(energy)] = np.sum(var["events_gan" + str(energy)], axis = (1, 2, 3))
+        var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
+        var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)] = get_sums(var["events_gan" + str(energy)])
+        var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m, x=x, y=y, z=z)
+        var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m, x=x, y=y, z=z)
+        var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
+        var["angle_act"+ str(energy)]= var["angle"+ str(energy)]
+    return metric(var, energies, m, angtype='angle', x=x, y=y, z=z, ang=1)
+                                                                                   
 # Load data from files in arrays
 def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
     for index, datafile in enumerate(datafiles):
@@ -373,7 +398,7 @@ def get_sorted_angle(datafiles, energies, flag=False, num_events1=10000, num_eve
                  if srt["events_act" + str(energy)].shape[0] > num_events1:
                     srt["events_act" + str(energy)] = srt["events_act" + str(energy)][:num_events1]
                     srt["energy" + str(energy)] = srt["energy" + str(energy)][:num_events1]
-                    srt["angle" + str(energy)]= srt["theta" + str(energy)][:num_events1]
+                    srt["angle" + str(energy)]= srt["angle" + str(energy)][:num_events1]
                     print('For {} energy {} events were found in first file'.format(energy, srt["events_act" + str(energy)].shape[0]))
                     flag=False
               else:
@@ -505,7 +530,7 @@ def get_gen(energy, gendir):
     return generated_images
 
 # generate images
-def generate(g, index, cond, latent=256, concat=1):
+def generate(g, index, cond, latent=256, concat=1, batch_size=50):
     energy_labels=np.expand_dims(cond[0], axis=1)
     if len(cond)> 1: # that means we also have angle
       angle_labels = cond[1]
@@ -526,7 +551,7 @@ def generate(g, index, cond, latent=256, concat=1):
       noise = np.random.normal(0, 1, (index, latent))
       #energy_labels=np.expand_dims(energy_labels, axis=1)
       gen_in = energy_labels * noise
-    generated_images = g.predict(gen_in, verbose=False, batch_size=50)
+    generated_images = g.predict(gen_in, verbose=False, batch_size=batch_size)
     return generated_images
 
 # discriminator predict
@@ -656,7 +681,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
       z =var["events_act"+ str(energy)].shape[3]
-
+      
       #calculations for data events
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0] # number of events in bin
       total += var["index" + str(energy)] # total events 
@@ -890,6 +915,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
     total = 0
     for energy in energies:
     #calculations for data events
+      var["events_act"+ str(energy)]= np.squeeze(var["events_act"+ str(energy)])
       # Getting dimensions of ecal images
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
@@ -946,10 +972,10 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              d.load_weights(disc_weights)
              start = time.time()
              if dformat=='channels_last':
-               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
+               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=-1)
                var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=-1)
              else:
-               #var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
+               var["events_act" + str(energy)] = np.expand_dims(var["events_act" + str(energy)], axis=1)
                var["events_gan" + str(energy)]['n_'+ str(i)] = np.expand_dims(var["events_gan" + str(energy)]['n_'+ str(i)], axis=1)
              discout= discriminate(d, var["events_act" + str(energy)] * scale)
              print(len(discout))

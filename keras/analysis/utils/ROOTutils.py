@@ -133,3 +133,11 @@ def stat_pos(a, pos=0):
 def fill_profile(prof, x, y):
   for i in range(len(y)):
       prof.Fill(y[i], x[i])
+
+
+# return max
+def Max(hist1, hist2):
+   max1 = hist1.GetMaximum()
+   max2 = hist2.GetBinContent(hist2.GetMaximumBin())
+   if max2 > max1:
+      hist1.GetYaxis().SetRangeUser(0, 1.2 * max2)
