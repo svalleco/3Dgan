@@ -530,7 +530,7 @@ def get_gen(energy, gendir):
     return generated_images
 
 # generate images
-def generate(g, index, cond, latent=256, concat=1):
+def generate(g, index, cond, latent=256, concat=1, batch_size=50):
     energy_labels=np.expand_dims(cond[0], axis=1)
     if len(cond)> 1: # that means we also have angle
       angle_labels = cond[1]
@@ -551,7 +551,7 @@ def generate(g, index, cond, latent=256, concat=1):
       noise = np.random.normal(0, 1, (index, latent))
       #energy_labels=np.expand_dims(energy_labels, axis=1)
       gen_in = energy_labels * noise
-    generated_images = g.predict(gen_in, verbose=False, batch_size=50)
+    generated_images = g.predict(gen_in, verbose=False, batch_size=batch_size)
     return generated_images
 
 # discriminator predict
@@ -681,7 +681,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
       z =var["events_act"+ str(energy)].shape[3]
-
+      
       #calculations for data events
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0] # number of events in bin
       total += var["index" + str(energy)] # total events 
