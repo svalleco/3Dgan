@@ -31,7 +31,7 @@ def main():
    latent = params.latentsize
    particle= params.particle
    angtype= params.angtype
-   plotsdir= params.plotsdir
+   plotdir= params.plotdir
    sortdir= params.sortdir
    gendir= params.gendir
    discdir= params.discdir
@@ -60,6 +60,7 @@ def main():
    dweights= [params.dweights]
    xscales= [params.xscales]
    ascales= [params.ascales]
+   dscale = params.dscale
    yscale= params.yscale
    xpowers = [params.xpower]
    thresh = params.thresh
@@ -68,7 +69,7 @@ def main():
    labels=['']
     
    #Architecture 
-   from AngleArch3dGAN_newarch_layers import generator, discriminator
+   from AngleArch3dGAN_prev import generator, discriminator
 
    if datapath=='path1':
        datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
@@ -96,12 +97,12 @@ def main():
    g = generator(latent)
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
                 datapath, sortdir, gendir, discdir, nbEvents, binevents, moments, xscales, xpowers,
-                ascales, flags, latent, events_per_file, particle, thresh=thresh*50., angtype=angtype, offset=0.0,
+                ascales, dscale, flags, latent, particle, events_per_file=events_per_file, thresh=thresh*50., angtype=angtype, offset=0.0,
                 angloss=angloss, addloss=addloss, concat=concat 
                 , pre =taking_power, post =inv_power  # Adding other preprocessing, Default is simple scaling                 
    )
    
-   get_plots_angle(var, labels, plotsdir, energies, angles, angtype, moments, len(gweights), ifpdf, stest, angloss=angloss, addloss=addloss, cell=cell, corr=corr)
+   get_plots_angle(var, labels, plotdir, energies, angles, angtype, moments, len(gweights), ifpdf=ifpdf, grid=grid, stest=stest, angloss=angloss, addloss=addloss, cell=cell, corr=corr)
 
 def sqrt(n, scale=1):
    return np.sqrt(n * scale)
@@ -118,16 +119,16 @@ def inv_power(n, scale=1.0, power=1.0):
 def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
+    parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='path3', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='theta', help='Angle used.')
-    parser.add_argument('--plotsdir', action='store', type=str, default='results/3dgan_Analysis/', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
     parser.add_argument('--nbEvents', action='store', type=int, default=100000, help='Max limit for events used for Testing')
+    parser.add_argument('--eventsperfile', action='store', type=int, default=5000, help='Number of events in a file')
     parser.add_argument('--binevents', action='store', type=int, default=2000, help='Number of events in each bin')
     parser.add_argument('--moments', action='store', type=int, default=3, help='Number of moments to compare')
     parser.add_argument('--addloss', action='store', type=int, default=1, help='If using bin count loss')
@@ -144,14 +145,15 @@ def get_parser():
     parser.add_argument('--save_disc', action='store', default=False, help='Save discriminator output')
     parser.add_argument('--read_disc', action='store', default=False, help='Get discriminator output')
     parser.add_argument('--ifpdf', action='store', default=True, help='Whether generate pdf plots or .C plots')
-    parser.add_argument('--grid', action='store', default=True, help='set grid')
+    parser.add_argument('--grid', action='store', default=False, help='set grid')
     parser.add_argument('--leg', action='store', default=True, help='add legends')
     parser.add_argument('--statbox', action='store', default=True, help='add statboxes')
     parser.add_argument('--mono', action='store', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights_newarch_layers_all/params_generator_epoch_017.hdf5', help='comma delimited list for paths to Generator weights.')
-    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights_newarch_layers_all/params_discriminator_epoch_017.hdf5', help='comma delimited list for paths to Discriminator weights')
+    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights/params_generator_epoch_059.hdf5', help='comma delimited list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights/params_discriminator_epoch_059.hdf5', help='comma delimited list for paths to Discriminator weights')
     parser.add_argument('--xscales', action='store', type=int, default=1, help='Multiplication factors for cell energies')
     parser.add_argument('--ascales', action='store', type=int, default=1, help='Multiplication factors for angles')
+    parser.add_argument('--dscale', action='store', type=int, default=50, help='Data = dscale * GeV')
     parser.add_argument('--yscale', action='store', default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--xpower', action='store', default=0.85, help='Power of cell energies')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
