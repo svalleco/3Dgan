@@ -1,61 +1,40 @@
-
-import sys
-import h5py
-
-from h5py import File as HDF5File
 import numpy as np
-
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
                           Dropout, BatchNormalization, Activation, Embedding)
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)
-from BN import BatchNormalization as BatchNormalization2
+#from normalization import BatchNormalization as BatchNormalization2
 from keras.models import Model, Sequential
 import math
-from tensorflow import py_func, float32, Tensor
 import tensorflow as tf
 
-K.set_image_dim_ordering('tf')
-
-def ecal_sum(image, power):
-    image = K.pow(image, 1./power)
-    sum = K.sum(image, axis=(1, 2, 3))
+# calculate sum of intensities
+def ecal_sum(image, daxis):
+    #image = K.squeeze(image, axis=daxis)# squeeze along channel axis
+    sum = K.sum(image, axis=daxis)
     return sum
-   
-def count2(image, power):
-    bin1 = K.sum(K.tf.where(image > 0.08**power, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.08**power, image > 0.05**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.035**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.035**power, image > 0.025**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.025**power, image > 0.018**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.018**power, image > 0.0122**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0122**power, image > 0.009**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin8 = K.sum(K.tf.where(K.tf.logical_and(image < 0.009**power, image > 0.006**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin9 = K.sum(K.tf.where(K.tf.logical_and(image < 0.006**power, image > 0.0025**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin10 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0025**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin11 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8, bin9, bin10, bin11], axis=1), -1)
-    return bins
 
-def count(image, power):
-    bin1 = K.sum(K.tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.03**power, image > 0.02**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.02**power, image > 0.0125**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0125**power, image > 0.008**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.008**power, image > 0.003**power), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.003**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=(1, 2, 3))
-    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
+# counts for various bins   
+def count(image, daxis):
+    limits=[0.05, 0.03, 0.02, 0.0125, 0.008, 0.003] # bin boundaries used
+    bin1 = K.sum(K.tf.where(image > limits[0], K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < limits[0], image > limits[1]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < limits[1], image > limits[2]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < limits[2], image > limits[3]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < limits[3], image > limits[4]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < limits[4], image > limits[5]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < limits[5], image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), axis=-1)
     return bins
                                         
-
-def ecal_angle(image, power):
-    image = K.squeeze(image, axis=4)
-    image = K.pow(image, 1./power)
-    # size of ecal
+# angle calculation 
+def ecal_angle(image, daxis):
+    image = K.squeeze(image, axis=daxis)# squeeze along channel axis
+    
+    # get shapes
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
     z_shape= K.int_shape(image)[3]
@@ -114,29 +93,39 @@ def ecal_angle(image, power):
     ang = K.expand_dims(ang, 1)
     return ang
 
-def discriminator(power=1.0):
-  
-    image=Input(shape=(51, 51, 25, 1))
+def discriminator(power=1.0, dformat='channels_last'):
+    K.set_image_data_format(dformat)
+    if dformat =='channels_last':
+        dshape=(51, 51, 25,1)
+        daxis=4
+        baxis=-1
+        daxis2=(1, 2, 3)
+    else:
+        dshape=(1, 51, 51, 25)
+        daxis=1
+        baxis=1
+        daxis2=(2, 3, 4)
+    image=Input(shape=dshape)
 
-    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, (5, 6, 6), padding='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization2()(x)
+    x = BatchNormalization(axis=baxis)(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization2()(x)
+    x = BatchNormalization(axis=baxis)(x)
     x = Dropout(0.2)(x)
 
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization2()(x)
+    x = BatchNormalization(axis=baxis)(x)
     x = Dropout(0.2)(x)
 
     x = AveragePooling3D((2, 2, 2))(x)
@@ -148,47 +137,59 @@ def discriminator(power=1.0):
     dnn_out = dnn(image)
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    #inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image    
-    ang = Lambda(ecal_angle, arguments={'power':power})(image)
-    ecal = Lambda(ecal_sum, arguments={'power':power})(image)
-    add_loss = Lambda(count, arguments={'power':power})(image)
-    Model(input=[image], output=[fake, aux, ang, ecal, add_loss]).summary()
-    return Model(input=[image], output=[fake, aux, ang, ecal, add_loss])
+    inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image
+    ang = Lambda(ecal_angle, arguments={'daxis':daxis})(inv_image)
+    ecal = Lambda(ecal_sum, arguments={'daxis':daxis2})(inv_image)
+    add_loss = Lambda(count, arguments={'daxis':daxis2})(inv_image)
+    Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary()
+    return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss])
 
 
-def generator(latent_size=200, return_intermediate=False):
-    
+def generator(latent_size=256, return_intermediate=False, dformat='channels_last'):
+    if dformat =='channels_last':
+        dim = (9,9,8,8)
+        baxis=-1
+    else:
+        dim = (8, 9, 9,8)
+        baxis=-1
+    K.set_image_data_format(dformat)
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
-        Reshape((9, 9, 8, 8)),
-        UpSampling3D(size=(6, 6, 4)),
+        Reshape(dim),
+        UpSampling3D(size=(6, 6, 6)),
         
-        Conv3D(8, 4, 4, 8, border_mode='valid', init='he_uniform'),
+        Conv3D(8, (6, 6, 8), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization2(),
+        BatchNormalization(axis=baxis),
         
-        #ZeroPadding3D((2, 3, 1)),
-        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        ZeroPadding3D((2, 2, 1)),
+        Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization2(),
+        BatchNormalization(axis=baxis),
+        ####################################### added layers 
+        
+        ZeroPadding3D((2, 2, 1)),
+        Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis),
 
-        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        ZeroPadding3D((2, 2, 1)),
+        Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization2(),
+        BatchNormalization(axis=baxis),
 
-        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
+        ZeroPadding3D((1, 1, 0)),
+        Conv3D(6, (3, 3, 5), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization2(),
-
-        Conv3D(6, 4, 4, 6, border_mode='same', init='he_uniform'),
-        Activation('relu'),
-        BatchNormalization2(),
+        BatchNormalization(axis=baxis),
         
-        #ZeroPadding3D((0, 2,0)),
-        Conv3D(6, 2, 2, 3, border_mode='same', init='he_uniform'),
+        #####################################  
+        
+        ZeroPadding3D((1, 1,0)),
+        Conv3D(6, (3, 3, 3), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         
-        Conv3D(1, 2, 2, 2,  border_mode='same', init='glorot_normal'),
+        Conv3D(1, (2, 2, 2),  padding='valid', kernel_initializer='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
@@ -198,8 +199,9 @@ def generator(latent_size=200, return_intermediate=False):
     return Model(input=[latent], output=[fake_image])
 
 def main():
-    g= generator()
-    d=discriminator()
+    dformat= 'channels_first'
+    g= generator(dformat=dformat)
+    d=discriminator(dformat=dformat)
 
 if __name__ == "__main__":
     main()

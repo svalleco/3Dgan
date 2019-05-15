@@ -284,13 +284,14 @@ def OptAnalysisShort(var, generated_images, energies, ang=1):
 def OptAnalysisAngle(var, g, energies, ascale=None, xscale=None, yscale=100, xpower=None, latent=256, concat=1):
     m=2
     for energy in energies:
-        if ascale: var["angle"+ str(energy)]= var["angle"+ str(energy)] * ascale
+        var["events_act" + str(energy)] = np.squeeze(var["events_act" + str(energy)])
+        if ascale: var["angle_act"+ str(energy)]= var["angle_act"+ str(energy)] * ascale
         if yscale: var["energy" + str(energy)]=var["energy" + str(energy)]/yscale
         num = var["events_act" + str(energy)].shape[0]
         x = var["events_act" + str(energy)].shape[1]
         y = var["events_act" + str(energy)].shape[2]
         z = var["events_act" + str(energy)].shape[3]
-        var["events_gan" + str(energy)] = generate(g, num, [var["energy" + str(energy)], (var["angle"+ str(energy)])], latent, concat)
+        var["events_gan" + str(energy)] = generate(g, num, [var["energy" + str(energy)], (var["angle_act"+ str(energy)])], latent, concat)
         var["events_gan" + str(energy)] = np.squeeze(var["events_gan" + str(energy)])
         if xpower: var["events_gan" + str(energy)] = np.power(var["events_gan" + str(energy)], 1.0/xpower)
         if xscale: var["events_gan" + str(energy)] = var["events_gan" + str(energy)]/xscale
@@ -302,7 +303,7 @@ def OptAnalysisAngle(var, g, energies, ascale=None, xscale=None, yscale=100, xpo
         var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m, x=x, y=y, z=z)
         var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m, x=x, y=y, z=z)
         var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
-        var["angle_act"+ str(energy)]= var["angle"+ str(energy)]
+        #var["angle_act"+ str(energy)]= var["angle"+ str(energy)]
     return metric(var, energies, m, angtype='angle', x=x, y=y, z=z, ang=1)
                                                                                    
 # Load data from files in arrays
