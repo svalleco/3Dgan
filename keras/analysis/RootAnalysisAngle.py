@@ -11,7 +11,7 @@ import math
 import sys
 import argparse
 
-if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used        
+if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used        
     tlab = True
 else:
     tlab= False
@@ -83,12 +83,16 @@ def main():
        datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech
        events_per_file = 10000
        energies = [0, 50, 100, 200, 250, 300, 400, 500]
+   elif datapath=='path4':
+       datapath = "/eos/user/g/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
+       events_per_file = 5000
+       energies = [0, 110, 150, 190]
 
    if tlab: 
      #Weights
-     dweights=["/gkhattak/weights/3dgan_weights/params_discriminator_epoch_059.hdf5"]
-     gweights= ["/gkhattak/weights/3dgan_weights/params_generator_epoch_059.hdf5"]
-     datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
+     dweights=["/gkhattak/weights/3dgan_weights_k2_final_test_run2/params_discriminator_epoch_059.hdf5"]
+     gweights= ["/gkhattak/weights/3dgan_weights_k2_final_test_run2/params_generator_epoch_059.hdf5"]
+     datapath = '/eos/user/g/gkhattak/*Measured3ThetaEscan/*.h5'
      events_per_file = 5000
    angles = [62, 90, 118]
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
@@ -120,10 +124,10 @@ def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path1', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path4', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='theta', help='Angle used.')
-    parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis_gan_training_ep65/', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
@@ -149,8 +153,8 @@ def get_parser():
     parser.add_argument('--leg', action='store', default=True, help='add legends')
     parser.add_argument('--statbox', action='store', default=True, help='add statboxes')
     parser.add_argument('--mono', action='store', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights_gan_training/params_generator_epoch_065.hdf5', help='comma delimited list for paths to Generator weights.')
-    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights_gan_training/params_discriminator_epoch_065.hdf5', help='comma delimited list for paths to Discriminator weights')
+    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights_training/params_generator_epoch_059.hdf5', help='comma delimited list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights_training/params_discriminator_epoch_059.hdf5', help='comma delimited list for paths to Discriminator weights')
     parser.add_argument('--xscales', action='store', type=int, default=1, help='Multiplication factors for cell energies')
     parser.add_argument('--ascales', action='store', type=int, default=1, help='Multiplication factors for angles')
     parser.add_argument('--dscale', action='store', type=int, default=50, help='Data = dscale * GeV')

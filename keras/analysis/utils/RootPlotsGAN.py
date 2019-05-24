@@ -6,9 +6,9 @@ import math
 import time
 import numpy.core.umath_tests as umath
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy.stats import wasserstein_distance as wass
-plt.switch_backend('Agg')
 
 import ROOTutils as my # common utility functions for root
 from GANutils import safe_mkdir, get_sums
