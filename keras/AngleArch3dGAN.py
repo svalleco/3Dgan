@@ -5,18 +5,16 @@ from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)
-#from normalization import BatchNormalization as BatchNormalization2
 from keras.models import Model, Sequential
 import math
 import tensorflow as tf
 
 # calculate sum of intensities
 def ecal_sum(image, daxis):
-    #image = K.squeeze(image, axis=daxis)# squeeze along channel axis
     sum = K.sum(image, axis=daxis)
     return sum
 
-# counts for various bins   
+# counts for various bin entries   
 def count(image, daxis):
     limits=[0.05, 0.03, 0.02, 0.0125, 0.008, 0.003] # bin boundaries used
     bin1 = K.sum(K.tf.where(image > limits[0], K.ones_like(image), K.zeros_like(image)), axis=daxis)
@@ -96,14 +94,14 @@ def ecal_angle(image, daxis):
 def discriminator(power=1.0, dformat='channels_last'):
     K.set_image_data_format(dformat)
     if dformat =='channels_last':
-        dshape=(51, 51, 25,1)
-        daxis=4
-        baxis=-1
-        daxis2=(1, 2, 3)
+        dshape=(51, 51, 25,1) # sample shape
+        daxis=4 # channel axis 
+        baxis=-1 # axis for BatchNormalization
+        daxis2=(1, 2, 3) # axis for sum
     else:
-        dshape=(1, 51, 51, 25)
-        daxis=1
-        baxis=1
+        dshape=(1, 51, 51, 25) 
+        daxis=1 
+        baxis=1 
         daxis2=(2, 3, 4)
     image=Input(shape=dshape)
 
@@ -138,20 +136,20 @@ def discriminator(power=1.0, dformat='channels_last'):
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
     inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image
-    ang = Lambda(ecal_angle, arguments={'daxis':daxis})(inv_image)
-    ecal = Lambda(ecal_sum, arguments={'daxis':daxis2})(inv_image)
-    add_loss = Lambda(count, arguments={'daxis':daxis2})(inv_image)
+    ang = Lambda(ecal_angle, arguments={'daxis':daxis})(inv_image) # angle calculation
+    ecal = Lambda(ecal_sum, arguments={'daxis':daxis2})(inv_image) # sum of energies
+    add_loss = Lambda(count, arguments={'daxis':daxis2})(inv_image) # loss for bin counts
     Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary()
     return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss])
 
 
 def generator(latent_size=256, return_intermediate=False, dformat='channels_last'):
     if dformat =='channels_last':
-        dim = (9,9,8,8)
-        baxis=-1
+        dim = (9,9,8,8) # shape for dense layer
+        baxis=-1 # axis for BatchNormalization
     else:
         dim = (8, 9, 9,8)
-        baxis=-1
+        baxis=1
     K.set_image_data_format(dformat)
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
