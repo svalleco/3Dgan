@@ -1,38 +1,41 @@
 import os
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from utils.GANutils import safe_mkdir
-plt.switch_backend('Agg')
+import argparse
+
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
 
 def main():
-   #pkl file name and plots dir
-   lossfile =  '../results/3dgan_history.pkl'
-   outdir = 'results/loss_plots'
+   parser = get_parser()
+   params = parser.parse_args()
+   
+   historyfile = params.historyfile
+   outdir = params.outdir
+   ylim = [params.ylim1, params.ylim2, params.ylim3, params.ylim4, params.ylim5, params.ylim6, params.ylim7]
+   start_epoch =params.start_epoch
+   fit_order = params.fit_order
+   num_ang_losses = params.num_ang_losses
+   num_add_loss = params.num_add_loss
+   gen_weight = params.gen_weight
+   aux_weight = params.aux_weight
+   ecal_weight = params.ecal_weight
+   ang_weight = params.ang_weight
+   add_weight = params.add_weight
 
-   # limits for plots. Adjust according to current plots
-   ymax = [20, 5, 5, 40, 1, 3.5, 10.] #[combined loss, Gen train loss, Gen test loss, Aux training loss, lower limit for generator BCE only, upper limit for generator BCE, Disc. Losses]
-
-   start_epoch =0 # removing initial epochs to check for overfitting of Generation loss
-   fit_order = 3 # order of fit used
-   num_ang_losses = 1 # number of angle losses
-   num_add_loss = 1 # any additional loss used
-
-   #Getting losses in arrays
+   #Loss names 
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
    bloss= 'Binary cross entropy'
+   # angle name
    angtype = 'theta'
-   gen_weight = 3   # weight of generation loss
-   aux_weight = 0.1 # weight of auxilliary regression loss
-   ecal_weight = 0.1 # weight of ecal sum loss
-   ang_weight = 25 # weight of angle loss
-   add_weight = 0.1 # weight of any additional loss
-
+   
    if num_ang_losses==1:
        weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
        losstypes = ['Weighted sum', bloss, ploss, aloss, ploss]
@@ -48,9 +51,31 @@ def main():
        lossnames.append('bin')
 
    safe_mkdir(outdir)
-   plot_loss(lossfile, ymax, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order)
+   plot_loss(historyfile, ylim, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order)
    print('Loss Plots are saved in {}'.format(outdir))
    
+def get_parser():
+    parser = argparse.ArgumentParser(description='Loss plots' )
+    parser.add_argument('--historyfile', action='store', type=str, default='../results/3dgan_history_training.pkl', help='Pickle file for loss history')
+    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots', help='directory for results')
+    parser.add_argument('--ylim1', type=float, default=20, help='y max for combined train loss')
+    parser.add_argument('--ylim2', type=float, default=5, help='y max for BCE train loss')
+    parser.add_argument('--ylim3', type=float, default=5, help='y max for BCE test loss')
+    parser.add_argument('--ylim4', type=float, default=40, help='y max for Axilliary training losses')
+    parser.add_argument('--ylim5', type=float, default=0.5, help='y min for Generator BCE only')
+    parser.add_argument('--ylim6', type=float, default=2.5, help='y max for Generator BCE only')
+    parser.add_argument('--ylim7', type=float, default=10., help='y max for combined test & train losses')
+    parser.add_argument('--start_epoch', type=int, default=0, help='can be used to remove initial epochs')
+    parser.add_argument('--fit_order', type=int, default=3, help='order of polynomial used for fit')
+    parser.add_argument('--num_ang_losses', type=int, default=1, help='number of losses used for angle')
+    parser.add_argument('--num_add_loss', type=int, default=1, help='number of additional losses')
+    parser.add_argument('--gen_weight', type=float, default=3, help='weight of GAN loss')
+    parser.add_argument('--aux_weight', type=float, default=0.1, help='weight of auxilliary energy regression loss')
+    parser.add_argument('--ecal_weight', type=float, default=0.1, help='weight of ecal sum loss')
+    parser.add_argument('--ang_weight', type=float, default=25, help='weight of angle loss')
+    parser.add_argument('--add_weight', type=float, default=0.1, help='weight of bin count loss')    
+    return parser
+
 def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3):
                              
    with open(lossfile, 'rb') as f:
@@ -63,11 +88,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
            '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
                          '#bcbd22', '#17becf']
    loop = np.arange(len(lossnames))
-   #gen_test= gen_test[:21]
-   #gen_train =gen_train[:21]
-   #disc_test =disc_test[:21]
-   #disc_train=disc_train[:21]
-
+ 
    #Plots for Testing and Training Losses
    plt.figure(fig)
    plt.subplot(221)
