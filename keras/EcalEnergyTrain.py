@@ -194,7 +194,7 @@ def Gan3DTrain(discriminator, generator, datapath, nEvents, WeightsDir, pklfile,
     print('The total data was divided in {} Train files and {} Test files'.format(len(Trainfiles), len(Testfiles)))
     nb_test = int(nEvents * f[1])
     if nb_test % batch_size >0:
-      nb_test = (nb_test/batch_size) * batch_size
+      nb_test = int((nb_test/batch_size) * batch_size)
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
