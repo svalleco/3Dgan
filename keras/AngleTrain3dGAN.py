@@ -96,7 +96,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/eos/user/g/gkhattak/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
     parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
