@@ -10,7 +10,7 @@ print(np.__version__)
 import math
 import sys
 import argparse
-
+from memory_profiler import profile
 if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used        
     tlab = True
 else:
@@ -84,7 +84,7 @@ def main():
        events_per_file = 10000
        energies = [0, 50, 100, 200, 250, 300, 400, 500]
    elif datapath=='path4':
-       datapath = "/eos/user/g/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
+       datapath = "/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
        events_per_file = 5000
        energies = [0, 110, 150, 190]
 
@@ -92,7 +92,7 @@ def main():
      #Weights
      dweights=["/gkhattak/weights/3dgan_weights_k2_final_test_run2/params_discriminator_epoch_059.hdf5"]
      gweights= ["/gkhattak/weights/3dgan_weights_k2_final_test_run2/params_generator_epoch_059.hdf5"]
-     datapath = '/eos/user/g/gkhattak/*Measured3ThetaEscan/*.h5'
+     datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
      events_per_file = 5000
    angles = [62, 90, 118]
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]

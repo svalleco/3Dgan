@@ -14,7 +14,7 @@ import time
 import math
 import ROOT
 
-if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
+if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used
     tlab = True
 else:
     tlab= False
@@ -30,21 +30,21 @@ sys.path.insert(0,'../')
 def main():
     # All of the following needs to be adjusted
     from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights/params_generator*.hdf5'
+    weightdir = '3dgan_weights_k2_final_test_run2/params_generator*.hdf5'
     if tlab:
-      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
+      datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
       genpath = '/gkhattak/weights/' + weightdir
     else:
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
-    
+    datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results' # plot directory
+    plotsdir = 'results/optimization_results_training' # plot directory
     particle = "Ele" 
     scale = 1
     threshold = 0
     ang = 1
-    concat=1
+    concat=2
     power=0.85
     g= generator(latent_size=256)
     start = 0
@@ -55,7 +55,7 @@ def main():
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
-    #gen_weights=gen_weights[:stop]
+    gen_weights=gen_weights[start:stop]
     epoch = []
     for i in np.arange(len(gen_weights)):
       name = os.path.basename(gen_weights[i])
