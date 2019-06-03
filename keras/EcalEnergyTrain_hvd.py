@@ -176,7 +176,7 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ecal_weight],options=run_options,run_metadata=run_metadata
     )
-
+    discriminator.trainable = True # workaround for a k2 bug
     gcb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
