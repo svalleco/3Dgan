@@ -11,14 +11,12 @@ except ImportError:
 import keras
 import argparse
 import os
-os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 from six.moves import range
 import sys
-#import glob
 import h5py 
 import numpy as np
 import time
-import math
+#import math
 import argparse
 
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
@@ -34,8 +32,6 @@ except:
 #from memory_profiler import profile # used for memory profiling
 import keras.backend as K
 import analysis.utils.GANutils as gan
-#K.set_image_dim_ordering('tf')
-
 from keras.layers import Input
 from keras.models import Model
 from keras.optimizers import Adadelta, Adam, RMSprop
@@ -51,11 +47,8 @@ from keras.utils.generic_utils import Progbar
 
 def main():
     #Architectures to import
-    if keras.__version__ == '1.2.2':
-        from AngleArch3dGAN_newarch_layers import generator, discriminator
-    else:
-        from AngleArch3dGAN_k2 import generator, discriminator
-
+    from AngleArch3dGAN import generator, discriminator
+    
     #Values to be set by user
     parser = get_parser()
     params = parser.parse_args()
@@ -75,14 +68,30 @@ def main():
     analyse=params.analyse # if analysing
     energies =params.energies # Bins
     loss_weights=[params.gen_weight, params.aux_weight, params.ang_weight, params.ecal_weight, params.hist_weight]
-    
     thresh = params.thresh # threshold for data
     angtype = params.angtype
+    warm = params.warm
+    prev_gweights = params.prev_gweights
+    prev_dweights = params.prev_dweights
+    lr = params.lr
+    
+    if datapath=='path1':
+        datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
+        events_per_file = 5000
+        energies = [110, 150, 190]
+    elif datapath=='path2':
+        datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
+        events_per_file = 10000
+        energies = [50, 100, 200, 250, 300, 400, 500]
+    elif datapath=='path3':
+        datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech
+        events_per_file = 10000
+        energies = [50, 100, 200, 250, 300, 400, 500]
 
     if tlab:
-      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
-      weightdir = '/gkhattak/weights/3Dweights'
-      pklfile = '/gkhattak/results/3dgan_history.pkl'
+       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
+       weightdir = '/gkhattak/weights/3Dweights'
+       pklfile = '/gkhattak/results/3dgan_history.pkl'
 
     print(params)
 
@@ -91,17 +100,17 @@ def main():
     d=discriminator(xpower)
     g=generator(latent_size)
     Gan3DTrainAngle(d, g, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
-                    latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
+                    latent_size=latent_size, loss_weights=loss_weights, lr=lr, xscale = xscale, xpower=xpower, angscale=ascale,
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
-                    energies=energies)
+                    energies=energies, warm=warm, prev_gweights=prev_gweights, prev_dweights=prev_dweights)
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/data/shared/gkhattak/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
-    parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
+    parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
+    parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
@@ -114,9 +123,13 @@ def get_parser():
     parser.add_argument('--ang_weight', action='store', type=float, default=25, help='loss weight for angle loss')
     parser.add_argument('--ecal_weight', action='store', type=float, default=0.1, help='loss weight for ecal sum loss')
     parser.add_argument('--hist_weight', action='store', type=float, default=0.1, help='loss weight for additional bin count loss')
-    parser.add_argument('--thresh', action='store', type=int, default=0., help='Threshold for cell energies')
+    parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
-    parser.add_argument('--name', action='store', type=str, default='newarch_layers', help='Identifier for training.')
+    parser.add_argument('--warm', action='store', default=True, help='Start from pretrained weights or random initialization')
+    parser.add_argument('--prev_gweights', type=str, default='weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5', help='Initial generator weights for warm start')
+    parser.add_argument('--prev_dweights', type=str, default='weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5', help='Initial discriminator weights for warm start')
+    parser.add_argument('--lr', type=float, default=0.001, help='learning rate for optimizer')
+    parser.add_argument('--name', action='store', type=str, default='gan_training_all', help='Identifier for training.')
     return parser
 
 # A histogram fucntion that counts cells in different bins
@@ -137,30 +150,37 @@ def hist_count(x, p=1):
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    ang = np.array(f.get(angtype))
+    ang = f.get(angtype)
     X=np.array(f.get('ECAL'))* xscale
     Y=np.array(f.get('energy'))/yscale
-    X[X < thresh] = 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    ang = ang.astype(np.float32)
-    X = np.expand_dims(X, axis=-1)
     ecal = np.sum(X, axis=(1, 2, 3))
+    if ang==None:
+      indexes = np.where(ecal > 10.0)
+      X=X[indexes]
+      Y=Y[indexes]
+      ang = gan.measPython(X)
+    else:
+      ang = np.array(ang)
+      ang = ang.astype(np.float32)
+    X[X < thresh] = 0
+    X = np.expand_dims(X, axis=-1)
+    ecal = np.expand_dims(ecal, axis=-1)
     if xpower !=1.:
         X = np.power(X, xpower)
     return X, Y, ang, ecal
 
-def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[]):
+def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
     verbose = False    
     particle='Ele'
     f = [0.9, 0.1]
     loss_ftn = hist_count
-    lr =0.0008
     print('[INFO] Building discriminator')
     #discriminator.summary()
     discriminator.compile(
-        optimizer=RMSprop(),
+        optimizer=RMSprop(lr=lr),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -169,7 +189,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     print('[INFO] Building generator')
     #generator.summary()
     generator.compile(
-        optimizer=RMSprop(),
+        optimizer=RMSprop(lr=lr),
         loss='binary_crossentropy'
     )
  
@@ -185,7 +205,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(),
+        optimizer=RMSprop(lr=lr),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -208,6 +228,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     test_history = defaultdict(list)
     init_time = time.time()- start_init
     analysis_history = defaultdict(list)
+    if warm:
+        generator.load_weights(prev_gweights)
+        print('Generator initialized from {}'.format(prev_gweights))
+        discriminator.load_weights(prev_dweights)
+        print('Discriminator initialized from {}'.format(prev_dweights))
+                
     print('Initialization time is {} seconds'.format(init_time))
     for epoch in range(nb_epochs):
         epoch_start = time.time()
@@ -335,7 +361,6 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
            file_index +=1
                                                                        
            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
-           #noise = np.multiply(energy_batch.reshape(-1, 1), noise)
            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
            generated_images = generator.predict(generator_ip, verbose=False)
            add_loss_test = loss_ftn(image_batch, xpower)
