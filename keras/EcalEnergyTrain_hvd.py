@@ -86,8 +86,8 @@ def DivideFiles(FileSearch="/data/LCD/*/*.h5", nEvents=200000, EventsperFile = 1
 # This functions loads data from a file and also does any pre processing
 def GetData(datafile, xscale =1, yscale = 100, dimensions = 3, keras_dformat="channels_last"):
     #get data for training                                                                                         
-    #if hvd.rank()==0:
-    #    print('Loading Data from .....', datafile)                              
+    if hvd.rank()==0:
+        print('Loading Data from .....', datafile)                              
     f=h5py.File(datafile,'r')
     
     X=np.array(f.get('ECAL'))
@@ -140,20 +140,20 @@ def randomize(a, b, c):
 
 def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=True):
     start_init = time.time()
-    # verbose = False
-    #if hvd.rank()==0:
-    #    print('[INFO] Building discriminator')
-    #discriminator.summary()
+    verbose = False
+    if hvd.rank()==0:
+        print('[INFO] Building discriminator')
+    
     discriminator.compile(
         optimizer=opt,
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[gen_weight, aux_weight, ecal_weight],options=run_options,run_metadata=run_metadata
     )
 
-    # build the generator
-    #if hvd.rank()==0:
-    #    print('[INFO] Building generator')
-    #generator.summary()
+    #build the generator
+    if hvd.rank()==0:
+        print('[INFO] Building generator')
+    
     generator.compile(
         optimizer=opt,
         loss='binary_crossentropy',options=run_options,run_metadata=run_metadata
@@ -177,7 +177,7 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
         loss_weights=[gen_weight, aux_weight, ecal_weight],options=run_options,run_metadata=run_metadata
     )
     discriminator.trainable = True # workaround for a k2 bug
-    """
+    
     gcb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
@@ -212,14 +212,15 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
     gcb.on_train_begin()
     dcb.on_train_begin()
     ccb.on_train_begin()
-    """
+    
 
+    datapath = '/eos/user/g/gkhattak/FixedAngleData/*.h5'
     # Getting Data
     Trainfiles, Testfiles = DivideFiles(datapath, nEvents=nEvents, EventsperFile = EventsperFile, datasetnames=["ECAL"], Particles =["Ele"])
     print(Trainfiles)
     print(Testfiles)
-    #if hvd.rank()==0:
-    #    print("Train files: {0} \nTest files: {1}".format(Trainfiles, Testfiles))
+    if hvd.rank()==0:
+        print("Train files: {0} \nTest files: {1}".format(Trainfiles, Testfiles))
     
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
@@ -246,19 +247,19 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
     assert X_train.shape[0] == EventsperFile * len(Trainfiles), "# Total events in training files"
     nb_train = X_train.shape[0]# Total events in training files
     total_batches = int(nb_train / global_batch_size)
-    #if hvd.rank()==0:
-    #    print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
+    if hvd.rank()==0:
+        print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
     train_history = defaultdict(list)
     test_history = defaultdict(list)
 
-    #if hvd.rank()==0:
-    #    print('Initialization time was {} seconds'.format(time.time() - start_init))
+    if hvd.rank()==0:
+        print('Initialization time was {} seconds'.format(time.time() - start_init))
 
     for epoch in range(nb_epochs):
         epoch_start = time.time()
-        #if hvd.rank()==0:
-        print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
+        if hvd.rank()==0:
+           print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         
         randomize(X_train, Y_train, ecal_train)
 
@@ -310,20 +311,21 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
                 print('processed {}/{} batches in {}'.format(index + 1, total_batches, time.time() - start))
         
         # save weights every epoch
-        #if hvd.rank()==0:
-        safe_mkdir(WeightsDir)
+        if hvd.rank()==0:
+           safe_mkdir(WeightsDir)
 
-        print ("saving weights of gen")
-        generator.save_weights(WeightsDir + '/generator_{0}{1:03d}.hdf5'.format(g_weights, epoch), overwrite=True)
+           print ("saving weights of gen")
+           generator.save_weights(WeightsDir + '/generator_{0}{1:03d}.hdf5'.format(g_weights, epoch), overwrite=True)
             
-        print ("saving weights of disc")
-        discriminator.save_weights(WeightsDir + '/discriminator_{0}{1:03d}.hdf5'.format(d_weights, epoch), overwrite=True)
+           print ("saving weights of disc")
+           discriminator.save_weights(WeightsDir + '/discriminator_{0}{1:03d}.hdf5'.format(d_weights, epoch), overwrite=True)
 
-        epoch_time = time.time()-epoch_start
-        print("The {} epoch took {} seconds".format(epoch, epoch_time))
+           epoch_time = time.time()-epoch_start
+           print("The {} epoch took {} seconds".format(epoch, epoch_time))
 
-        #print('The training took {} seconds.'.format(time.time()-epoch_start))
-        print('\nTesting for epoch {}:'.format(epoch + 1))
+           #print('The training took {} seconds.'.format(time.time()-epoch_start))
+           print('\nTesting for epoch {}:'.format(epoch + 1))
+        
         test_start=time.time()
         noise = np.random.normal(0.1, 1, (nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (nb_test, 1))
@@ -359,7 +361,7 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
         train_history['discriminator'].append(discriminator_train_loss)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
-        pickle.dump({'train': train_history, 'test': test_history}, open('3Dgan-history.pkl', 'wb'))
+        pickle.dump({'train': train_history, 'test': test_history}, open('/gkhattak/hvd-history.pkl', 'wb'))
         
         print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
             'component', *discriminator.metrics_names))
@@ -374,6 +376,25 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
                              *train_history['discriminator'][-1]))
         print(ROW_FMT.format('discriminator (test)',
                              *test_history['discriminator'][-1]))
+        mean = 0
+        var = 0
+        with open('BN_log.txt', 'a') as f:
+           print('######  Epoch {} ######'.format(epoch))
+           f.write(os.linesep + '###### Epoch {} ######'.format(epoch))
+           for i, l in enumerate(generator.layers[1].layers):
+             if 'batch_normalization' in l.name:
+               print("#### {} ####".format(l.name))
+               f.write(os.linesep)
+               f.write("#### {} ####".format(l.name) + os.linesep)
+
+               for w in l.weights:
+                 if 'moving_' in w.name:
+                    print("moving average for {}".format(w.name))
+                    f.write(os.linesep + "moving average for {}  ".format(w.name))
+                    print(K.eval(w))
+                    for i in K.eval(w): f.write('{}, '.format(i))
+                    print("layer statistics")
+                    f.write(os.linesep + 'layer statistics   ')
 
         if analysis:
               analysis_history = defaultdict(list)
@@ -405,7 +426,7 @@ def get_parser():
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
-    parser.add_argument('--weightsdir', action='store', type=str, default='3Dweights', help='Directory to store weights.')
+    parser.add_argument('--weightsdir', action='store', type=str, default='/gkhattak/hvdweights/', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
@@ -432,7 +453,7 @@ if __name__ == '__main__':
     from sklearn.model_selection import train_test_split
 
     import tensorflow as tf
-    #import horovod.keras as hvd
+    import horovod.keras as hvd
 
     #Values to be set by user
     parser = get_parser()
@@ -462,7 +483,7 @@ if __name__ == '__main__':
 
 
     # Initialize Horovod.
-    #hvd.init()
+    hvd.init()
 
     #Architectures to import
     from EcalEnergyGan import generator, discriminator
@@ -474,8 +495,9 @@ if __name__ == '__main__':
     energies =[100, 200, 300, 400] # Bins
     resultfile = '3dgan_analysis.pkl' # analysis result
 
-    global_batch_size = batch_size# * hvd.size()
-    #print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
+    global_batch_size = batch_size * hvd.size()
+    print(hvd.size())
+    print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
     #datapath = '/bigdata/shared/LCD/NewV1/*scan/*.h5' #Data path on Caltech
@@ -487,10 +509,10 @@ if __name__ == '__main__':
     xscale = params.xscale
     warmup_epochs = params.warmupepochs
     mod=0
-    #opt = getattr(keras.optimizers, params.optimizer)
-    opt = RMSprop()
-    #opt = opt(params.learningRate * hvd.size())
-    #opt = hvd.DistributedOptimizer(opt)
+    opt = getattr(keras.optimizers, params.optimizer)
+    #opt = RMSprop()
+    opt = opt(params.learningRate * hvd.size())
+    opt = hvd.DistributedOptimizer(opt)
     # Building discriminator and generator
     d=discriminator(keras_dformat=d_format)
     g=generator(latent_size,keras_dformat=d_format)
