@@ -23,21 +23,24 @@ except:
 def main():
   latent = 256  #latent space
   power=0.85    #power for cell energies used in training
-  thresh =0.0   #threshold used
+  thresh =0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/IQA_p85_ep27' # dir for results
+  plotsdir = 'results/IQA_newarch3_lr_L_1' # dir for results
   gan.safe_mkdir(plotsdir) 
   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path     
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
   energies =[0, 110, 150, 190]# energy bins
-  #angles=[math.radians(x) for x in [62, 90, 118]]
   angles=[62, 90, 118]
+  L=1
+  concat=2
+  stest = True
+  dscale =50.0
   g = generator(latent)       # build generator
-  gen_weight1= "../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_027.hdf5" # weights for generator
+  gen_weight1= "../weights/3dgan_weights_newarch3_lr/params_generator_epoch_050.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
   sorted_data = gan.get_sorted_angle(data_files[24:], energies, thresh=thresh) # load data in a dict
-
+  
   # for each energy bin
   for energy in energies:
      for a in angles:
@@ -46,15 +49,17 @@ def main():
        sorted_data["events_act" + str(energy) + "ang_" + str(a)] = sorted_data["events_act" + str(energy)][indexes]
        sorted_data["energy" + str(energy) + "ang_" + str(a)] = sorted_data["energy" + str(energy)][indexes]
        sorted_data["angle" + str(energy) + "ang_" + str(a)] = sorted_data["angle" + str(energy)][indexes]
-       
+       sorted_data["events_act" + str(energy) + "ang_" + str(a)] = sorted_data["events_act" + str(energy) + "ang_" + str(a)]/dscale
        index= sorted_data["events_act" + str(energy)+ "ang_" + str(a)].shape[0]  # number of events in bin
        # generate images
        generated_images = gan.generate(g, index, [sorted_data["energy" + str(energy)+ "ang_" + str(a)]/100.
                                     , sorted_data["angle" + str(energy)+ "ang_" + str(a)]]
-                                    , latent, concat=1)
+                                       , latent, concat=concat)
        # post processing
        generated_images = np.power(generated_images, 1./power)
-
+       generated_images = generated_images /dscale
+       generated_images[generated_images < thresh]=0
+       
        # Get MSCN Coefficients
        mscn_g4= MSCN_sparse(sorted_data["events_act" + str(energy)+ "ang_" + str(a)])
        mscn_gan= MSCN_sparse(generated_images)
@@ -68,14 +73,15 @@ def main():
        mscn_gan= mscn_gan[mscn_gan!=0]
 
        #find other metrics
-       data_range= np.amax(sorted_data["events_act" + str(energy)+ "ang_" + str(a)])
-       ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
+       #data_range= np.amax(sorted_data["events_act" + str(energy)+ "ang_" + str(a)])
+       #L=data_range
+       ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
        print('Energy={}'.format(energy))
        print('SSIM={}'.format(ms_ssim))
-       psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, data_range=data_range)
+       psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, data_range=L)
        print('PSNR={}'.format(psnr))
        #make plot
-       Draw1d(mscn_g4, mscn_gan, filename, labels, [ms_ssim, psnr])
+       Draw1d(mscn_g4, mscn_gan, filename, labels, [ms_ssim, psnr], stest=stest)
 
        if get_shuffled:
           # repeat for shuffled data
@@ -86,11 +92,11 @@ def main():
           mscn_2 = mscn_2.flatten()
           mscn_2 = mscn_2[mscn_2!=0]
 
-          ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
+          ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
           print('SSIM Data shuffled ={}'.format(ms_ssim))
-          psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, data_range=data_range)
+          psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, data_range=L)
           print('PSNR Data shuffled ={}'.format(psnr))
-          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ms_ssim, psnr])
+          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ms_ssim, psnr], stest=stest)
 
           # repeat for shuffled GAN
           filename = path.join(plotsdir, "IQA_GAN_shuffled{}GeV_{}degree.pdf".format(energy, a))
@@ -100,11 +106,11 @@ def main():
           mscn_2 = mscn_2.flatten()
           mscn_2 = mscn_2[mscn_2!=0]
 
-          ms_ssim=measure.compare_ssim(generated_images, shuffled_gan, multichannel=True, data_range=data_range, gaussian_weights=True, use_sample_covariance=False)
+          ms_ssim=measure.compare_ssim(generated_images, shuffled_gan, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
           print('SSIM GAN shuffled ={}'.format(ms_ssim))
-          psnr = measure.compare_psnr(generated_images, shuffled_gan, data_range=data_range)
+          psnr = measure.compare_psnr(generated_images, shuffled_gan, data_range=L)
           print('PSNR GAN shuffled ={}'.format(psnr))
-          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ms_ssim, psnr])
+          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ms_ssim, psnr], stest=stest)
                               
 
 # MSCN original
@@ -176,7 +182,7 @@ def MS_SSIM(images1, images2):
   return K.eval(ssim_val)
 
 # Plot for MSCN
-def Draw1d(array1, array2, filename, labels, metrics=[]):
+def Draw1d(array1, array2, filename, labels, metrics=[], stest=True):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
   c.SetGrid()
   min1=np.amin(array1)
@@ -197,6 +203,9 @@ def Draw1d(array1, array2, filename, labels, metrics=[]):
   leg.AddEntry(hist2, "{} ".format(labels[1]), "l")
   if len(metrics)==2:
     leg.AddEntry(hist2, "ssim={:.4f} psnr={:.4f}".format(metrics[0], metrics[1]), "l")
+  if stest:
+    ks= hist1.KolmogorovTest(hist2)
+    leg.AddEntry(hist2, "K test ={:.4f}".format(ks), "l")
   hist1.Sumw2()
   hist2.Sumw2()
   hist1.GetYaxis().CenterTitle()
