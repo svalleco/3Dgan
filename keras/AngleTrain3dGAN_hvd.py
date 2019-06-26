@@ -50,6 +50,22 @@ import horovod.keras as hvd
 #import tensorflow as tf
 #print('tensorflow version', tf.__version__)
 #print('numpy version', np.version.version)
+def genbatches(a,n):
+    for i in range(0, len(a), n):
+        # Create an index range for l of n items:
+        yield a[i:i+n]
+
+
+def randomize(a, b, c, d):
+    assert a.shape[0] == b.shape[0]
+    # Generate the permutation index array.
+    permutation = np.random.permutation(a.shape[0])
+    # Shuffle the arrays by giving the permutation in the square brackets.
+    shuffled_a = a[permutation]
+    shuffled_b = b[permutation]
+    shuffled_c = c[permutation]
+    shuffled_d = d[permutation]
+    return shuffled_a, shuffled_b, shuffled_c, shuffled_d
 
 def main():
     #Architectures to import
@@ -260,7 +276,23 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         X_test, Y_test, ang_test, ecal_test = X_test[:numTest], Y_test[:numTest], ang_test[:numTest], ecal_test[:numTest]
     else:
         nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
+    for index, dtrain in enumerate(Trainfiles):
+        if index == 0:
+            X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+        else:
+            X_temp, Y_temp, ecal_temp = GetDatAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+            X_train = np.concatenate((X_train, X_temp))
+            Y_train = np.concatenate((Y_train, Y_temp))
+            ang_train = np.concatenate((ang_train, ang_temp))
+            ecal_train = np.concatenate((ecal_train, ecal_temp))
+
+    nb_train = X_train.shape[0]# Total events in training files
+    total_batches = nb_train / global_batch_size
     if hvd.rank()==0:
+        print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
+
+
+   if hvd.rank()==0:
        print('Test Data loaded of shapes:')
        print(X_test.shape)
        print(Y_test.shape)
@@ -276,48 +308,27 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
        print('Initialization time is {} seconds'.format(init_time))
     for epoch in range(nb_epochs):
         epoch_start = time.time()
-        print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-        X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-        nb_file=1
-  
+        if hvd.rank()==0:
+            print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
+ 
         epoch_gen_loss = []
         epoch_disc_loss = []
-        index = 0
-        total_batches = 0
-        file_index=0
-     
-        while nb_file < len(Trainfiles) and index < nb_Train:
-            if verbose:
-                progress_bar.update(index)
-            else:
-                if index % 100 == 0:
-                    print('processed {}/{} batches'.format(index + 1, total_batches))
-            loaded_data = X_train.shape[0]
-            used_data = file_index * batch_size
-            if (loaded_data - used_data) < (batch_size + 1 ):
-                X_train = X_train[(file_index * batch_size):]
-                Y_train = Y_train[(file_index * batch_size):]
-                ang_train = ang_train[(file_index * batch_size):]
-                ecal_train = ecal_train[(file_index * batch_size):]
-                                                                
-                X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-                nb_file+=1
-                
-                X_train = np.concatenate((X_train, X_temp))
-                Y_train = np.concatenate((Y_train, Y_temp))
-                ang_train = np.concatenate((ang_train, ang_temp))
-                ecal_train = np.concatenate((ecal_train, ecal_temp))
-                nb_batches = int(X_train.shape[0] / batch_size)
-                if hvd.rank()==0:         
-                    print("{} batches loaded..........".format(nb_batches))
-                file_index = 0
+        randomize(X_train, Y_train, ecal_train, angle_train)
 
-            image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
-            energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
-            ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
-            file_index +=1
+        epoch_gen_loss = []
+        epoch_disc_loss = []
+        
+        image_batches = genbatches(X_train, batch_size)
+        energy_batches = genbatches(Y_train, batch_size)
+        ecal_batches = genbatches(ecal_train, batch_size)
+        angle_batches = genbatches(angle_train, batch_size)
+        for index in range(total_batches):
+            start = time.time()         
+            image_batch = image_batches.next()
+            energy_batch = energy_batches.next()
+            ecal_batch = ecal_batches.next()
+            angle_batch = angle_batches.next()
+
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
             generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1)
@@ -361,37 +372,9 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             #print('add_loss_batch')
             #print(np.transpose(add_loss_batch[:5]))
 
-        # Testing    
-        print ('Total batches were {}'.format(index))
-        print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
-        print('\nTesting for epoch {}:'.format(epoch))
-        test_start = time.time()
-        noise = np.random.normal(0, 1, (nb_Test, latent_size-1))
-        noise = np.multiply(Y_test.reshape(-1, 1), noise)
-        generator_ip = np.concatenate((ang_test.reshape(-1, 1), noise), axis=1)
-        generated_images = generator.predict(generator_ip, verbose=False)
-        add_loss_test = loss_ftn(X_test, xpower)
-        X = np.concatenate((X_test, generated_images))
-        y = np.array([1] * nb_Test + [0] * nb_Test)
-        ang = np.concatenate((ang_test, ang_test))
-        ecal = np.concatenate((ecal_test, ecal_test))
-        aux_y = np.concatenate((Y_test, Y_test), axis=0)
-        add_loss= np.concatenate((add_loss_test, add_loss_test), axis=0)
-        add_loss = np.expand_dims(add_loss, axis=-1)
-        discriminator_test_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
-        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
-
-        noise = np.random.normal(0, 1, (2 * nb_Test, latent_size - 1))
-        noise = np.multiply(aux_y.reshape(-1, 1), noise)
-        generator_ip = np.concatenate((ang.reshape(-1, 1), noise), axis=1)
-        trick = np.ones(2 * nb_Test)
-        generator_test_loss = combined.evaluate(generator_ip,
-                [trick, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
-        generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
+        # Testing  
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
-        test_history['generator'].append(generator_test_loss)
-        test_history['discriminator'].append(discriminator_test_loss)
         if hvd.rank()==0:
             if analyse:
                 result = gan.OptAnalysisShort(var, generated_images, energies)
@@ -408,12 +391,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
             print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
-            print(ROW_FMT.format('generator (test)',
-                             *test_history['generator'][-1]))
             print(ROW_FMT.format('discriminator (train)',
                              *train_history['discriminator'][-1]))
-            print(ROW_FMT.format('discriminator (test)',
-                             *test_history['discriminator'][-1]))
 
         # save weights every epoch
             generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
@@ -422,8 +401,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
                                    overwrite=True)
         
             epoch_time = time.time()-test_start
-            print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
-            pickle.dump({'train': train_history, 'test': test_history}, open(pklfile, 'wb'))
+            pickle.dump({'train': train_history, open(pklfile, 'wb'))
 
 if __name__ == '__main__':
     main()
