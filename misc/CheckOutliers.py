@@ -30,13 +30,13 @@ def main():
     energies=[0, 110, 150, 190]
     concat = 2
     angles = [62, 90, 118]
-    outdir = 'results/Outliers_gan_training_peaks/' # dir for results
+    outdir = 'results/Outliers_gan_training_peaks_119/' # dir for results
     safe_mkdir(outdir)
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
     g = generator(latent)       # build generator
     d = discriminator()
-    gen_weight1= "../weights/3dgan_weights_gan_training/params_generator_epoch_089.hdf5" # weights for generator
-    disc_weight1= "../weights/3dgan_weights_gan_training/params_discriminator_epoch_089.hdf5" # weights for discriminator
+    gen_weight1= "../weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5" # weights for generator
+    disc_weight1= "../weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5" # weights for discriminator
     sortdir = 'SortedData'
     gendir = 'Gen'
     discdir = 'Disc'
