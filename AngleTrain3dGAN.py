@@ -70,7 +70,7 @@ def main():
     loss_weights=[params.gen_weight, params.aux_weight, params.ang_weight, params.ecal_weight, params.hist_weight]
     thresh = params.thresh # threshold for data
     angtype = params.angtype
-    warm = params.warm
+    warm= params.warm
     prev_gweights = params.prev_gweights
     prev_dweights = params.prev_dweights
     lr = params.lr
@@ -94,7 +94,6 @@ def main():
        pklfile = '/gkhattak/results/3dgan_history.pkl'
 
     print(params)
-
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
     d=discriminator(xpower)
@@ -117,6 +116,7 @@ def get_parser():
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
     parser.add_argument('--analyse', action='store', default=False, help='Whether or not to perform analysis')
+    parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
     parser.add_argument('--energies', action='store', type=int, default=[0, 110, 150, 190], help='Energy bins for analysis')
     parser.add_argument('--gen_weight', action='store', type=float, default=3, help='loss weight for generation real/fake loss')
     parser.add_argument('--aux_weight', action='store', type=float, default=0.1, help='loss weight for auxilliary energy regression loss')
@@ -125,7 +125,6 @@ def get_parser():
     parser.add_argument('--hist_weight', action='store', type=float, default=0.1, help='loss weight for additional bin count loss')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
-    parser.add_argument('--warm', action='store', default=True, help='Start from pretrained weights or random initialization')
     parser.add_argument('--prev_gweights', type=str, default='weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5', help='Initial discriminator weights for warm start')
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate for optimizer')
@@ -160,6 +159,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
       indexes = np.where(ecal > 10.0)
       X=X[indexes]
       Y=Y[indexes]
+      ecal = ecal[indexes]
       ang = gan.measPython(X)
     else:
       ang = np.array(ang)
