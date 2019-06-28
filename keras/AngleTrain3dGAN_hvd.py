@@ -10,6 +10,7 @@ except ImportError:
     import pickle
 import keras
 from keras.callbacks import CallbackList
+kv2 = keras.__version__.startswith('2')
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
@@ -35,7 +36,6 @@ except:
 #from memory_profiler import profile # used for memory profiling
 import keras.backend as K
 import analysis.utils.GANutils as gan
-#K.set_image_dim_ordering('tf')
 
 from keras.layers import Input
 from keras.models import Model
@@ -43,7 +43,6 @@ from keras.optimizers import Adadelta, Adam, RMSprop
 from keras.utils.generic_utils import Progbar
 import horovod.keras as hvd
 #config = tf.ConfigProto(log_device_placement=True)
-
 # printing versions of software used
 #print('keras version:', keras.__version__)
 #print('python version:', sys.version)
@@ -104,6 +103,7 @@ def main():
     print(params)
     #initialize Horovod
     hvd.init()
+ 
     opt = getattr(keras.optimizers, params.optimizer)
     opt = opt(params.learningRate * hvd.size())
     opt = hvd.DistributedOptimizer(opt)
@@ -114,7 +114,7 @@ def main():
     gan.safe_mkdir(weightdir)
     d=discriminator(xpower)
     g=generator(latent_size)
-    Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=global_batch_size,
+    Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
                     energies=energies, warmup_epochs=warmup_epochs)
@@ -148,15 +148,19 @@ def get_parser():
 def mapping(x):
     return x
     
+if K.image_data_format() !='channels_last':
+   daxis = (2,3,4)
+else:
+   daxis = (1,2,3)
 def hist_count(x, p=1):
-    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=(1, 2, 3))
-    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=(1, 2, 3))
-    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=(1, 2, 3))
-    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=(1, 2, 3))
-    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=(1, 2, 3))
-    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=(1, 2, 3))
-    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=(1, 2, 3))
-    bin8 = np.sum(np.where(x==0, 1, 0), axis=(1, 2, 3))
+    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
+    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
+    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=daxis)
+    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=daxis)
+    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=daxis)
+    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=daxis)
+    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=daxis)
+    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
     bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
     bins[np.where(bins==0)]=1
     return bins
@@ -173,12 +177,16 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     Y = Y.astype(np.float32)
     ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
-    ecal = np.sum(X, axis=(1, 2, 3))
+    if K.image_data_format() !='channels_last':
+       X =np.moveaxis(X, -1, 1)
+       ecal = np.sum(X, axis=(2, 3, 4))
+    else:
+       ecal = np.sum(X, axis=(1, 2, 3))
     if xpower !=1.:
         X = np.power(X, xpower)
     return X, Y, ang, ecal
 
-def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
+def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
     start_init = time.time()
     verbose = False    
     particle='Ele'
@@ -218,7 +226,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
-    discriminator.trainable = True
+    if kv2: 
+        discriminator.trainable = True #workaround for keras 2 bug
     gcb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
@@ -280,7 +289,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         if index == 0:
             X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
         else:
-            X_temp, Y_temp, ecal_temp = GetDatAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+            X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
             X_train = np.concatenate((X_train, X_temp))
             Y_train = np.concatenate((Y_train, Y_temp))
             ang_train = np.concatenate((ang_train, ang_temp))
@@ -292,7 +301,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
 
-   if hvd.rank()==0:
+    if hvd.rank()==0:
        print('Test Data loaded of shapes:')
        print(X_test.shape)
        print(Y_test.shape)
@@ -313,7 +322,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
  
         epoch_gen_loss = []
         epoch_disc_loss = []
-        randomize(X_train, Y_train, ecal_train, angle_train)
+        randomize(X_train, Y_train, ecal_train, ang_train)
 
         epoch_gen_loss = []
         epoch_disc_loss = []
@@ -321,14 +330,14 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         image_batches = genbatches(X_train, batch_size)
         energy_batches = genbatches(Y_train, batch_size)
         ecal_batches = genbatches(ecal_train, batch_size)
-        angle_batches = genbatches(angle_train, batch_size)
-        for index in range(total_batches):
+        ang_batches = genbatches(ang_train, batch_size)
+        for index in range(int(total_batches)):
             start = time.time()         
-            image_batch = image_batches.next()
-            energy_batch = energy_batches.next()
-            ecal_batch = ecal_batches.next()
-            angle_batch = angle_batches.next()
-
+            image_batch = next(image_batches) 
+            energy_batch = next(energy_batches)
+            ecal_batch = next(ecal_batches)
+            ang_batch = next(ang_batches)
+            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
             noise = np.random.normal(0, 1, (batch_size, latent_size-1))
             noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
             generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1)
@@ -401,7 +410,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
                                    overwrite=True)
         
             epoch_time = time.time()-test_start
-            pickle.dump({'train': train_history, open(pklfile, 'wb'))
+            pickle.dump({'train': train_history}, open(pklfile, 'wb'))
 
 if __name__ == '__main__':
     main()
