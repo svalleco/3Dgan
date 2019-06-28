@@ -42,11 +42,10 @@ from keras.models import Model
 from keras.optimizers import Adadelta, Adam, RMSprop
 from keras.utils.generic_utils import Progbar
 import horovod.keras as hvd
-#config = tf.ConfigProto(log_device_placement=True)
 # printing versions of software used
 #print('keras version:', keras.__version__)
 #print('python version:', sys.version)
-#import tensorflow as tf
+import tensorflow as tf
 #print('tensorflow version', tf.__version__)
 #print('numpy version', np.version.version)
 def genbatches(a,n):
@@ -94,6 +93,17 @@ def main():
     angtype = params.angtype
     warmup_epochs = params.warmupepochs
  
+    config = tf.ConfigProto(log_device_placement=True)
+    config.intra_op_parallelism_threads = params.intraop
+    config.inter_op_parallelism_threads = params.interop
+    os.environ['KMP_BLOCKTIME'] = str(1)
+    os.environ['KMP_SETTINGS'] = str(1)
+    os.environ['KMP_AFFINITY'] = 'granularity=fine,compact'
+    # os.environ['KMP_AFFINITY'] = 'balanced'
+    # os.environ['OMP_NUM_THREADS'] = str(params.intraop)
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
+    K.set_session(tf.Session(config=config))
+
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
       weightdir = '/gkhattak/weights/3dgan_weights'
@@ -142,6 +152,8 @@ def get_parser():
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
     parser.add_argument('--learningRate', '-lr', action='store', type=float, default=0.001, help='Learning Rate')
     parser.add_argument('--optimizer', action='store', type=str, default='RMSprop', help='Keras Optimizer to use.')
+    parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
+    parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
     return parser
 
