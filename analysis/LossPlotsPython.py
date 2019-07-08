@@ -7,8 +7,11 @@ import matplotlib.colors as colors
 from utils.GANutils import safe_mkdir
 import argparse
 
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used          
+if os.environ.get('HOSTNAME'):
+  if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used          
     tlab = True
+  else:
+    tlab= False
 else:
     tlab= False
 
@@ -63,8 +66,8 @@ def main():
    
 def get_parser():
     parser = argparse.ArgumentParser(description='Loss plots' )
-    parser.add_argument('--historyfile', action='store', type=str, default='3dgan_history_gan_training_lr_p0005_k2.pkl', help='Pickle file for loss history')
-    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots_gan_training_lr_p0005_k2', help='directory for results')
+    parser.add_argument('--historyfile', action='store', type=str, default='3dgan_history_gan_training.pkl', help='Pickle file for loss history')
+    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots_gan_training', help='directory for results')
     parser.add_argument('--ylim1', type=float, default=20, help='y max for combined train loss')
     parser.add_argument('--ylim2', type=float, default=5, help='y max for BCE train loss')
     parser.add_argument('--ylim3', type=float, default=5, help='y max for BCE test loss')
