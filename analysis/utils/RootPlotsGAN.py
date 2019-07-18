@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import wasserstein_distance as wass
 plt.switch_backend('Agg')
 
-import ROOTutils as my # common utility functions for root
-from GANutils import safe_mkdir, get_sums
+import utils.ROOTutils as my # common utility functions for root
+from utils.GANutils import safe_mkdir, get_sums
 
 ##################################### Plots used in detailed analysis ######################################################
 def z_test(array1, array2):
@@ -1524,9 +1524,9 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
           plot_moment(var["momentZ_act" + str(energy)], var["momentZ_gan" + str(energy)], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt, labels, stest=stest)
           plots+=1
 
-    print 'Plots are saved in ', plots_dir
+    print( 'Plots are saved in ', plots_dir)
     plot_time= time.time()- start
-    print '{} Plots are generated in {} seconds'.format(plots, plot_time)
+    print( '{} Plots are generated in {} seconds'.format(plots, plot_time))
 
 
 ##################################### Get plots for variable angle #####################################################################
