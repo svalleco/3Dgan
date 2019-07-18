@@ -23,7 +23,7 @@ def fill_hist(hist, array):
 def fill_graph(graph, x, y):
    n = x.shape[0]
    for i in np.arange(n):
-      graph.SetPoint(i, x[i], y[i])
+      graph.SetPoint(int(i), x[i], y[i])
 
 # normalize in different modes
 def normalize(hist, mod=0):
