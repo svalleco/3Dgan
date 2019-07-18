@@ -74,11 +74,15 @@ def main():
     prev_gweights = params.prev_gweights
     prev_dweights = params.prev_dweights
     lr = params.lr
-    
-    if datapath=='path1':
+
+    # 5000 events in each file for 100-200 GeV version
+    events_per_file = 5000
+    energies = [110, 150, 190]
+            
+    if datapath=='path':
+        datapath = "/bigdata/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
+    elif datapath=='path1':
         datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
-        events_per_file = 5000
-        energies = [110, 150, 190]
     elif datapath=='path2':
         datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
         events_per_file = 10000
@@ -108,7 +112,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path', help='HDF5 files to train from.')
     parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
@@ -128,7 +132,7 @@ def get_parser():
     parser.add_argument('--prev_gweights', type=str, default='weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5', help='Initial discriminator weights for warm start')
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate for optimizer')
-    parser.add_argument('--name', action='store', type=str, default='gan_training_all', help='Identifier for training.')
+    parser.add_argument('--name', action='store', type=str, default='gan_training_test', help='Identifier for training.')
     return parser
 
 # A histogram fucntion that counts cells in different bins
