@@ -67,14 +67,16 @@ def main():
    dformat = params.dformat
 
    labels=['']
-    
-   #Architecture 
-   from AngleArch3dGAN_prev import generator, discriminator
+   energies = [0, 110, 150, 190] 
+   events_per_file = 5000
 
-   if datapath=='path1':
+   #Architecture 
+   from AngleArch3dGAN import generator, discriminator
+   
+   if datapath=='path':
+       datapath = "/bigdata/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV 
+   elif datapath=='path1':
        datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
-       events_per_file = 5000
-       energies = [0, 110, 150, 190]
    elif datapath=='path2':
        datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
        events_per_file = 10000
@@ -120,7 +122,7 @@ def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path3', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='theta', help='Angle used.')
     parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis/', help='Directory to store the analysis plots.')
@@ -149,8 +151,8 @@ def get_parser():
     parser.add_argument('--leg', action='store', default=True, help='add legends')
     parser.add_argument('--statbox', action='store', default=True, help='add statboxes')
     parser.add_argument('--mono', action='store', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights/params_generator_epoch_059.hdf5', help='comma delimited list for paths to Generator weights.')
-    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights/params_discriminator_epoch_059.hdf5', help='comma delimited list for paths to Discriminator weights')
+    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5', help='comma delimited list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5', help='comma delimited list for paths to Discriminator weights')
     parser.add_argument('--xscales', action='store', type=int, default=1, help='Multiplication factors for cell energies')
     parser.add_argument('--ascales', action='store', type=int, default=1, help='Multiplication factors for angles')
     parser.add_argument('--dscale', action='store', type=int, default=50, help='Data = dscale * GeV')
