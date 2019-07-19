@@ -17,7 +17,7 @@ import utils.ROOTutils as r
 import setGPU
 
 def main():
-   datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
+   datapath = "/bigdata/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
    outdir = 'results/data_bins_spectrum'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
@@ -25,12 +25,20 @@ def main():
    print('The angle data varies from {} to {}'.format(np.amin(x[x>0]), np.amax(x)))
    labels = ['G4 Var. Angle']
    bins=[0.05, 0,03, 0.02, 0.0125, 0.008, 0.003]
-   bin_edges = [15, 0.05, 0,03, 0.02, 0.0125, 0.008, 0.003, 0., 0.]
    scale = 50.
-   bins = [_/scale for _ in bins]
-   bin_edges = [_/scale for _ in bin_edges]
-   p=[int(np.amin(y)), int(np.amax(y))]   
-   plot_ecal_hist_bins([x/scale], bins, outfile, y, labels, logy=0, norm=2, p=p, ifpdf=False)
+   bins.extend([0, -0.003])
+   bins = sorted(bins)
+   bins.extend([np.amax(x)])
+ 
+   edges = np.zeros(len(bins))
+   for i, bin in enumerate(bins):
+     edges[i] = bins[i]/scale
+   print (edges[3:])
+   p=[int(np.amin(y)), int(np.amax(y))]
+   plot_ecal_hist_bins([x/scale], edges, outfile, y, labels, logy=0, logx=0, norm=2, p=p, ifpdf=True)   
+   plot_ecal_hist_bins([x/scale], edges, outfile+'_ylog', y, labels, logy=1, logx=0, norm=2, p=p, ifpdf=True)
+   plot_ecal_hist_bins([x/scale], edges[3:], outfile+'_xylog', y, labels, logy=1, logx=1, norm=2, p=p, ifpdf=True)
+   plot_ecal_hist_bins([x/scale], edges[3:], outfile+'_xlog', y, labels, logy=0, logx=1, norm=2, p=p, ifpdf=True)
    print('Histogram is saved in ', outfile)
          
 def GetAngleData(datafile, numevents=1000, ftn=0, scale=1, angtype='theta'):
@@ -47,8 +55,7 @@ def GetAngleData(datafile, numevents=1000, ftn=0, scale=1, angtype='theta'):
 def plot_ecal_flatten_hist_bins(events, bins, out_file, energy, labels, logy=0, norm=0, ifpdf=True, p=[2, 500]):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    c1.SetGrid()
-   ROOT.gPad.SetLogx()
-   
+      
    title = "Cell energy {:d}-{:d} GeV Primary".format(p[0], p[1])
    legend = ROOT.TLegend(.1, .6, .3, .9)
    color =2
@@ -60,7 +67,7 @@ def plot_ecal_flatten_hist_bins(events, bins, out_file, energy, labels, logy=0, 
       hds.append(ROOT.TH1F(label, "", 100, -8, 1))
       hd = hds[i]
       hd.SetStats(0)
-      r.BinLogX(hd)
+      #r.BinLogX(hd)
       data = event.flatten()
       r.fill_hist(hd, data)
       lines=[]
@@ -92,22 +99,23 @@ def plot_ecal_flatten_hist_bins(events, bins, out_file, energy, labels, logy=0, 
    else:
      c1.Print(out_file + '.C')
 
-def plot_ecal_hist_bins(events, bins_edges, out_file, energy, labels, logy=0, norm=0, ifpdf=True, p=[2, 500]):
+def plot_ecal_hist_bins(events, bin_edges, out_file, energy, labels, logy=0, logx=0, norm=0, ifpdf=True, p=[2, 500]):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                                                                                              
    c1.SetGrid()
-   ROOT.gPad.SetLogx()
-
+   if logx:
+     ROOT.gPad.SetLogx()
    title = "Cell energy {:d}-{:d} GeV Primary".format(p[0], p[1])
-   legend = ROOT.TLegend(.1, .6, .3, .9)
+   legend = ROOT.TLegend(.1, .8, .3, .9)
    color =2
    if logy:
       ROOT.gPad.SetLogy()
-      title = title + " (log)"
    hds=[]
    for i, (event, label) in enumerate(zip(events, labels)):
-      hds.append(ROOT.TH1F(label, "", len(bin_edges)_1, bins_edges))
+      hds.append(ROOT.TH1F(label, "", len(bin_edges)-1, bin_edges))
       hd = hds[i]
       hd.SetStats(0)
+      #if logx:
+      #  r.BinLogX(hd)
       data = event.flatten()
       r.fill_hist(hd, data)
       if norm:
