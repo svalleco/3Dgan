@@ -34,23 +34,23 @@ except:
   pass
 
 def main():
-  latent = 256  #latent space
+  latent = 500  #latent space
   power=0.85    #power for cell energies used in training
   thresh =0.0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/peaks2_newarch3_all_2_lr_ep59_seed1_2' # dir for results
+  plotsdir = 'results/peaks2_gan_training_lr_0005_k2' # dir for results
   gan.safe_mkdir(plotsdir) 
-  #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
-  datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech 
+  datapath = "/bigdata/shared/gkhattak/EleEscan/*.h5" # Data path
+  #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech 
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  #energies =[110, 150, 190] #[50, 100, 150, 200, 300, 400]# energy bins
-  energies = [50, 100, 150, 200, 300, 400]
+  energies =[110, 150, 190] 
+  #energies = [50, 100, 150, 200, 300, 400]
   angles=[62, 90, 118]
   L=1e-6
   concat=2
   g = generator(latent)       # build generator
-  gen_weight1= "../weights/3dgan_weights_newarch3_all_2_lr/params_generator_epoch_059.hdf5" # weights for generator
+  gen_weight1= "../weights/keras2_weights/params_generator_epoch_158.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
   sorted_data = gan.get_sorted_angle(data_files[25:27], energies, num_events1=10000, num_events2=50000, thresh=thresh) # load data in a dict
   sigma = 1
