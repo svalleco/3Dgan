@@ -112,18 +112,18 @@ def discriminator(power=1.0, dformat='channels_last'):
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization(axis=baxis)(x)
+    x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization(axis=baxis)(x)
+    x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization(axis=baxis)(x)
+    x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = AveragePooling3D((2, 2, 2))(x)
@@ -158,28 +158,28 @@ def generator(latent_size=256, return_intermediate=False, dformat='channels_last
         
         Conv3D(8, (6, 6, 8), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
         
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
         ####################################### added layers 
         
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
 
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
 
         ZeroPadding3D((1, 1, 0)),
         Conv3D(6, (3, 3, 5), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
         
         #####################################  
         
