@@ -4,7 +4,9 @@ import numpy as np
 import math
 import time
 import glob
-import GANutilsANG as gan
+import sys
+sys.path.insert(0,'../analysis')
+import utils.GANutils as gan
 import setGPU
 import keras.backend as K
 import tensorflow as tf
@@ -20,14 +22,20 @@ def GetAngleDataSorted(datafile):
    X = X.astype(np.float32)
    Y = Y.astype(np.float32)
    theta = theta.astype(np.float32)
-   eta = eta.astype(np.float32)
-   indexes = np.where((Y >= 100.0) & (Y <=200.0))
+   indexes = np.where(Y <= 100.0) # & (Y <=200.0))
    X = X[indexes]
    Y = Y[indexes]
    theta = theta[indexes]
-   eta = eta[indexes]
+   eta =  eta[indexes]
    ecal = np.sum(X, axis=(1, 2, 3))
-   return X, Y, theta, eta, ecal
+   indexes2 = np.where(ecal > 10.0)
+   X=X[indexes2]
+   Y=Y[indexes2]
+   ecal = ecal[indexes2]
+   eta =  eta[indexes2]
+   theta = theta[indexes2]
+   mtheta = gan.measPython(X)
+   return X, Y, theta, mtheta, eta, ecal
 
 def GetAngleDataProcessed(datafile):
    #get data for training
@@ -37,11 +45,7 @@ def GetAngleDataProcessed(datafile):
    eta = np.array(f.get('eta'))
    X=np.array(f.get('ECAL'))
    Y=np.array(f.get('energy'))
-   #X = X.astype(np.float32)
-   #Y = Y.astype(np.float32)
-   #theta = theta.astype(np.float32)
    m_theta = measPython(X)
-   #eta = eta.astype(np.float32)
    ecal = np.sum(X, axis=(1, 2, 3))
    return X, Y, theta, m_theta, eta, ecal
 
@@ -156,8 +160,6 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
                  
    indexes = np.where(amask>0)
    ang[indexes] = 100.
-   #ang = ang.reshape(-1, 1)
-   print(ang.shape)
    print ('The time taken by Meas5_2 = {} seconds'.format(time.time()-start))
    return ang
                                                                                                                                                     
@@ -172,8 +174,7 @@ def SaveData(data, filename, eventsperfile):
       mtheta = data[3]
       eta = data[4]
       ecal = data[5]
-   print(theta[:5])
-   print(mtheta[:5])
+   
    with h5py.File(filename ,'w') as outfile:
       outfile.create_dataset('ECAL',data=X[:eventsperfile])
       outfile.create_dataset('energy',data= Y[:eventsperfile])
@@ -183,10 +184,7 @@ def SaveData(data, filename, eventsperfile):
       if len(data)==6:
          outfile.create_dataset('mtheta',data=mtheta[:eventsperfile])
    print('Data is stored in {} file'.format(filename))
-   out = [X[eventsperfile:], Y[eventsperfile:], theta[eventsperfile:], mtheta[eventsperfile:], eta[eventsperfile:], ecal[eventsperfile:]]
-   #if len(data)==6:
-   #   out.append(mtheta[eventsperfile:])
-   #out.append([eta[eventsperfile:], ecal[eventsperfile:]])
+   out = [X[eventsperfile:], Y[eventsperfile:], theta[eventsperfile:], mtheta[eventsperfile:], eta[eventsperfile:], ecal[eventsperfile:]] 
    return out
 
    
@@ -195,14 +193,19 @@ def GetAllData(datafiles, eventsperfile, filename, getdata=GetAngleDataSorted):
    for i, f in enumerate(datafiles):
        if i == 0:
          data = getdata(f)
+         print(data[0].shape)
+         print(data[1][:10])
+         if data[0].shape[0] > eventsperfile:
+           data = SaveData(data, filename+'_{:03d}.h5'.format(num), eventsperfile)
+           print(data[0].shape)
+           num+=1
        else:
          temp_data = getdata(f)
          new_data = []
          for item1, item2 in zip(data, temp_data):
            new_data.append(np.concatenate((item1, item2), axis=0))
          data = new_data
-       print(data[0].shape)
-       if data[0].shape[0] > eventsperfile:
+         if data[0].shape[0] > eventsperfile:
            data = SaveData(data, filename+'_{:03d}.h5'.format(num), eventsperfile)
            print(data[0].shape)
            num+=1
@@ -210,14 +213,13 @@ def GetAllData(datafiles, eventsperfile, filename, getdata=GetAngleDataSorted):
       data = SaveData(data, filename+'_{:03d}.h5'.format(num), eventsperfile)
                  
 def main():
-   #datapath ='/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5'
-   sortedpath = '/data/shared/gkhattak'
-   datapath = sortedpath +'/EleEscan/*.h5'
+   datapath ='/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5'
+   sortedpath = '/bigdata/shared/gkhattak'
    Particles = ['Ele']
    eventsperfile = 5000
    MaxFiles = -1
-   l1 = 100
-   l2 = 200
+   l1 = 2
+   l2 = 100
    print ("Searching in :", datapath)
    Files =sorted( glob.glob(datapath))
    print ("Found {} files. ".format(len(Files)))
@@ -238,11 +240,12 @@ def main():
 
    for p in Particles:
      print('There are {} files for {}'.format(len(Samples[p]), p))
-     pdir = os.path.join(sortedpath, '{}Measured3ThetaEscan'.format(p))
+     pdir = os.path.join(sortedpath, '{}scan_RandomAngle100GeV'.format(p))
      gan.safe_mkdir(pdir)
      print ('Directory {} is created'.format(pdir))
      filename = os.path.join(pdir, '{}_VarAngleMeas_{:d}_{:d}'.format(p, l1, l2))
-     GetAllData(Samples[p], eventsperfile, filename, GetAngleDataProcessed)
+     GetAllData(Samples[p], eventsperfile, filename)
+
 
 if __name__ == "__main__":
     main()
