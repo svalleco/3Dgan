@@ -26,13 +26,13 @@ def main():
   thresh =0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/IQA_newarch3_lr_L_1' # dir for results
+  plotsdir = 'results/IQA_newarch3_lr_L_p2' # dir for results
   gan.safe_mkdir(plotsdir) 
-  datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path     
+  datapath = "/bigdata/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path     
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
   energies =[0, 110, 150, 190]# energy bins
   angles=[62, 90, 118]
-  L=1
+  L=1e-2
   concat=2
   stest = True
   dscale =50.0
@@ -75,13 +75,13 @@ def main():
        #find other metrics
        #data_range= np.amax(sorted_data["events_act" + str(energy)+ "ang_" + str(a)])
        #L=data_range
-       ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
+       ssim_mean, ssim_std=SSIM(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
        print('Energy={}'.format(energy))
-       print('SSIM={}'.format(ms_ssim))
+       print('SSIM={}'.format(ssim_mean))
        psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, data_range=L)
        print('PSNR={}'.format(psnr))
        #make plot
-       Draw1d(mscn_g4, mscn_gan, filename, labels, [ms_ssim, psnr], stest=stest)
+       Draw1d(mscn_g4, mscn_gan, filename, labels, [ssim_mean, psnr], stest=stest)
 
        if get_shuffled:
           # repeat for shuffled data
@@ -92,11 +92,11 @@ def main():
           mscn_2 = mscn_2.flatten()
           mscn_2 = mscn_2[mscn_2!=0]
 
-          ms_ssim=measure.compare_ssim(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
+          ms_ssim=SSIM(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
           print('SSIM Data shuffled ={}'.format(ms_ssim))
           psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, data_range=L)
           print('PSNR Data shuffled ={}'.format(psnr))
-          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ms_ssim, psnr], stest=stest)
+          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ssim_mean, psnr], stest=stest)
 
           # repeat for shuffled GAN
           filename = path.join(plotsdir, "IQA_GAN_shuffled{}GeV_{}degree.pdf".format(energy, a))
@@ -106,11 +106,11 @@ def main():
           mscn_2 = mscn_2.flatten()
           mscn_2 = mscn_2[mscn_2!=0]
 
-          ms_ssim=measure.compare_ssim(generated_images, shuffled_gan, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
-          print('SSIM GAN shuffled ={}'.format(ms_ssim))
+          ssim_mean, ssim_std=SSIM(generated_images, shuffled_gan, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
+          print('SSIM GAN shuffled ={}'.format(ssim_mean))
           psnr = measure.compare_psnr(generated_images, shuffled_gan, data_range=L)
           print('PSNR GAN shuffled ={}'.format(psnr))
-          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ms_ssim, psnr], stest=stest)
+          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ssim_mean, psnr], stest=stest)
                               
 
 # MSCN original
@@ -173,13 +173,11 @@ def MSCN_sparse(images):
         mscn[:, x:x+3, y:y+3, z:z+5]=image_slice
   return mscn
 
-def MS_SSIM(images1, images2):
-  #images1 = np.squeeze(images1)
-  #images2 = np.squeeze(images2)
-  image_tensor1=K.tf.convert_to_tensor(images1)
-  image_tensor2=K.tf.convert_to_tensor(images2)
-  ssim_val = ssim_skimage(image_tensor1, image_tensor2)
-  return K.eval(ssim_val)
+def SSIM(images1, images2, multichannel=True, data_range=1, gaussian_weights=True, use_sample_covariance=False):
+  ssim_val=[]
+  for i in np.arange(images1.shape[0]):
+     ssim_val.append(measure.compare_ssim(images1[i], images2[i], multichannel=multichannel, data_range=data_range, gaussian_weights=gaussian_weights, use_sample_covariance=use_sample_covariance))
+  return np.mean(ssim_val), np.std(ssim_val)
 
 # Plot for MSCN
 def Draw1d(array1, array2, filename, labels, metrics=[], stest=True):
