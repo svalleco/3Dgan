@@ -35,10 +35,10 @@ def main():
    for i, bin in enumerate(bins):
      edges[i] = bins[i]/scale
    p=[int(np.amin(y)), int(np.amax(y))]
-   plot_ecal_hist_bins([x/scale], edges, outfile, y, labels, logy=0, logx=0, norm=2, p=p, ifpdf=True)   
-   plot_ecal_hist_bins([x/scale], edges, outfile+'_ylog', y, labels, logy=1, logx=0, norm=2, p=p, ifpdf=True)
-   plot_ecal_hist_bins([x/scale], edges[3:], outfile+'_xylog', y, labels, logy=1, logx=1, norm=2, p=p, ifpdf=True)
-   plot_ecal_hist_bins([x/scale], edges[3:], outfile+'_xlog', y, labels, logy=0, logx=1, norm=2, p=p, ifpdf=True)
+   #plot_ecal_hist_bins([x/scale], edges, outfile, y, labels, logy=0, logx=0, norm=2, p=p, ifpdf=True)   
+   #plot_ecal_hist_bins([x/scale], edges, outfile+'_ylog', y, labels, logy=1, logx=0, norm=2, p=p, ifpdf=True)
+   #plot_ecal_hist_bins([x/scale], edges[3:], outfile+'_xylog', y, labels, logy=1, logx=1, norm=2, p=p, ifpdf=True)
+   #plot_ecal_hist_bins([x/scale], edges[3:], outfile+'_xlog', y, labels, logy=0, logx=1, norm=2, p=p, ifpdf=True)
    plot_ecal_prof_bins([x], outfile+'_prof', y, labels, scale=scale, logy=0, logx=0, norm=2, p=p, ifpdf=True)
    print('Histogram is saved in ', outfile)
          
@@ -178,8 +178,9 @@ def plot_ecal_prof_bins(events, out_file, energy, labels, scale=1, bins = [0.05,
       hd.SetStats(0)
       for e in event:
          counts = hist_count(e, limits=bins)
+         counts = np.flip(counts, 0)
          for c in np.arange(len(counts)-1):
-           hd.Fill(c, counts[c])
+           hd.Fill(c, counts[c + 1])
       hd.SetLineColor(color)
       if i ==0:
         hd.SetTitle(title)
