@@ -3,13 +3,13 @@
 from __future__ import print_function
 import os
 ## setting seed ###
-from numpy.random import seed
-seed(1)
-from tensorflow import set_random_seed
-set_random_seed(1)
-import random
-random.seed(1)
-os.environ['PYTHONHASHSEED'] = '0' 
+#from numpy.random import seed
+#seed(1)
+#from tensorflow import set_random_seed
+#set_random_seed(1)
+#import random
+#random.seed(1)
+#os.environ['PYTHONHASHSEED'] = '0' 
 ##################
 
 from collections import defaultdict
@@ -25,9 +25,9 @@ import numpy as np
 import time
 import math
 import tensorflow as tf
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 import analysis.utils.GANutils as gan
-if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used to set defaults accordingly
+if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
     tlab = True
 else:
     tlab= False
@@ -37,7 +37,7 @@ try:
 except:
     pass
 
-from memory_profiler import profile # used for memory profiling
+#from memory_profiler import profile # used for memory profiling
 import keras.backend as K
 from keras.layers import Input
 from keras.models import Model
@@ -57,12 +57,15 @@ def main():
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
     datapath = params.datapath# Data path
+    outpath = params.outpath # training output
     nEvents = params.nEvents# maximum number of events used in training
     ascale = params.ascale # angle scale
     yscale = params.yscale # scaling energy
     weightdir = 'weights/3dgan_weights_' + params.name
     pklfile = 'results/3dgan_history_' + params.name + '.pkl'# loss history
     resultfile = 'results/3dgan_analysis' + params.name + '.pkl'# optimization metric history
+    prev_gweights = 'weights/' + params.prev_gweights
+    prev_dweights = 'weights/' + params.prev_dweights
     xscale = params.xscale
     xpower = params.xpower
     analyse=params.analyse # if analysing
@@ -71,13 +74,38 @@ def main():
     thresh = params.thresh # threshold for data
     angtype = params.angtype
     particle = params.particle
+    warm = params.warm
     lr = params.lr
-    energies = [110, 150, 190] # bins used in short analysis
+    events_per_file = 5000
+    energies = [0, 110, 150, 190]
+
     if tlab:
-      #datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
-      weightdir = '/gkhattak/weights/3dgan_weights_' + params.name 
-      pklfile = '/gkhattak/results/3dgan_history_' +  params.name +'.pkl'
-      resultfile = '/gkhattak/results/3dgan_analysis_' +  params.name +'.pkl'
+       if not warm:
+         datapath = 'path4'
+       outpath = '/gkhattak/'
+         
+    if datapath=='path1':
+       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                                         
+    elif datapath=='path2':
+       datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate                              
+       events_per_file = 10000
+       energies = [0, 50, 100, 200, 250, 300, 400, 500]
+    elif datapath=='path3':
+       datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech                                                      
+       events_per_file = 10000
+       energies = [0, 50, 100, 200, 250, 300, 400, 500]
+    elif datapath=='path4':
+       datapath = "/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                             
+    elif datapath=='path5':
+       datapath = "/gkhattak/data/*RandomAngle100GeV/*.h5"
+       energies = [0, 10, 50, 90]
+
+    weightdir = outpath + 'weights/3dgan_weights_' + params.name
+    pklfile = outpath + 'results/3dgan_history_' + params.name + '.pkl'# loss history
+    resultfile = outpath + 'results/3dgan_analysis' + params.name + '.pkl'# optimization metric history   
+    prev_gweights = outpath + 'weights/' + params.prev_gweights
+    prev_dweights = outpath + 'weights/' + params.prev_dweights
+
     print(params)
     
     # Building discriminator and generator
@@ -89,14 +117,16 @@ def main():
     Gan3DTrainAngle(d, g, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, loss_weights=loss_weights, lr=lr, xscale = xscale, xpower=xpower, angscale=ascale,
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
-                    energies=energies, dformat=dformat, particle=particle, verbose=verbose)
+                    energies=energies, dformat=dformat, particle=particle, verbose=verbose, warm=warm,
+                    prev_gweights= prev_gweights, prev_dweights=prev_dweights   )
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
+    parser.add_argument('--nbepochs', action='store', type=int, default=240, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path4', help='HDF5 files to train from.')
+    parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
     parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
@@ -113,8 +143,11 @@ def get_parser():
     parser.add_argument('--thresh', action='store', type=int, default=0., help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle')
-    parser.add_argument('--lr', action='store', type=float, default=0.0008, help='Learning rate')
-    parser.add_argument('--name', action='store', type=str, default='training', help='Unique identifier can be set for each training')
+    parser.add_argument('--lr', action='store', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
+    parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
+    parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
+    parser.add_argument('--name', action='store', type=str, default='gan_training_epsilon_2_500GeV', help='Unique identifier can be set for each training')
     return parser
 
 # A histogram fucntion that counts cells in different bins
@@ -150,7 +183,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
         X = np.power(X, xpower)
     return X, Y, ang, ecal
 
-def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False):
+def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
     loss_ftn = hist_count # function used for additional loss
@@ -193,6 +226,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
+
+    if warm:
+        generator.load_weights(prev_gweights)
+        print('Generator initialized from {}'.format(prev_gweights))
+        discriminator.load_weights(prev_dweights)
+        print('Discriminator initialized from {}'.format(prev_dweights))
 
     # Getting All available Data sorted in test train fraction
     Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
