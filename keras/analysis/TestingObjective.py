@@ -14,7 +14,7 @@ import time
 import math
 import ROOT
 
-if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used
+if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
     tlab = True
 else:
     tlab= False
@@ -30,28 +30,32 @@ sys.path.insert(0,'../')
 def main():
     # All of the following needs to be adjusted
     from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_k2_final_test_run2/params_generator*.hdf5'
+    weightdir = '3dgan_weights_gan_training/params_generator*.hdf5'
     if tlab:
-      datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
+      #datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
+      datapath = '/gkhattak/data/*100GeV/*.h5'
       genpath = '/gkhattak/weights/' + weightdir
     else:
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
-    datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
+    #datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
+    
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results_training' # plot directory
+    plotsdir = 'results/optimization_results_gan_training/' # plot directory
     particle = "Ele" 
     scale = 1
     threshold = 0
     ang = 1
     concat=2
     power=0.85
-    g= generator(latent_size=256)
+    latent = 256
+    g= generator(latent_size=latent)
     start = 0
-    stop = 60
+    stop = 500
     gen_weights=[]
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
+    energies =[110, 150, 190]
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
@@ -63,8 +67,8 @@ def main():
       epoch.append(num)
     print("{} weights are found".format(len(gen_weights)))
     result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle
-                        , scale, power=power, thresh=threshold, ang=ang, concat=concat
-            , preproc = taking_power, postproc=inv_power
+            , scale, power=power, thresh=threshold, ang=ang, concat=concat, latent=latent
+            , preproc = taking_power, postproc=inv_power, energies=energies
              )
     PlotResultsRoot(result, plotsdir, start, epoch, fits, ang=ang)
 
@@ -158,6 +162,7 @@ def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
                     
     mg.SetTitle("Optimization function: Mean Relative Error on shower shapes, moment and sampling fraction;Epochs;Error")
     mg.Draw('ALP')
+    mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(total))
     c1.Update()
     legend.Draw()
     c1.Update()
@@ -199,15 +204,15 @@ def postproc(n, scale=1):
     return n/scale
         
 # results are obtained using metric and saved to a log file
-def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc):
+def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, latent = 256, preproc=preproc, postproc=postproc, energies=[110, 150, 190]):
     resultfile = os.path.join(resultdir,  'result_log.txt')
     file = open(resultfile,'w')
     result = []
     for i in range(len(gen_weights)):
        if i==0:
-         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc)) # For the first time when sorted data is not saved we can make use opposite flags
+         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, latent=latent, postproc=postproc, energies=energies)) # For the first time when sorted data is not saved we can make use opposite flags
        else:
-         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc))
+         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, latent=latent, postproc=postproc, energies=energies))
        #file.write(len(result[i]) * '{:.4f}\t'.format(*result[i]))
        file.write('\t'.join(str(r) for r in result[i]))
        file.write('\n')
@@ -248,13 +253,12 @@ def postproc(n, scale=1):
     return n/scale
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc, energies=[110, 150, 190]):
+def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, latent = 256, concat=1, preproc=preproc, postproc=postproc, energies=[110, 150, 190]):
    print ("Started")
    num_events=2000
    num_data = 140000
    ascale = 1
    Test = True
-   latent= 256
    m = 2
    var = {}
    sorted_path= sorted_path 
