@@ -20,7 +20,7 @@ def main():
    #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # path to data
    datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
    # path to generator weights
-   genweight = "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5"
+   genweight = "../keras/weights/3dgan_weights_gan_training_chr_pion_2_500GeV/params_generator_epoch_020.hdf5"
    # generator model
    from AngleArch3dGAN import generator
 
@@ -41,14 +41,15 @@ def main():
    xpower = 0.85
    concat = 2
    ascale=1
+   particle = 'ChPi'
    ecalscale=50. # scaling in original data set
    post = inv_power # post processing: It can be either scale (without sqrt) or square(sqrt)
-   thresh = 0 # if using threshold
-   plotsdir = 'results/2D_pami_ep21_log/' # name of folder to save results
+   thresh = 3e-4 # if using threshold
+   plotsdir = 'results/2D_chr_pi_ep20_log_thresh/' # name of folder to save results
    gan.safe_mkdir(plotsdir) # make plot directory
    opt="colz" # option for 2D hist
    angtype='theta'
-   datafiles = gan.GetDataFiles(datapath, Particles=['Ele']) # get list of files
+   datafiles = gan.GetDataFiles(datapath, Particles=[particle]) # get list of files
    var = gan.get_sorted_angle(datafiles[-2:], energies, True, num_events1, num_events2, angtype=angtype, thresh=thresh) # returning a dict with sorted data.
    for energy in energies:
       edir = os.path.join(plotsdir, 'energy{}'.format(energy))
