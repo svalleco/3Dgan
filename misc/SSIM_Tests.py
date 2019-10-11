@@ -23,7 +23,7 @@ except:
 def main():
   datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  energies =[50, 100, 200, 300, 400, 500]# energy bins
+  energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
   angles=[62, 90, 118]
 
   latent = 256  #latent space
@@ -36,14 +36,14 @@ def main():
   get_shuffled= True # whether to make plots for shuffled
   
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/IQA_pami_ep21_ssim' # dir for results
+  plotsdir = 'results/IQA_pami_ep21_ssim_large' # dir for results
   gan.safe_mkdir(plotsdir) 
   L=[1, 1e-2, 1e-4, 1e-6, 1e-8]
 
   g = generator(latent)       # build generator
   gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
-  sorted_data = gan.get_sorted_angle(data_files[-5:], energies, thresh=thresh) # load data in a dict
+  sorted_data = gan.get_sorted_angle(data_files[-20:], energies, thresh=thresh) # load data in a dict
   
   ssim_dict={}
   for i, l in enumerate(L):
@@ -91,7 +91,8 @@ def main():
           ssim_dict['L{}'.format(str(i))]['energy' + str(energy)]['angle' + str(a)]['GANXGAN']=ssim_gan
           print('GAN X GAN: SSIM GAN  mean={} std={}'.format(np.mean(ssim_gan), np.std(ssim_gan)))
      for a in angles:
-          DrawMulti(ssim_dict['L{}'.format(str(i))], energies, a, l, path.join(plotsdir, "L{}_degree{}.pdf".format(i, a)), labels)
+          DrawMulti(ssim_dict['L{}'.format(str(i))], energies[1:], a, l, path.join(plotsdir, "L{}_degree{}.pdf".format(i, a)), labels)
+          DrawScatter(ssim_dict['L{}'.format(str(i))]['energy0'], sorted_data["energy0" + "ang_" + str(a)], a, l, path.join(plotsdir, "L{}_degree{}_scatter.pdf".format(i, a)), labels)
                                         
 
 def SSIM(images1, images2, multichannel=True, data_range=1, gaussian_weights=True, use_sample_covariance=False, shuffle=True):
@@ -107,17 +108,19 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
   if grid: c.SetGrid()
   color = 2
-  legend = ROOT.TLegend(.7, .6, .9, .9)
-  legend.SetTextSize(0.028)
-
+  legend = ROOT.TLegend(.7, .7, .9, .9)
+  
   mg=ROOT.TMultiGraph()
   g_g4xgan = ROOT.TGraphErrors(len(energies))
 
   for i, energy in enumerate(energies):
       mean = np.mean(dict_L['energy' + str(energy)]['angle' + str(angle)]['G4XGAN'])
       g_g4xgan.SetPoint(i, energy, mean)
-      g_g4xgan.SetPointError(i, 0.5, np.std(dict_L['energy' + str(energy)]['angle' + str(angle)]['G4XGAN']))
+      g_g4xgan.SetPointError(i, 5, np.std(dict_L['energy' + str(energy)]['angle' + str(angle)]['G4XGAN']))
   g_g4xgan.SetLineColor(color)
+  g_g4xgan.SetMarkerColor(color)
+  g_g4xgan.SetMarkerStyle(21)
+  
   mg.Add(g_g4xgan)
   legend.AddEntry(g_g4xgan, "G4 x GAN", "l")
 
@@ -125,8 +128,10 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   g_g4xg4 = ROOT.TGraphErrors(len(energies))
   for i, energy in enumerate(energies):
       g_g4xg4.SetPoint(i, energy, np.mean(dict_L['energy' + str(energy)]['angle' + str(angle)]['G4XG4']))
-      g_g4xg4.SetPointError(i,0.5, np.std(dict_L['energy' + str(energy)]['angle' + str(angle)]['G4XG4']))
+      g_g4xg4.SetPointError(i, 5, np.std(dict_L['energy' + str(energy)]['angle' + str(angle)]['G4XG4']))
   g_g4xg4.SetLineColor(color)
+  g_g4xg4.SetMarkerColor(color)
+  g_g4xg4.SetMarkerStyle(21)
   mg.Add(g_g4xg4)
   legend.AddEntry(g_g4xg4, "G4 x G4", "l")
 
@@ -134,13 +139,65 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   g_ganxgan = ROOT.TGraphErrors(len(energies))
   for i, energy in enumerate(energies):
       g_ganxgan.SetPoint(i, energy, np.mean(dict_L['energy' + str(energy)]['angle' + str(angle)]['GANXGAN']))
-      g_ganxgan.SetPointError(i,0.5, np.std(dict_L['energy' + str(energy)]['angle' + str(angle)]['GANXGAN']))
+      g_ganxgan.SetPointError(i, 5, np.std(dict_L['energy' + str(energy)]['angle' + str(angle)]['GANXGAN']))
   g_ganxgan.SetLineColor(color)
+  g_ganxgan.SetMarkerColor(color)
+  g_ganxgan.SetMarkerStyle(21)
   mg.Add(g_ganxgan)
   legend.AddEntry(g_ganxgan, "GAN x GAN", "l")
-  mg.GetYaxis().SetRangeUser(0.,1.2)
+
   mg.SetTitle("SSIM: L={} Angle={} #circ;Ep [GeV];ssim".format(L, angle))
+  if L == 1:
+    mg.GetYaxis().SetRangeUser(0.9,  1.1)
+  elif L==0.01:
+    mg.GetYaxis().SetRangeUser(0.8,  1)
+  else:
+    mg.GetYaxis().SetRangeUser(0.,  1)
+  mg.GetYaxis().SetTitleSize(0.045)
+  mg.GetXaxis().SetTitleSize(0.045)
   mg.Draw('ALP')
+  c.Update()
+  legend.Draw()
+  c.Update()
+
+  c.Print(filename)
+  print (' The plot is saved in.....{}'.format(filename))
+
+# Plot for MSCN                                                                                                                                                                                                                                                                           
+def DrawScatter(dict_E, energy, angle, L, filename, labels, grid=0):
+  c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
+  if grid: c.SetGrid()
+  color = 2
+  legend = ROOT.TLegend(.7, .7, .9, .9)
+
+  mg=ROOT.TMultiGraph()
+  g_g4xgan = ROOT.TGraph(energy.shape[0])
+
+  for i in np.arange(energy.shape[0]):
+    g_g4xgan.SetPoint(i, energy[i], dict_E['angle' + str(angle)]['G4XGAN'][i])
+  g_g4xgan.SetMarkerColor(color)
+  g_g4xgan.SetMarkerStyle(3)
+  mg.Add(g_g4xgan)
+  legend.AddEntry(g_g4xgan, "G4 x GAN", "p")
+  color+=2
+  g_g4xg4 = ROOT.TGraph(energy.shape[0])
+  for i in np.arange(energy.shape[0]):
+    g_g4xg4.SetPoint(i, energy[i], dict_E['angle' + str(angle)]['G4XG4'][i])
+  g_g4xg4.SetMarkerColor(color)
+  g_g4xg4.SetMarkerStyle(3)
+  mg.Add(g_g4xg4)
+  legend.AddEntry(g_g4xg4, "G4 x G4", "p")
+
+  color+=2
+  g_ganxgan = ROOT.TGraph(energy.shape[0])
+  for i in np.arange(energy.shape[0]):
+    g_ganxgan.SetPoint(i, energy[i], dict_E['angle' + str(angle)]['GANXGAN'][i])
+  g_ganxgan.SetMarkerColor(color)
+  g_ganxgan.SetMarkerStyle(3)
+  mg.Add(g_ganxgan)
+  legend.AddEntry(g_ganxgan, "GAN x GAN", "p")
+  mg.SetTitle("SSIM: L={} Angle={} #circ;Ep [GeV];ssim".format(L, angle))
+  mg.Draw('AP')
   c.Update()
   legend.Draw()
   c.Update()
