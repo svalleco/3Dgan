@@ -125,10 +125,10 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=240, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path4', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
     parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
-    parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
+    parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
@@ -147,7 +147,7 @@ def get_parser():
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--name', action='store', type=str, default='gan_training_epsilon_2_500GeV', help='Unique identifier can be set for each training')
+    parser.add_argument('--name', action='store', type=str, default='gan_training', help='Unique identifier can be set for each training')
     return parser
 
 # A histogram fucntion that counts cells in different bins
@@ -183,6 +183,31 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
         X = np.power(X, xpower)
     return X, Y, ang, ecal
 
+#get data for training
+def GetDataAngle2(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
+    print ('Loading Data from .....', datafile)
+    f=h5py.File(datafile,'r')
+    X=np.array(f.get('ECAL'))* xscale
+    Y=np.array(f.get('energy'))/yscale
+    X[X < thresh] = 0
+    X = X.astype(np.float32)
+    Y = Y.astype(np.float32)
+    ecal = np.sum(X, axis=(1, 2, 3))
+    indexes = np.where(ecal > 10.0)
+    X=X[indexes]
+    Y=Y[indexes]
+
+    if angtype in f:
+      ang = np.array(f.get(angtype))[indexes]
+    else:
+      ang = gan.measPython(X)
+    X = np.expand_dims(X, axis=daxis)
+    ecal=ecal[indexes]
+    ecal=np.expand_dims(ecal, axis=daxis)
+    if xpower !=1.:
+        X = np.power(X, xpower)
+    return X, Y, ang, ecal
+
 def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
@@ -199,7 +224,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     # build the discriminator
     print('[INFO] Building discriminator')
     discriminator.compile(
-        optimizer=RMSprop(lr),
+        optimizer=RMSprop(lr, decay=0.001),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -207,7 +232,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     # build the generator
     print('[INFO] Building generator')
     generator.compile(
-        optimizer=RMSprop(lr),
+        optimizer=RMSprop(lr, decay=0.001),
         loss='binary_crossentropy'
     )
  
@@ -222,7 +247,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         name='combined_model'
     )
     combined.compile(
-        optimizer=RMSprop(lr),
+        optimizer=RMSprop(lr, decay=0.001),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -257,7 +282,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         # read first file
-        X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+        X_train, Y_train, ang_train, ecal_train = GetDataAngle2(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
         nb_file=1
         epoch_gen_loss = []
         epoch_disc_loss = []
@@ -281,7 +306,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                 ang_left = ang_train[(file_index * batch_size):]
                 ecal_left = ecal_train[(file_index * batch_size):]
                 # read in next file                                                
-                X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+                X_train, Y_train, ang_train, ecal_train = GetDataAngle2(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
                 nb_file+=1
                 # concatenate to left over data
                 X_train = np.concatenate((X_left, X_train))
@@ -341,7 +366,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         test_start = time.time()
 
         #read first test file
-        X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+        X_test, Y_test, ang_test, ecal_test = GetDataAngle2(Testfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
         disc_test_loss=[]
         gen_test_loss =[]
         nb_file=1
@@ -359,7 +384,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                ang_left = ang_test[(file_index * batch_size):]
                ecal_left = ecal_test[(file_index * batch_size):]
                # read in new file
-               X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+               X_test, Y_test, ang_test, ecal_test = GetDataAngle2(Testfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
                nb_file+=1
                # concatenate with left over data
                X_test = np.concatenate((X_left, X_test))
