@@ -5,11 +5,11 @@ import h5py
 import os
 ## setting seed ###
 from numpy.random import seed
-seed(1)
+seed(10)
 from tensorflow import set_random_seed
-set_random_seed(1)
+set_random_seed(10)
 import random
-random.seed(1)
+random.seed(10)
 os.environ['PYTHONHASHSEED'] = '0'
 ##################
 
@@ -39,29 +39,35 @@ def main():
   thresh =0.0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/peaks2_gan_training_epsilon_ep176' # dir for results
+  plotsdir = 'results/peaks2_gan_training_0_500_GeV_unif_theta' # dir for results
   gan.safe_mkdir(plotsdir) 
-  datapath = "/bigdata/shared/gkhattak/*scan*100GeV/*.h5" # Data path
-  #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech 
+  #datapath = "/bigdata/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
+  datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech 
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  energies =[10, 50, 90] 
-  #energies = [50, 100, 150, 200, 300, 400]
-  angles=[62, 90, 118]
+  #energies =[110, 150, 190] 
+  energies = [50, 100, 150, 200, 300, 400]
+  angles=[0]
   L=1e-6
   concat=2
+  dscale =50.
   g = generator(latent)       # build generator
-  gen_weight1= "../keras/weights/gan_training_epsilon_100GeV/params_generator_epoch_176.hdf5" # weights for generator
+  gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
-  sorted_data = gan.get_sorted_angle(data_files[25:27], energies, num_events1=10000, num_events2=50000, thresh=thresh) # load data in a dict
+  sorted_data = gan.get_sorted_angle(data_files[-20:], energies, num_events1=10000, num_events2=5000, thresh=thresh) # load data in a dict
   sigma = 1
   peak_threshold=0.3
   # for each energy bin
   plist_g4=[]
   plist_gan=[]
+  elist_g4=[]
+  elist_gan=[]
   for energy in energies:
      for a in angles:
        filename = path.join(plotsdir, "peaks_{}GeV_{}degree.pdf".format(energy, a)) # file name
-       indexes = np.where(((sorted_data["angle" + str(energy)]) > math.radians(a) - 0.1) & ((sorted_data["angle" + str(energy)]) < math.radians(a) + 0.1))
+       if a==0: 
+            indexes = np.where(sorted_data["angle" + str(energy)] > 0)
+       else:
+            indexes = np.where(((sorted_data["angle" + str(energy)]) > math.radians(a) - 0.1) & ((sorted_data["angle" + str(energy)]) < math.radians(a) + 0.1))
        sorted_data["events_act" + str(energy) + "ang_" + str(a)] = sorted_data["events_act" + str(energy)][indexes]
        sorted_data["energy" + str(energy) + "ang_" + str(a)] = sorted_data["energy" + str(energy)][indexes]
        sorted_data["angle" + str(energy) + "ang_" + str(a)] = sorted_data["angle" + str(energy)][indexes]
@@ -75,14 +81,33 @@ def main():
        generated_images = np.power(generated_images, 1./power)
        peaks_g4 = FindPeaks(sorted_data["events_act" + str(energy) + "ang_" + str(a)],  sigma, peak_threshold)
        peaks_gan = FindPeaks(generated_images,  sigma, peak_threshold)
+       generated_images = generated_images/dscale
+       sorted_data["events_act" + str(energy) + "ang_" + str(a)] = sorted_data["events_act" + str(energy) + "ang_" + str(a)]/dscale
+       #Draw1d(peaks_g4, peaks_gan, filename, labels)
        
-       Draw1d(peaks_g4, peaks_gan, filename, labels)
        indexes_gan = np.where(peaks_gan > 1)
        events_gan = generated_images[indexes_gan]
        n = events_gan.shape[0]
        plist_gan.append((n * 100.0)/index)
-       
+       if n>0:
+         elist_gan.append((plist_gan[-1] * np.sqrt(n))/n)
+       else:
+         elist_gan.append(0.)    
+       print('fraction gan', plist_gan[-1])
+       print('error gan', elist_gan[-1])
        print("For energy {} GeV and angle {} degrees there are {}/{} events with multi peaks for GAN".format(energy, a, n, index))
+       indexes_act = np.where(peaks_g4 > 1)
+       events_act = sorted_data["events_act" + str(energy) + "ang_" + str(a)][indexes_act]
+       m = events_act.shape[0]
+       plist_g4.append((m * 100.0)/index)
+       if m>0:
+         elist_g4.append((plist_g4[-1] * np.sqrt(m))/m)
+       else:
+         elist_g4.append(0.)
+       print('fraction g4', plist_g4[-1])
+       print('error g4', elist_g4[-1])                                                                                                                                                                                                                                             
+       print("For energy {} GeV and angle {} degrees there are {}/{} events with multi peaks from G4".format(energy, a, m, index))  
+       
        edir = plotsdir + '/events_{}GeV_{}degree/'.format(energy, a)
        gan.safe_mkdir(edir)
        if n > 0:
@@ -91,22 +116,18 @@ def main():
          p1 = peaks_gan[indexes_gan]
          gdir = edir + 'GAN'
          gan.safe_mkdir(gdir)
-         for i in np.arange(n):
+         for i in np.arange(min(n, 10)):
            PlotEventPeaks(events_gan[i], e1[i], ang1[i], path.join(gdir, 'Event{}.pdf'.format(i)), i, opt='colz', label='GAN'.format(p1[i]), sigma=sigma, thresh=peak_threshold)
-       indexes_act = np.where(peaks_g4 > 1)
-       events_act = sorted_data["events_act" + str(energy) + "ang_" + str(a)][indexes_act]
-       m = events_act.shape[0]
-       plist_g4.append((m * 100.0)/index)
-       print("For energy {} GeV and angle {} degrees there are {}/{} events with multi peaks from G4".format(energy, a, m, index))
        if m > 0:
          e2 = sorted_data["energy" + str(energy)+ "ang_" + str(a)][indexes_act]
          ang2 = sorted_data["angle" + str(energy) + "ang_" + str(a)][indexes_act]
          p2 = peaks_g4[indexes_act]
          ddir =edir + 'G4'
          gan.safe_mkdir(ddir)
-         for i in np.arange(min(m, 20)):
+         for i in np.arange(min(m, 10)):
             PlotEventPeaks(events_act[i], e2[i], ang2[i], path.join(ddir, 'Event{}.pdf'.format(i)), i, opt='colz', label='G4'.format(p2[i]), sigma=sigma, thresh=peak_threshold)
-  DrawGraph(plist_g4, plist_gan, energies, angles, path.join(plotsdir, 'peak_percent.pdf'), labels=['G4', 'GAN']) 
+       
+  DrawGraph2(plist_g4, plist_gan, elist_g4, elist_gan, energies, angles, path.join(plotsdir, 'peak_percent.pdf'), labels=['G4', 'GAN']) 
                               
 def FindPeaks(events, sigma, thresh):
    n = events.shape[0]
@@ -182,9 +203,8 @@ def Draw1d(array1, array2, filename, labels):
   c.Print(filename)
   print (' The plot is saved in.....{}'.format(filename))
                   
-def DrawGraph(list1, list2, energies, angles, filename, labels):
+def DrawGraph(list1, list2, elist1, elist2,energies, angles, filename, labels):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
-  c.SetGrid()
   ROOT.gStyle.SetOptStat(111111)
   leg=ROOT.TLegend(.7, .6, .9, .9)
   mg=ROOT.TMultiGraph()
@@ -193,35 +213,104 @@ def DrawGraph(list1, list2, energies, angles, filename, labels):
   color=2
   peaks_g4 = []
   peaks_gan = []
+  ex_g4 = []
+  ex_gan = []
+  ey_g4 = []
+  ey_gan = []
+
   for j in np.arange(m):
     peaks_g4.append(np.zeros(n))
     peaks_gan.append(np.zeros(n))
+    ex_g4.append(np.zeros(n))
+    ex_gan.append(np.zeros(n))
+    ey_g4.append(np.zeros(n))
+    ey_gan.append(np.zeros(n))
   e = np.zeros(n)
   for i in np.arange(n):
     e[i] = energies[i]
     for j in np.arange(m):
       peaks_g4[j][i] = list1[(i*(m-1)) + j]
       peaks_gan[j][i] = list2[(i*(m-1)) + j]
+      ex_g4[j][i] = elist1[(i*(m-1)) + j]
+      ex_gan[j][i] = elist2[(i*(m-1)) + j]
+      ey_g4[j][i] = 0.5
+      ey_gan[j][i] = 0.5
+
   graphs_g4 =[]
   graphs_gan =[]
+  
   for i in np.arange(m):
-    graphs_g4.append(ROOT.TGraph(n, e, peaks_g4[i]))
+    graphs_g4.append(ROOT.TGraphErrors(n, e, peaks_g4[i], ex_g4[i], ey_g4[i]))
     mg.Add(graphs_g4[i])
     graphs_g4[i].SetLineColor(color)
+    graphs_g4[i].SetMarkerColor(color)
+    graphs_g4[i].SetMarkerStyle(21)
     leg.AddEntry(graphs_g4[i], "{} {} degree".format(labels[0], angles[i]), "l")
-    graphs_gan.append(ROOT.TGraph(n, e, peaks_gan[i]))
+    graphs_gan.append(ROOT.TGraphErrors(n, e, peaks_gan[i], ex_gan[i], ey_gan[i]))
     mg.Add(graphs_gan[i])
     graphs_gan[i].SetLineColor(color)
     graphs_gan[i].SetLineStyle(2)
+    graphs_gan[i].SetMarkerColor(color)
+    graphs_gan[i].SetMarkerStyle(21)
     leg.AddEntry(graphs_gan[i], "{} {} degree".format(labels[1], angles[i]), "l")
     color+=2        
   mg.SetTitle("Percentage of events with multiple peaks;Ep;percentage [%]")
+  mg.GetYaxis().SetRangeUser(0.,10.)
   mg.Draw('ALP')
   c.Update()
   leg.Draw()
               
   c.Update()
   c.Print(filename)
+  c.Print('peaks_graph.C')
+  print (' The plot is saved in.....{}'.format(filename))
+
+def DrawGraph2(list1, list2, elist1, elist2,energies, angles, filename, labels):
+  c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
+  ROOT.gStyle.SetOptStat(111111)
+  leg=ROOT.TLegend(.7, .6, .9, .9)
+  mg=ROOT.TMultiGraph()
+  n = len(energies)
+  color=2
+  peaks_g4 = np.zeros(n)
+  peaks_gan = np.zeros(n)
+  ex_g4 = np.zeros(n)
+  ex_gan = np.zeros(n)
+  ey_g4 = np.zeros(n)
+  ey_gan = np.zeros(n)
+  e = np.zeros(n)
+  for i in np.arange(n):
+    peaks_g4[i] = list1[i]
+    peaks_gan[i] = list2[i]
+    ex_g4[i] = elist1[i]
+    ex_gan[i] = elist2[i]
+    ey_g4[i] = 0.5
+    ey_gan[i] = 0.5
+    e[i]=energies[i]
+
+  graphs_g4=ROOT.TGraphErrors(n, e, peaks_g4, ex_g4, ey_g4)
+  mg.Add(graphs_g4)
+  graphs_g4.SetLineColor(color)
+  graphs_g4.SetMarkerColor(color)
+  graphs_g4.SetMarkerStyle(21)
+  leg.AddEntry(graphs_g4, "{} ".format(labels[0]), "l")
+  graphs_gan =ROOT.TGraphErrors(n, e, peaks_gan, ex_gan, ey_gan)
+  mg.Add(graphs_gan)
+  graphs_gan.SetLineColor(color+2)
+  graphs_gan.SetLineStyle(2)
+  graphs_gan.SetMarkerColor(color)
+  graphs_gan.SetMarkerStyle(21)
+  leg.AddEntry(graphs_gan, "{}".format(labels[1]), "l")
+  color+=2
+  mg.SetTitle("Percentage of events with multiple peaks;Ep;percentage [%]")
+  mg.GetYaxis().SetRangeUser(0.,10.)
+  mg.Draw('ALP')
+  c.Update()
+  leg.Draw()
+
+  c.Update()
+  c.Print(filename)
+  c.Print('peaks_graph.C')
   print (' The plot is saved in.....{}'.format(filename))
                                                                           
 
