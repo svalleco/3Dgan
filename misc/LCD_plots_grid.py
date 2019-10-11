@@ -5,8 +5,8 @@ import math
 import sys
 import ROOT
 import os
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan/')
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan/analysis')
+sys.path.insert(0,'../keras')
+sys.path.insert(0,'../keras/analysis')
 import utils.GANutils as gan
 from utils.GANutils import perform_calculations_angle, safe_mkdir  # to calculate different Physics quantities
 import utils.ROOTutils as my # common utility functions for root
@@ -21,17 +21,18 @@ def main():
     from AngleArch3dGAN import generator, discriminator
 
     #Weights
-    disc_weight1="../weights/3dgan_weights_newarch3_lr/params_discriminator_epoch_050.hdf5"
-    gen_weight1= "../weights/3dgan_weights_newarch3_lr/params_generator_epoch_050.hdf5"
+    disc_weight1="../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_discriminator_epoch_021.hdf5"
+    gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5"
 
     #Path to store results
-    plotsdir = "results/newarch3_lr_grid"
+    plotsdir = "results/icmla_grid_ep21_large"
     safe_mkdir(plotsdir)
     #Parameters
     latent = 256 # latent space
-    num_data = 100000
-    num_events = 2000
-    events_per_file = 5000
+    num_data = 500000
+    num_events = 10000
+    num_events1 = 20000
+    events_per_file = 10000
     thresh_hits = 3e-4
     m = 3  # number of moments
     angloss= 1 # total number of losses...1 or 2
@@ -39,14 +40,14 @@ def main():
     concat = 2 # if concatenting angle to latent space
     cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
     corr=1 # if making correlation plots
-    energies=[0, 110, 150, 190] # energy bins
+    energies=[0, 50, 100, 200, 300, 400, 500] # energy bins
     angles = [62, 90, 118] #[math.radians(x) for x in [62, 90, 118]] # angle bins
     angtype = 'theta'# the angle data to be read from file
     particle='Ele'# partcile type
     thresh=0 # Threshold for ecal energies
     #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-    datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
-
+    #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+    datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
     sortdir = 'SortedAngleData'  # if saving sorted data
     gendir = 'SortedAngleGen'  # if saving generated events
     discdir = 'SortedAngleDisc' # if saving disc outputs
@@ -61,7 +62,7 @@ def main():
     read_gen = False # True if generated data is already saved and can be loaded
     save_disc = False # True if discriminiator data is to be saved
     read_disc =  False # True if discriminated data is to be loaded from previously saved file
-    ifpdf = True # True if pdf are required. If false .C files will be generated
+    ifC= False # True if .C files are required. If false pdf files will be generated
 
     flags =[Test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
     dweights = [disc_weight1]#, disc_weight2]
@@ -76,11 +77,9 @@ def main():
     var= perform_calculations_angle(g, d, gweights, dweights, energies, angles,
                                     datapath, sortdir, gendir, discdir, num_data, num_events, m, xscales, xpowers,
                                     ascales, dscale, flags, latent, events_per_file=events_per_file, particle=particle, thresh=thresh, angtype=angtype, offset=0.0,
-                                    angloss=angloss, addloss=addloss, concat=concat
+                                    angloss=angloss, addloss=addloss, concat=concat, num_events1=20000
                                     , pre =taking_power, post =inv_power  # Adding other preprocessing, Default is simple scaling
     )
-
-
     states = 0
     legs=0
     norm=1
@@ -111,10 +110,8 @@ def main():
         ratio1_gan=[my.ratio1_total(var["events_gan"+ str(energy)]['n_0'])]
         ratio2_gan=[my.ratio2_total(var["events_gan"+ str(energy)]['n_0'])]
         ratio3_gan=[my.ratio3_total(var["events_gan"+ str(energy)]['n_0'])]
-        if energy == 0:
-            p =[100, 200]
-        else:
-            p = [np.amin(var["energy"+ str(energy)]), np.amax(var["energy"+ str(energy)])]
+        
+        p = [int(np.amin(var["energy"+ str(energy)])), int(np.amax(var["energy"+ str(energy)]))]
         
         for theta in angles:
            sumx_act.append(var["sumsx_act"+ str(energy) + "ang_" + str(theta)])
@@ -146,11 +143,11 @@ def main():
                               
            energy_act.append(var["energy"+ str(energy) + "ang_" + str(theta)])
         thetas = [0, 62, 90, 118]
-        PlotSamplingGrid(ecal_act, ecal_gan, energy_act, hits_act, hits_gan, os.path.join(edir, 'samplig_grid{}'.format(energy)), energy, thetas, states=states,leg=legs, norm=norm)
-        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid{}'.format(energy)), energy, thetas, states=states,leg=legs, norm=norm)
-        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid_log{}'.format(energy)), energy, thetas, log=1, states=states,leg=legs, norm=norm)
-        PlotMomentHistGrid(momentx_act, momenty_act, momentz_act, momentx_gan, momenty_gan, momentz_gan, os.path.join(edir, 'moment_grid{}'.format(energy)), energy, thetas, states=states, leg=legs, norm=norm)
-        PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, os.path.join(edir, 'ratio_grid{}'.format(energy)), energy, thetas, states=states, leg=legs, norm=norm)        
+        PlotSamplingGrid(ecal_act, ecal_gan, energy_act, hits_act, hits_gan, os.path.join(edir, 'samplig_grid{}'.format(energy)), energy, thetas, p=p, states=states,leg=legs, norm=norm, ifC=ifC)
+        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid{}'.format(energy)), energy, thetas, p=p, states=states,leg=legs, norm=norm, ifC=ifC)
+        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid_log{}'.format(energy)), energy, thetas, p=p, log=1, states=states,leg=legs, norm=norm, ifC=ifC)
+        PlotMomentHistGrid(momentx_act, momenty_act, momentz_act, momentx_gan, momenty_gan, momentz_gan, os.path.join(edir, 'moment_grid{}'.format(energy)), energy, thetas, p=p, states=states, leg=legs, norm=norm, ifC=ifC)
+        PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, os.path.join(edir, 'ratio_grid{}'.format(energy)), energy, thetas, p=p, states=states, leg=legs, norm=norm, ifC=ifC)        
 
 def taking_power(n, scale=1.0, power=1.0):
     return(np.power(n * scale, power))
@@ -178,7 +175,7 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         canvas.cd(pad)
         if theta==0:
             title = "theta=60-120 degrees"
-            bins=100
+            bins=50
         else:
             title = "theta={} degrees".format(theta)
             
@@ -234,8 +231,8 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
 
         if log:
             ROOT.gPad.SetLogy()
-        h_act.append(ROOT.TH1F('G4_hits{:d}theta_{:d}GeV'.format(theta, energy), '', 50, 0, 2000))
-        h_gan.append(ROOT.TH1F('GAN_hits{:d}theta_{:d}GeV'.format(theta, energy), '', 50, 0, 2000))
+        h_act.append(ROOT.TH1F('G4_hits{:d}theta_{:d}GeV'.format(theta, energy), '', 40, 0, 2200))
+        h_gan.append(ROOT.TH1F('GAN_hits{:d}theta_{:d}GeV'.format(theta, energy), '', 40, 0, 2200))
         legs.append(ROOT.TLegend(0.65,0.1,0.9,0.3))
         h_act[i].Sumw2()
         h_gan[i].Sumw2()
@@ -259,7 +256,11 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         h_act[i].GetYaxis().SetTitleSize(0.053)
         h_act[i].GetXaxis().SetTitleSize(0.051)
         h_act[i].GetXaxis().SetTitleOffset()
-        h_act[i].GetYaxis().SetRangeUser(0., 0.18)
+        if i==0:
+          ymax = max(h_act[i].GetMaximum(), h_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, h_act[i].GetMaximum(), h_gan[i].GetMaximum())
+        h_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
         canvas.Update()
         h_act[i].Draw('')
         h_act[i].Draw('sames hist')
@@ -514,7 +515,12 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         r1_act[i].GetYaxis().SetTitleOffset()
         r1_act[i].GetYaxis().SetTitleSize(0.055)
         r1_act[i].GetXaxis().SetTitleSize(0.05)
-        if norm:  r1_act[i].GetYaxis().SetRangeUser(0., 0.3)
+        if i==0:
+          ymax = max(r1_act[i].GetMaximum(), r1_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, r1_act[i].GetMaximum(), r1_gan[i].GetMaximum())
+         
+        r1_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
         r1_act[i].SetTitle(title)
         legs[pad-1].SetHeader('Ratio first/total', "C")
         canvas.Update()
@@ -556,14 +562,19 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if norm:
             r2_act[i]=my.normalize(r2_act[i], 1)
             r2_gan[i]=my.normalize(r2_gan[i], 1)
-            r2_act[i].GetYaxis().SetRangeUser(0., 0.3)
         r2_act[i].GetXaxis().SetTitle("Ratio mid/total")
         r2_act[i].GetYaxis().SetTitle("normalized count")
         r2_act[i].GetYaxis().CenterTitle()
         r2_act[i].GetYaxis().SetTitleOffset()
         r2_act[i].GetYaxis().SetTitleSize(0.055)
         r2_act[i].GetXaxis().SetTitleSize(0.05)
-      
+        if i==0:
+          ymax = max(r2_act[i].GetMaximum(), r2_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, r2_act[i].GetMaximum(), r2_gan[i].GetMaximum())
+
+        r2_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
+
         canvas.Update()
         r2_act[i].Draw('')
         r2_act[i].Draw('sames hist')
@@ -606,14 +617,20 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if norm:
             r3_act[i]=my.normalize(r3_act[i], 1)
             r3_gan[i]=my.normalize(r3_gan[i], 1)
-            r3_act[i].GetYaxis().SetRangeUser(0., 0.2)
+
         r3_act[i].GetXaxis().SetTitle("Ratio third/total")
         r3_act[i].GetYaxis().SetTitle("normalized count")
         r3_act[i].GetYaxis().CenterTitle()
         r3_act[i].GetYaxis().SetTitleOffset()
         r3_act[i].GetYaxis().SetTitleSize(0.055)
         r3_act[i].GetXaxis().SetTitleSize(0.05)
-        
+        if i==0:
+          ymax = max(r3_act[i].GetMaximum(), r3_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, r3_act[i].GetMaximum(), r3_gan[i].GetMaximum())
+
+        r3_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
+
         canvas.Update()
         r3_act[i].Draw('')
         r3_act[i].Draw('sames hist')
@@ -680,7 +697,7 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if norm:
             mmtx_act[i]=my.normalize(mmtx_act[i], 1)
             mmtx_gan[i]=my.normalize(mmtx_gan[i], 1)
-            mmtx_act[i].GetYaxis().SetRangeUser(0., 0.9)
+
         mmtx_act[i].GetXaxis().SetTitle("2nd X moment")
         mmtx_act[i].GetYaxis().SetTitle("normalized count")
         mmtx_act[i].GetYaxis().CenterTitle()
@@ -688,6 +705,13 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         mmtx_act[i].GetYaxis().SetTitleSize(0.055)
         mmtx_act[i].GetXaxis().SetTitleSize(0.05)
         mmtx_act[i].SetTitle(title)
+        if i==0:
+          ymax = max(mmtx_act[i].GetMaximum(), mmtx_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, mmtx_act[i].GetMaximum(), mmtx_gan[i].GetMaximum())
+
+        mmtx_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
+
         legs[pad-1].SetHeader('X2 moment', "C")
         canvas.Update()
         mmtx_act[i].Draw('')
@@ -732,14 +756,20 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if norm:
             mmty_act[i]=my.normalize(mmty_act[i], 1)
             mmty_gan[i]=my.normalize(mmty_gan[i], 1)
-            mmty_act[i].GetYaxis().SetRangeUser(0., 0.4)
+
         mmty_act[i].GetXaxis().SetTitle("2nd Y moment")
         mmty_act[i].GetYaxis().SetTitle("normalized count")
         mmty_act[i].GetYaxis().CenterTitle()
         mmty_act[i].GetYaxis().SetTitleOffset()
         mmty_act[i].GetYaxis().SetTitleSize(0.055)
         mmty_act[i].GetXaxis().SetTitleSize(0.05)
-             
+        if i==0:
+          ymax = max(mmty_act[i].GetMaximum(), mmty_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, mmty_act[i].GetMaximum(), mmty_gan[i].GetMaximum())
+
+        mmty_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
+     
         canvas.Update()
         mmty_act[i].Draw('')
         mmty_act[i].Draw('sames hist')
@@ -791,7 +821,13 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         mmtz_act[i].GetYaxis().SetTitleOffset()
         mmtz_act[i].GetYaxis().SetTitleSize(0.055)
         mmtz_act[i].GetXaxis().SetTitleSize(0.05)
-        
+        if i==0:
+          ymax = max(mmtz_act[i].GetMaximum(), mmtz_gan[i].GetMaximum())
+        else:
+          ymax = max(ymax, mmtz_act[i].GetMaximum(), mmtz_gan[i].GetMaximum())
+
+        mmtz_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
+
         canvas.Update()
         mmtz_act[i].Draw('')
         mmtz_act[i].Draw('sames hist')
