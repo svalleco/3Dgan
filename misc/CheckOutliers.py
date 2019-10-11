@@ -8,11 +8,10 @@ import tensorflow as tf
 #import tensorflow.python.ops.image_ops_impl as image
 import time
 import sys
-sys.path.insert(0,'../')
-sys.path.insert(0,'../analysis')
-from utils.GANutils import *
-from utils.RootPlotsGAN import * 
-import utils.ROOTutils as roo
+sys.path.insert(0,'../keras')
+from analysis.utils.GANutils import *
+from analysis.utils.RootPlotsGAN import * 
+import analysis.utils.ROOTutils as roo
 import ROOT.TSpectrum2 as sp
 from skimage import measure
 import math
@@ -30,13 +29,13 @@ def main():
     energies=[0, 110, 150, 190]
     concat = 2
     angles = [62, 90, 118]
-    outdir = 'results/Outliers_gan_training_peaks_119/' # dir for results
+    outdir = 'results/Outliers_gan_training_epsilon_k2_ep131_log/' # dir for results
     safe_mkdir(outdir)
     datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
     g = generator(latent)       # build generator
     d = discriminator()
-    gen_weight1= "../weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5" # weights for generator
-    disc_weight1= "../weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5" # weights for discriminator
+    gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5" # weights for generator
+    disc_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5" # weights for discriminator
     sortdir = 'SortedData'
     gendir = 'Gen'
     discdir = 'Disc'
@@ -237,6 +236,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
       for n in np.arange(len(index_act)):
           PlotEventPeaks(var["events_act" + str(energy)][index_act][n], var["energy_act" + str(energy)][index_act][n],
                          var["ang_act" + str(energy)][index_act][n], os.path.join(deventdir, 'Event{}.pdf'.format(n)), n, opt=opt, label='G4', sigma=sigma, thresh=thresh)
+      for n in np.arange(len(index_gan)):
           PlotEventPeaks(var["events_gan" + str(energy)]['n_0'][index_gan][n], var["energy_gan" + str(energy)][index_gan][n],
                          var["ang_gan" + str(energy)][index_gan][n], os.path.join(geventdir, 'Event{}.pdf'.format(n)), n, opt=opt, label='GAN', sigma=sigma, thresh=thresh)
    print ('Plots are saved in ', plots_dir)
@@ -244,13 +244,16 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
    print ('{} Plots are generated in {} seconds'.format(plots, plot_time))
                                            
 
-def PlotEventPeaks(event, energy, theta, out_file, n, opt="", unit='degrees', label="", sigma=1, thresh=0.2):
+def PlotEventPeaks(event, energy, theta, out_file, n, opt="", unit='degrees', label="", sigma=1, thresh=0.2, log=1):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make                                              
    canvas.Divide(2,2)
    x = event.shape[0]
    y = event.shape[1]
    z = event.shape[2]
    s = sp()
+   Min = 1e-4
+   Max = 1e-1
+
    ang1 = MeasPython(np.moveaxis(event, 3, 0))
    ang2 = MeasPython(np.moveaxis(event, 3, 0), mod=2)
    if unit == 'degrees':
@@ -266,33 +269,41 @@ def PlotEventPeaks(event, energy, theta, out_file, n, opt="", unit='degrees', la
    hx.SetStats(0)
    hy.SetStats(0)
    hz.SetStats(0)
-   #ROOT.gPad.SetLogz()                                                                                              
    ROOT.gStyle.SetPalette(1)
    event = np.expand_dims(event, axis=0)
    my.FillHist2D_wt(hx, np.sum(event, axis=1))
    my.FillHist2D_wt(hy, np.sum(event, axis=2))
    my.FillHist2D_wt(hz, np.sum(event, axis=3))
    canvas.cd(1)
+   if log: ROOT.gPad.SetLogz(1)
    hx.Draw(opt)
    hx.GetXaxis().SetTitle("Y axis")
    hx.GetYaxis().SetTitle("Z axis")
    hx.GetYaxis().CenterTitle()
+   hx.SetMinimum(Min)
+   hx.SetMaximum(Max)
    canvas.Update()
    #my.stat_pos(hx)                                                                                                  
    canvas.Update()
    canvas.cd(2)
+   if log: ROOT.gPad.SetLogz(1)
    hy.Draw(opt)
    hy.GetXaxis().SetTitle("X axis")
    hy.GetYaxis().SetTitle("Z axis")
    hx.GetYaxis().CenterTitle()
+   hy.SetMinimum(Min)
+   hy.SetMaximum(Max)
    canvas.Update()
    #my.stat_pos(hy)                                                                                                  
    canvas.Update()
    canvas.cd(3)
+   if log: ROOT.gPad.SetLogz(1)
    hz.Draw(opt)
    hz.GetXaxis().SetTitle("X axis")
    hz.GetYaxis().SetTitle("Y axis")
-   hx.GetYaxis().CenterTitle()
+   hz.GetYaxis().CenterTitle()
+   hz.SetMinimum(Min)
+   hz.SetMaximum(Max)
    nfound = s.Search(hz, sigma, "col", thresh)
    canvas.Update()
    canvas.cd(4)
