@@ -167,24 +167,7 @@ def hist_count(x, p=1.0, daxis=(1, 2, 3)):
     return bins
 
 #get data for training
-def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=4):
-    print ('Loading Data from .....', datafile)
-    f=h5py.File(datafile,'r')
-    ang = np.array(f.get(angtype))
-    X=np.array(f.get('ECAL'))* xscale
-    Y=np.array(f.get('energy'))/yscale
-    X[X < thresh] = 0
-    X = X.astype(np.float32)
-    Y = Y.astype(np.float32)
-    ang = ang.astype(np.float32)
-    ecal = np.sum(X, axis=(1, 2, 3))
-    X = np.expand_dims(X, axis=daxis)
-    if xpower !=1.:
-        X = np.power(X, xpower)
-    return X, Y, ang, ecal
-
-#get data for training
-def GetDataAngle2(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
+def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     X=np.array(f.get('ECAL'))* xscale
@@ -224,7 +207,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     # build the discriminator
     print('[INFO] Building discriminator')
     discriminator.compile(
-        optimizer=RMSprop(lr, decay=0.001),
+        optimizer=RMSprop(lr),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -232,7 +215,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     # build the generator
     print('[INFO] Building generator')
     generator.compile(
-        optimizer=RMSprop(lr, decay=0.001),
+        optimizer=RMSprop(lr),
         loss='binary_crossentropy'
     )
  
@@ -247,7 +230,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         name='combined_model'
     )
     combined.compile(
-        optimizer=RMSprop(lr, decay=0.001),
+        optimizer=RMSprop(lr),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
@@ -282,7 +265,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
         # read first file
-        X_train, Y_train, ang_train, ecal_train = GetDataAngle2(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+        X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
         nb_file=1
         epoch_gen_loss = []
         epoch_disc_loss = []
@@ -306,7 +289,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                 ang_left = ang_train[(file_index * batch_size):]
                 ecal_left = ecal_train[(file_index * batch_size):]
                 # read in next file                                                
-                X_train, Y_train, ang_train, ecal_train = GetDataAngle2(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+                X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
                 nb_file+=1
                 # concatenate to left over data
                 X_train = np.concatenate((X_left, X_train))
@@ -366,7 +349,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         test_start = time.time()
 
         #read first test file
-        X_test, Y_test, ang_test, ecal_test = GetDataAngle2(Testfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+        X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
         disc_test_loss=[]
         gen_test_loss =[]
         nb_file=1
@@ -384,7 +367,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                ang_left = ang_test[(file_index * batch_size):]
                ecal_left = ecal_test[(file_index * batch_size):]
                # read in new file
-               X_test, Y_test, ang_test, ecal_test = GetDataAngle2(Testfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+               X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
                nb_file+=1
                # concatenate with left over data
                X_test = np.concatenate((X_left, X_test))
