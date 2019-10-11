@@ -30,7 +30,7 @@ sys.path.insert(0,'../')
 def main():
     # All of the following needs to be adjusted
     from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_gan_training_epsilon_2_500GeV/params_generator*.hdf5'
+    weightdir = '3dgan_weights_gan_training_Pi0_2_500GeV_decay_p001/params_generator*.hdf5'
     if tlab:
       #datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
       datapath = '/gkhattak/data/*100GeV/*.h5'
@@ -38,10 +38,10 @@ def main():
     else:
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
-    #datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
-    datapath = '/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5' 
+    datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
+    #datapath = '/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5' 
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results_gan_training_2_500GeV/' # plot directory
+    plotsdir = 'results/optimization_results_gan_training/' # plot directory
     particle = "Ele" 
     scale = 1
     threshold = 0
@@ -51,11 +51,11 @@ def main():
     latent = 256
     g= generator(latent_size=latent)
     start = 0
-    stop = 500
+    stop = 30
     gen_weights=[]
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
-    energies =[50, 100, 200, 300, 400]
+    energies =[110, 150, 120]
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
