@@ -8,10 +8,9 @@ import tensorflow as tf
 #import tensorflow.python.ops.image_ops_impl as image 
 import time
 import sys
-sys.path.insert(0,'../')
-sys.path.insert(0,'../analysis')
-import utils.GANutils as gan
-import utils.ROOTutils as roo
+sys.path.insert(0,'../keras')
+import analysis.utils.GANutils as gan
+import analysis.utils.ROOTutils as roo
 from skimage import measure
 import math
 from AngleArch3dGAN import generator, discriminator
@@ -26,20 +25,20 @@ def main():
   thresh =0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/IQA_newarch3_lr_L_p2' # dir for results
+  plotsdir = 'results/IQA_pami_ep21_L8' # dir for results
   gan.safe_mkdir(plotsdir) 
-  datapath = "/bigdata/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path     
+  datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  energies =[0, 110, 150, 190]# energy bins
+  energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
   angles=[62, 90, 118]
-  L=1e-2
+  L=1e-8
   concat=2
   stest = True
   dscale =50.0
   g = generator(latent)       # build generator
-  gen_weight1= "../weights/3dgan_weights_newarch3_lr/params_generator_epoch_050.hdf5" # weights for generator
+  gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
-  sorted_data = gan.get_sorted_angle(data_files[24:], energies, thresh=thresh) # load data in a dict
+  sorted_data = gan.get_sorted_angle(data_files[-3:], energies, thresh=thresh) # load data in a dict
   
   # for each energy bin
   for energy in energies:
@@ -77,7 +76,7 @@ def main():
        #L=data_range
        ssim_mean, ssim_std=SSIM(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
        print('Energy={}'.format(energy))
-       print('SSIM={}'.format(ssim_mean))
+       print('SSIM mean ={} std ={}'.format(ssim_mean, ssim_std))
        psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, data_range=L)
        print('PSNR={}'.format(psnr))
        #make plot
@@ -92,8 +91,8 @@ def main():
           mscn_2 = mscn_2.flatten()
           mscn_2 = mscn_2[mscn_2!=0]
 
-          ms_ssim=SSIM(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
-          print('SSIM Data shuffled ={}'.format(ms_ssim))
+          ssim_mean, ssim_std=SSIM(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
+          print('SSIM Data shuffled mean ={} std={}'.format(ssim_mean, ssim_std))
           psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, data_range=L)
           print('PSNR Data shuffled ={}'.format(psnr))
           Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ssim_mean, psnr], stest=stest)
@@ -107,7 +106,7 @@ def main():
           mscn_2 = mscn_2[mscn_2!=0]
 
           ssim_mean, ssim_std=SSIM(generated_images, shuffled_gan, multichannel=True, data_range=L, gaussian_weights=True, use_sample_covariance=False)
-          print('SSIM GAN shuffled ={}'.format(ssim_mean))
+          print('SSIM GAN shuffled mean={} std={}'.format(ssim_mean, ssim_std))
           psnr = measure.compare_psnr(generated_images, shuffled_gan, data_range=L)
           print('PSNR GAN shuffled ={}'.format(psnr))
           Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ssim_mean, psnr], stest=stest)
