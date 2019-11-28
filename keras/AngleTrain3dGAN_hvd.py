@@ -92,6 +92,18 @@ def main():
     thresh = params.thresh # threshold for data
     angtype = params.angtype
     warmup_epochs = params.warmupepochs
+
+    d_format = params.channel_format
+
+    if d_format == 'channels_first':
+        print('Setting th channel ordering (NCHW)')
+        K.set_image_dim_ordering('th')
+        K.set_image_data_format('channels_first')
+    else:
+        print('Setting tf channel ordering (NHWC)')
+        K.set_image_dim_ordering('tf')
+        K.set_image_data_format('channels_last')
+
  
     config = tf.ConfigProto(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
@@ -103,6 +115,9 @@ def main():
     # os.environ['OMP_NUM_THREADS'] = str(params.intraop)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
     K.set_session(tf.Session(config=config))
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
+
 
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
@@ -155,6 +170,8 @@ def get_parser():
     parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
     parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
+    parser.add_argument('--channel_format', action='store', type=str, default='channels_first', help='NCHW vs NHWC')
+    parser.add_argument('--analysis', action='store', type=bool, default=False, help='Calculate optimisation function')
     return parser
 
 def mapping(x):

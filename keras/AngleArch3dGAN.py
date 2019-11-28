@@ -155,27 +155,47 @@ def discriminator(power=1.0):
 def generator(latent_size=200, return_intermediate=False):
     if K.image_data_format() =='channels_last':
         dim = (9,9,8,8)
+        baxis=-1 # axis for BatchNormalization
     else:
         dim = (8, 9, 9,8) 
+        baxis=1 # axis for BatchNormalization
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
         Reshape(dim),
+        UpSampling3D(size=(6, 6, 6)),
+        
+        Conv3D(8, (6, 6, 8), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+        
+        ZeroPadding3D((2, 2, 1)),
+        Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+        ####################################### added layers 
+        
+        ZeroPadding3D((2, 2, 1)),
+        Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
 
-        Conv3D(64, 6, 6, 8, border_mode='same', init='he_uniform'),
-        LeakyReLU(),
-        BatchNormalization(),
-        UpSampling3D(size=(3, 3, 2)),
+        ZeroPadding3D((2, 2, 1)),
+        Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
 
-        ZeroPadding3D((2, 3, 1)),
-        Conv3D(6, 5, 8, 8, init='he_uniform'),
-        LeakyReLU(),
-        BatchNormalization(),
-        UpSampling3D(size=(2, 2, 3)),
-
-        ZeroPadding3D((0, 2,0)),
-        Conv3D(6, 3, 5, 8, init='he_uniform'),
-        LeakyReLU(),
-        Conv3D(1, 2, 2, 2, init='glorot_normal'),
+        ZeroPadding3D((1, 1, 0)),
+        Conv3D(6, (3, 3, 5), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+        
+        #####################################  
+        
+        ZeroPadding3D((1, 1,0)),
+        Conv3D(6, (3, 3, 3), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        
+        Conv3D(1, (2, 2, 2),  padding='valid', kernel_initializer='glorot_normal'),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
