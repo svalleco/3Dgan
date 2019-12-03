@@ -11,7 +11,7 @@ import argparse
 import utils.RootPlotsGAN as pl
 import keras.backend as K
 
-if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
+if 'tlab' in os.environ.get('HOSTNAME'): # Here a check for host can be used
     tlab = True
 else:
     tlab= False
@@ -24,11 +24,6 @@ def main():
    from EcalEnergyGan import generator, discriminator
 
    import keras.backend as K
-
-   if tlab:
-      datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5' # Training data CERN EOS
-      gweights = ['/gkhattak/weights/EnergyWeights/3dgan_weights_train/params_generator_epoch_049.hdf5']
-      dweights = ['/gkhattak/weights/EnergyWeights/3dgan_weights_train/params_discriminator_epoch_049.hdf5']
 
    parser = get_parser()
    params = parser.parse_args()
@@ -63,6 +58,10 @@ def main():
    dformat = params.dformat
    labels=['']
    K.set_image_data_format(dformat)# setting global flag   
+   if tlab:
+      datapath = '/eos/user/g/gkhattak/FixedAngleData/*.h5' # Training data CERN EOS                                                                                                                          
+      gweights = ['/afs/cern.ch/work/g/gkhattak/generator_params_generator_epoch_014.hdf5']
+      dweights = ['/afs/cern.ch/work/g/gkhattak/discriminator_params_generator_epoch_014.hdf5']
       
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    d = discriminator(keras_dformat=dformat)
@@ -77,7 +76,7 @@ def get_parser():
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
-    parser.add_argument('--plotsdir', action='store', type=str, default='results/Analysis_plots/', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotsdir', action='store', type=str, default='results/surfsara_Analysis_plots/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
@@ -97,7 +96,7 @@ def get_parser():
     parser.add_argument('--ifpdf', action='store', default=True, help='Whether generate pdf plots or .C plots') 
     parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights_train/params_generator_epoch_049.hdf5', help='list for paths to Generator weights.')
     parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights_train/params_discriminator_epoch_049.hdf5', help='list for paths to Discriminator weights')
-    parser.add_argument('--xscales', action='store', type=int, default=[100], help='list for Multiplication factors for all models to be checked')
+    parser.add_argument('--xscales', action='store', type=int, default=[1], help='list for Multiplication factors for all models to be checked')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--energies', action='store', type=int, default=[0, 50, 100, 200, 250, 300, 400, 500], help='Energy bins for analysis')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
