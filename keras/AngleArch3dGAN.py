@@ -187,7 +187,7 @@ def generator(latent_size=256, return_intermediate=False, dformat='channels_last
         SeparableConv2D(16, (2, 2), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         
-        SeparableConv2D(25, (2, 2),  padding='valid', kernel_initializer='glorot_normal'),
+        SeparableConv2D(25, (2, 2),  padding='valid', kernel_initializer='glorot_normal', use_bias=False),
         Activation('relu')
     ])
     latent = Input(shape=(latent_size, ))   
