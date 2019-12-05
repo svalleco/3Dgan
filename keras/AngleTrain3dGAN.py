@@ -122,13 +122,13 @@ def main():
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
+    parser.add_argument('--nbepochs', action='store', type=int, default=120, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
     parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
-    parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
+    parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
@@ -147,21 +147,21 @@ def get_parser():
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--name', action='store', type=str, default='gan_training', help='Unique identifier can be set for each training')
+    parser.add_argument('--name', action='store', type=str, default='gan_training_2D', help='Unique identifier can be set for each training')
     return parser
 
 # A histogram fucntion that counts cells in different bins
 def hist_count(x, p=1.0, daxis=(1, 2, 3)):
     limits=np.array([0.05, 0.03, 0.02, 0.0125, 0.008, 0.003]) # bin boundaries used
     limits= np.power(limits, p)
-    bin1 = np.sum(np.where(x>(limits[0]) , 1, 0), axis=daxis)
-    bin2 = np.sum(np.where((x<(limits[0])) & (x>(limits[1])), 1, 0), axis=daxis)
-    bin3 = np.sum(np.where((x<(limits[1])) & (x>(limits[2])), 1, 0), axis=daxis)
-    bin4 = np.sum(np.where((x<(limits[2])) & (x>(limits[3])), 1, 0), axis=daxis)
-    bin5 = np.sum(np.where((x<(limits[3])) & (x>(limits[4])), 1, 0), axis=daxis)
-    bin6 = np.sum(np.where((x<(limits[4])) & (x>(limits[5])), 1, 0), axis=daxis)
-    bin7 = np.sum(np.where((x<(limits[5])) & (x>0.), 1, 0), axis=daxis)
-    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
+    bin1 = np.expand_dims(np.sum(np.where(x>(limits[0]) , 1, 0), axis=daxis), axis=1)
+    bin2 = np.expand_dims(np.sum(np.where((x<(limits[0])) & (x>(limits[1])), 1, 0), axis=daxis), axis=1)
+    bin3 = np.expand_dims(np.sum(np.where((x<(limits[1])) & (x>(limits[2])), 1, 0), axis=daxis), axis=1)
+    bin4 = np.expand_dims(np.sum(np.where((x<(limits[2])) & (x>(limits[3])), 1, 0), axis=daxis), axis=1)
+    bin5 = np.expand_dims(np.sum(np.where((x<(limits[3])) & (x>(limits[4])), 1, 0), axis=daxis), axis=1)
+    bin6 = np.expand_dims(np.sum(np.where((x<(limits[4])) & (x>(limits[5])), 1, 0), axis=daxis), axis=1)
+    bin7 = np.expand_dims(np.sum(np.where((x<(limits[5])) & (x>0.), 1, 0), axis=daxis), axis=1)
+    bin8 = np.expand_dims(np.sum(np.where(x==0, 1, 0), axis=daxis), axis=1)
     bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
     bins[np.where(bins==0)]=1 # so that an empty bin will be assigned a count of 1 to avoid unstability
     return bins
@@ -184,11 +184,11 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
       ang = np.array(f.get(angtype))[indexes]
     else:
       ang = gan.measPython(X)
-    X = np.expand_dims(X, axis=daxis)
+    #X = np.expand_dims(X, axis=daxis)
     ecal=ecal[indexes]
     ecal=np.expand_dims(ecal, axis=daxis)
     if xpower !=1.:
-        X = np.power(X, xpower)
+       X = np.power(X, xpower)
     return X, Y, ang, ecal
 
 def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
@@ -198,7 +198,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     
     # apply settings according to data format
     if dformat=='channels_last':
-       daxis=4 # channel axis
+       daxis=3 # channel axis
        daxis2=(1, 2, 3) # axis for sum
     else:
        daxis=1 # channel axis
@@ -305,7 +305,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+            add_loss_batch = loss_ftn(image_batch, xpower, daxis2)
             file_index +=1
             # Generate Fake events with same energy and angle as data batch
             noise = np.random.normal(0, 1, (batch_size, latent_size-2))
@@ -383,7 +383,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
            energy_batch = Y_test[(file_index * batch_size):(file_index + 1) * batch_size]
            ecal_batch = ecal_test[(file_index *  batch_size):(file_index + 1) * batch_size]
            ang_batch = ang_test[(file_index * batch_size):(file_index + 1) * batch_size]
-           add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+           add_loss_batch = loss_ftn(image_batch, xpower, daxis2)
            file_index +=1
            # Generate fake events                                                            
            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
