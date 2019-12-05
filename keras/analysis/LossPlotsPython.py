@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from utils.GANutils import safe_mkdir
 import argparse
+if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
+    tlab = True
+else:
+    tlab= False
 
 try:
     import cPickle as pickle
@@ -15,9 +19,11 @@ except ImportError:
 def main():
    parser = get_parser()
    params = parser.parse_args()
-   
-   historyfile = params.historyfile
-   outdir = params.outdir
+   if tlab:
+      historyfile = '/gkhattak/results/' + params.historyfile
+   else:
+      historyfile = '../results/' + params.historyfile
+   outdir = 'results/' + params.outdir
    ylim = [params.ylim1, params.ylim2, params.ylim3, params.ylim4, params.ylim5, params.ylim6, params.ylim7]
    start_epoch =params.start_epoch
    fit_order = params.fit_order
@@ -56,8 +62,8 @@ def main():
    
 def get_parser():
     parser = argparse.ArgumentParser(description='Loss plots' )
-    parser.add_argument('--historyfile', action='store', type=str, default='../results/3dgan_history_gan_training.pkl', help='Pickle file for loss history')
-    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots_gan_training', help='directory for results')
+    parser.add_argument('--historyfile', action='store', type=str, default='3dgan_history_gan_training_2D.pkl', help='Pickle file for loss history')
+    parser.add_argument('--outdir', action='store', type=str, default='loss_plots_gan_training_2D', help='directory for results')
     parser.add_argument('--ylim1', type=float, default=20, help='y max for combined train loss')
     parser.add_argument('--ylim2', type=float, default=2, help='y max for BCE train loss')
     parser.add_argument('--ylim3', type=float, default=2, help='y max for BCE test loss')

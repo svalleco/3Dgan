@@ -45,7 +45,7 @@ def fill_hist_wt(hist, weight):
 
 #2D weighted histogram        
 def FillHist2D_wt(hist, array):
-   array= np.squeeze(array, axis=3)
+   #array= np.squeeze(array)
    dim1 = array.shape[0]
    dim2 = array.shape[1]
    dim3 = array.shape[2]

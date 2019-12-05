@@ -10,8 +10,8 @@ print(np.__version__)
 import math
 import sys
 import argparse
-from memory_profiler import profile
-if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used        
+#from memory_profiler import profile
+if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used        
     tlab = True
 else:
     tlab= False
@@ -90,10 +90,11 @@ def main():
 
    if tlab: 
      #Weights
-     dweights=["/gkhattak/weights/3dgan_weights_gan_training/params_discriminator_epoch_059.hdf5"]
-     gweights= ["/gkhattak/weights/3dgan_weights_gan_training/params_generator_epoch_059.hdf5"]
+     dweights=["/gkhattak/weights/3dgan_weights_gan_training_2D/params_discriminator_epoch_010.hdf5"]
+     gweights= ["/gkhattak/weights/3dgan_weights_gan_training_2D/params_generator_epoch_010.hdf5"]
      datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
      events_per_file = 5000
+     energies = [0, 110, 150, 190]
    angles = [62, 90, 118]
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
    
@@ -127,7 +128,7 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='theta', help='Angle used.')
-    parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis_gan_training/', help='Directory to store the analysis plots.')
+    parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis_gan_training_2D/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')

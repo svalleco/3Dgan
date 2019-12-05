@@ -1962,6 +1962,7 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees', label="
 
 def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees', label="", logz=0):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,900 ,400) #make
+   
    x = aevent.shape[0]
    y = aevent.shape[1]
    z = aevent.shape[2]
@@ -1972,8 +1973,8 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    lmargin = 0.15
    rmargin = 0.17
    
-   ang1 = MeasPython(np.moveaxis(aevent, 3, 0))
-   ang2 = MeasPython(np.moveaxis(aevent, 3, 0), mod=2)
+   ang1 = MeasPython(np.expand_dims(aevent, axis=0))
+   ang2 = MeasPython(np.expand_dims(aevent, axis=0), mod=2)
    if unit == 'degrees':
       ang1= np.degrees(ang1)
       ang2= np.degrees(ang2)
