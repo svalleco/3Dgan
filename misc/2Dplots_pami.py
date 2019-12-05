@@ -9,8 +9,10 @@ import math
 import time
 import glob
 import numpy.core.umath_tests as umath
-import setGPU #if Caltech
-
+try:
+  import setGPU #if Caltech
+except:
+  pass
 sys.path.insert(0,'../keras')
 import analysis.utils.GANutils as gan
 import analysis.utils.ROOTutils as r
@@ -18,9 +20,10 @@ import analysis.utils.RootPlotsGAN as pl
 
 def main():
    #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # path to data
-   datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+   #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+   datapath = "/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5" 
    # path to generator weights
-   genweight = "../keras/weights/3dgan_weights_gan_training_chr_pion_2_500GeV/params_generator_epoch_020.hdf5"
+   genweight = "/gkhattak/weights/3dgan_weights_gan_training_2D/params_generator_epoch_020.hdf5"
    # generator model
    from AngleArch3dGAN import generator
 
@@ -34,23 +37,23 @@ def main():
    num=10 # random events generated
    thetamin = np.radians(60)  # min theta
    thetamax = np.radians(120) # maximum theta
-   energies=[50, 100, 200, 300, 400] # energy bins
+   energies=[110, 150, 190] # energy bins
    thetas = [62, 90, 118] # angle bins
    ang = 1 # use all calculation for variable angle
    xscale = 1 # scaling of images
    xpower = 0.85
    concat = 2
    ascale=1
-   particle = 'ChPi'
+   particle = 'Ele'
    ecalscale=50. # scaling in original data set
    post = inv_power # post processing: It can be either scale (without sqrt) or square(sqrt)
    thresh = 3e-4 # if using threshold
-   plotsdir = 'results/2D_chr_pi_ep20_log_thresh/' # name of folder to save results
+   plotsdir = 'results/2Dplots_gan_training_2D_ep20_thresh/' # name of folder to save results
    gan.safe_mkdir(plotsdir) # make plot directory
    opt="colz" # option for 2D hist
    angtype='theta'
    datafiles = gan.GetDataFiles(datapath, Particles=[particle]) # get list of files
-   var = gan.get_sorted_angle(datafiles[-2:], energies, True, num_events1, num_events2, angtype=angtype, thresh=thresh) # returning a dict with sorted data.
+   var = gan.get_sorted_angle(datafiles[-1:], energies, True, num_events1, num_events2, angtype=angtype, thresh=thresh) # returning a dict with sorted data.
    for energy in energies:
       edir = os.path.join(plotsdir, 'energy{}'.format(energy))
       gan.safe_mkdir(edir)
