@@ -37,7 +37,7 @@ except:
     pass
 
 #from memory_profiler import profile # used for memory profiling
-config = tf.ConfigProto(log_device_placement=True)
+#config = tf.ConfigProto(log_device_placement=True)
 
 def main():
     #Architectures to import
@@ -69,6 +69,7 @@ def main():
     angtype = params.angtype
     particle = params.particle
     warm = params.warm
+    tpu_name = params.tpu
     lr = params.lr
     events_per_file = 5000
     energies = [0, 110, 150, 190]
@@ -106,7 +107,7 @@ def main():
     gan.safe_mkdir(weightdir)
     
     # GAN training 
-    Gan3DTrainAngle(datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
+    Gan3DTrainAngle(tpu_name, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, loss_weights=loss_weights, lr=lr, xscale = xscale, xpower=xpower, angscale=ascale,
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
                     energies=energies, dformat=dformat, particle=particle, verbose=verbose, warm=warm,
@@ -140,6 +141,7 @@ def get_parser():
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
     parser.add_argument('--name', action='store', type=str, default='gan_training', help='Unique identifier can be set for each training')
+    parser.add_argument('--tpu', action='store', type=str, default='', help='Name of the TPU as stored in $TPU_NAME var')
     return parser
 
 # A histogram fucntion that counts cells in different bins
@@ -183,7 +185,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
         X = np.power(X, xpower)
     return X, Y, ang, ecal
 
-def Gan3DTrainAngle(datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=256, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=256, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
     loss_ftn = hist_count # function used for additional loss
@@ -196,7 +198,15 @@ def Gan3DTrainAngle(datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_
        daxis=1 # channel axis
        daxis2=(2, 3, 4) # axis for sum
 
-    resolver = tf.contrib.cluster_resolver.TPUClusterResolver('grpc://' + os.environ['COLAB_TPU_ADDR'])
+    #resolver = tf.contrib.cluster_resolver.TPUClusterResolver('grpc://' + os.environ['COLAB_TPU_ADDR'])
+    resolver = tf.contrib.cluster_resolver.TPUClusterResolver(tpu_name)
+    run_config = tf.contrib.tpu.RunConfig(
+      cluster=tpu_cluster_resolver,
+      model_dir=WeightsDir,
+      session_config=tf.ConfigProto(
+          allow_soft_placement=True, log_device_placement=True),
+      tpu_config=tf.contrib.tpu.TPUConfig(FLAGS.iterations, FLAGS.num_shards),
+    )
     tf.contrib.distribute.initialize_tpu_system(resolver)
     strategy = tf.contrib.distribute.TPUStrategy(resolver)
 
