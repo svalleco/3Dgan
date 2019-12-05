@@ -1962,7 +1962,6 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees', label="
 
 def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees', label="", logz=0):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,900 ,400) #make
-   
    x = aevent.shape[0]
    y = aevent.shape[1]
    z = aevent.shape[2]

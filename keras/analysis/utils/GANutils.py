@@ -379,7 +379,7 @@ def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
     X=X[indexes]
     Y=Y[indexes]
     ang=ang[indexes]
-    X = np.expand_dims(X, axis=-1)
+    #X = np.expand_dims(X, axis=-1)
     return X, Y, ang 
 
 # Get sorted data for variable angle
