@@ -24,17 +24,12 @@ import numpy as np
 import time
 import math
 import tensorflow as tf
+from tensorflow.python.framework.ops import disable_eager_execution
+disable_eager_execution()
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 import analysis.utils.GANutils as gan
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
-    tlab = True
-else:
-    tlab= False
+tlab= False
     
-try:
-    import setGPU #if Caltech
-except:
-    pass
 
 #from memory_profiler import profile # used for memory profiling
 #config = tf.ConfigProto(log_device_placement=True)
@@ -178,6 +173,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
       ang = np.array(f.get(angtype))[indexes]
     else:
       ang = gan.measPython(X)
+    ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=daxis)
     ecal=ecal[indexes]
     ecal=np.expand_dims(ecal, axis=daxis)
@@ -187,6 +183,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
 
 def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=256, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
+    from AngleArch3dGAN_tf import generator, discriminator
     f = [0.9, 0.1] # train, test fractions 
     loss_ftn = hist_count # function used for additional loss
     
@@ -199,14 +196,16 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
        daxis2=(2, 3, 4) # axis for sum
 
     #resolver = tf.contrib.cluster_resolver.TPUClusterResolver('grpc://' + os.environ['COLAB_TPU_ADDR'])
+    iterations =100
+    num_shards =200
     resolver = tf.contrib.cluster_resolver.TPUClusterResolver(tpu_name)
-    run_config = tf.contrib.tpu.RunConfig(
-      cluster=tpu_cluster_resolver,
-      model_dir=WeightsDir,
-      session_config=tf.ConfigProto(
-          allow_soft_placement=True, log_device_placement=True),
-      tpu_config=tf.contrib.tpu.TPUConfig(FLAGS.iterations, FLAGS.num_shards),
-    )
+    #run_config = tf.contrib.tpu.RunConfig(
+    #  cluster=resolver,
+    #  model_dir=WeightsDir,
+    #  session_config=tf.ConfigProto(
+    #      allow_soft_placement=True, log_device_placement=True),
+    #  tpu_config=tf.contrib.tpu.TPUConfig(iterations, num_shards),
+    #)
     tf.contrib.distribute.initialize_tpu_system(resolver)
     strategy = tf.contrib.distribute.TPUStrategy(resolver)
 
@@ -234,7 +233,7 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
        fake_image = generator( latent)
        discriminator.trainable = False
        fake, aux, ang, ecal, add_loss= discriminator(fake_image)
-       combined = Model([latent], [fake, aux, ang, ecal, add_loss])
+       combined = tf.keras.models.Model([latent], [fake, aux, ang, ecal, add_loss])
        combined.compile(
           optimizer=tf.keras.optimizers.RMSprop(lr),
           loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
@@ -315,6 +314,7 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
             file_index +=1
             # Generate Fake events with same energy and angle as data batch
             noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            noise = noise.astype(np.float32) 
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
             # Train discriminator first on real batch and then the fake batch
