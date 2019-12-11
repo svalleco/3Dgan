@@ -23,73 +23,31 @@ try:
     import setGPU #if Caltech
 except:
     pass
-
-import utils.GANutils as gan
-sys.path.insert(0,'../')
+sys.path.insert(0,'../keras/')
+import analysis.utils.GANutils as gan
 
 def main():
-    # All of the following needs to be adjusted
-    from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_gan_training_Pi0_2_500GeV_decay_p001/params_generator*.hdf5'
-    if tlab:
-      #datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
-      datapath = '/gkhattak/data/*100GeV/*.h5'
-      genpath = '/gkhattak/weights/' + weightdir
-    else:
-      datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
-      genpath = "../weights/" + weightdir # path to weights
-    datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
-    #datapath = '/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5' 
-    sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results_gan_training/' # plot directory
-    particle = "Ele" 
-    scale = 1
-    threshold = 0
-    ang = 1
-    concat=2
-    power=0.85
-    latent = 256
-    g= generator(latent_size=latent)
-    start = 0
-    stop = 30
-    gen_weights=[]
-    disc_weights=[]
-    fits = ['pol1', 'pol2', 'expo']
-    energies =[110, 150, 120]
-    gan.safe_mkdir(plotsdir)
-    for f in sorted(glob.glob(genpath)):
-      gen_weights.append(f)
-    gen_weights=gen_weights[start:stop]
-    epoch = []
-    for i in np.arange(len(gen_weights)):
-      name = os.path.basename(gen_weights[i])
-      num = int(filter(str.isdigit, name)[:-1])
-      epoch.append(num)
-    print("{} weights are found".format(len(gen_weights)))
-    result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle
-            , scale, power=power, thresh=threshold, ang=ang, concat=concat, latent=latent
-            , preproc = taking_power, postproc=inv_power, energies=energies
-             )
-    PlotResultsRoot(result, plotsdir, start, epoch, fits, ang=ang)
-
-def sqrt(n, scale=1):
-    return np.sqrt(n * scale)
-
-def square(n, scale=1):
-    return np.square(n)/scale
-
-def taking_power(n, xscale=1, power=1):
-    return np.power(n * xscale, power)
-
-def inv_power(n, xscale=1, power=1.):
-    return np.power(n, 1./power)/xscale
-        
+    result=[]
+    resultfile = 'result_log.txt'
+    file = open(resultfile)
+    plotdir = 'obj_bin_p85'
+    gan.safe_mkdir(plotdir)
+    for line in file:
+      fields = line.strip().split()
+      fields = [float(_) for _ in fields]
+      print(fields)
+      result.append(fields)
+    file.close
+    epochs = np.arange(len(result))
+    print(epochs)
+    print('The result file {} is read.'.format(resultfile))
+    PlotResultsRoot(result, plotdir, epochs, ang=0)
 
 #Plots results in a root file
-def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
+def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfile='obj_result', ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
-    c1.SetGrid ()
     legend = ROOT.TLegend(.5, .6, .9, .9)
+    
     legend.SetTextSize(0.028)
     mg=ROOT.TMultiGraph()
     color1 = 2
@@ -164,9 +122,10 @@ def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
     mg.Draw('ALP')
     mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(total))
     c1.Update()
-    legend.Draw()
+    #legend.Draw()
     c1.Update()
-    c1.Print(os.path.join(resultdir, "result.pdf"))
+    c1.Print(os.path.join(resultdir, plotfile + '.pdf'))
+    c1.Print(os.path.join(resultdir, plotfile + '.C'))
 
     fits = ['pol1', 'pol2', 'expo']
     for i, fit in enumerate(fits):
@@ -192,9 +151,10 @@ def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
         legend.AddEntry(ge.GetFunction(fit), 'Energy fit', "l")
         legend.AddEntry(gm.GetFunction(fit), 'Moment fit', "l")  
         legend.AddEntry(gs.GetFunction(fit), 'S. Fr. fit', "l")
-      legend.Draw()
+      #legend.Draw()
       c1.Update()
-      c1.Print(os.path.join(resultdir, "result_{}.pdf".format(fit)))
+      c1.Print(os.path.join(resultdir, plotfile + '_{}.pdf'.format(fit)))
+      c1.Print(os.path.join(resultdir, plotfile + '_{}.C'.format(fit)))
     print ('The plot is saved to {}'.format(resultdir))
 
 def preproc(n, scale=1):

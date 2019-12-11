@@ -28,7 +28,7 @@ def main():
    ecal_weight = params.ecal_weight
    ang_weight = params.ang_weight
    add_weight = params.add_weight
-
+   leg = params.leg
    #Loss names 
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
@@ -51,19 +51,19 @@ def main():
        lossnames.append('bin')
 
    safe_mkdir(outdir)
-   plot_loss(historyfile, ylim, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order)
+   plot_loss(historyfile, ylim, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order, leg=leg)
    print('Loss Plots are saved in {}'.format(outdir))
    
 def get_parser():
     parser = argparse.ArgumentParser(description='Loss plots' )
-    parser.add_argument('--historyfile', action='store', type=str, default='../results/3dgan_history_training.pkl', help='Pickle file for loss history')
-    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots', help='directory for results')
+    parser.add_argument('--historyfile', action='store', type=str, default='../results/3dgan_history_gan_training.pkl', help='Pickle file for loss history')
+    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots_gan_training', help='directory for results')
     parser.add_argument('--ylim1', type=float, default=20, help='y max for combined train loss')
-    parser.add_argument('--ylim2', type=float, default=5, help='y max for BCE train loss')
-    parser.add_argument('--ylim3', type=float, default=5, help='y max for BCE test loss')
+    parser.add_argument('--ylim2', type=float, default=2, help='y max for BCE train loss')
+    parser.add_argument('--ylim3', type=float, default=2, help='y max for BCE test loss')
     parser.add_argument('--ylim4', type=float, default=40, help='y max for Axilliary training losses')
-    parser.add_argument('--ylim5', type=float, default=0.5, help='y min for Generator BCE only')
-    parser.add_argument('--ylim6', type=float, default=2.5, help='y max for Generator BCE only')
+    parser.add_argument('--ylim5', type=float, default=0.85, help='y min for Generator BCE only')
+    parser.add_argument('--ylim6', type=float, default=0.95, help='y max for Generator BCE only')
     parser.add_argument('--ylim7', type=float, default=10., help='y max for combined test & train losses')
     parser.add_argument('--start_epoch', type=int, default=0, help='can be used to remove initial epochs')
     parser.add_argument('--fit_order', type=int, default=3, help='order of polynomial used for fit')
@@ -73,10 +73,11 @@ def get_parser():
     parser.add_argument('--aux_weight', type=float, default=0.1, help='weight of auxilliary energy regression loss')
     parser.add_argument('--ecal_weight', type=float, default=0.1, help='weight of ecal sum loss')
     parser.add_argument('--ang_weight', type=float, default=25, help='weight of angle loss')
-    parser.add_argument('--add_weight', type=float, default=0.1, help='weight of bin count loss')    
+    parser.add_argument('--add_weight', type=float, default=0.1, help='weight of bin count loss')
+    parser.add_argument('--leg', default=True, help='draw legend')    
     return parser
 
-def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3):
+def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3, leg=True):
                              
    with open(lossfile, 'rb') as f:
     			x = pickle.load(f)
@@ -95,28 +96,28 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.title('Discriminator loss')
    for i in loop:
       plt.plot(weights[i] * disc_train[:,i], label='{} (train)'.format(lossnames[i]))
-   plt.legend(fontsize='x-small')                                                                   
+   if leg: plt.legend(fontsize='x-small')                                                                   
    plt.ylim(0, ymax[6])                                                                                                                           
 
    plt.subplot(222)
    plt.title('Generator loss')
    for i in loop:
       plt.plot(weights[i] * gen_train[:,i], label='{} (train)'.format(lossnames[i]))
-   plt.legend(fontsize='x-small')                                                                   
+   if leg: plt.legend(fontsize='x-small')                                                                   
    plt.ylim(0, ymax[0])                                                                                              
 
    plt.subplot(223)
    #plt.title('Testing loss for Discriminator')
    for i in loop:
       plt.plot(weights[i] * disc_test[:,i], label='{} (test)'.format(lossnames[i]))
-   plt.legend(fontsize='x-small')
+   if leg: plt.legend(fontsize='x-small')
    plt.ylim(0, ymax[6])  
     
    plt.subplot(224)
   # plt.title('\nTesting loss for Generator')
    for i in loop:
       plt.plot(weights[i] * gen_test[:,i], label='{} (test)'.format(lossnames[i]))
-   plt.legend(fontsize='x-small')
+   if leg: plt.legend(fontsize='x-small')
    plt.ylim(0, ymax[0])  
    plt.savefig(os.path.join(lossdir,'losses.pdf')) 
    
@@ -127,7 +128,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    for i in loop:
        plt.plot(weights[i] * disc_train[:,i], label='Disc {} ({})'.format(lossnames[i], losstype[i]), color=color[i])
        plt.plot(weights[i] * gen_train[:,i], label='Gen {} ({})'.format(lossnames[i], losstype[i]), color=color[i], linestyle='--')
-   plt.legend(fontsize='x-small')
+   if leg: plt.legend(fontsize='x-small')
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
    plt.ylim(0, ymax[0])  
@@ -139,7 +140,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.title('{} losses for GAN'.format(losstype[1]))
    plt.plot(gen_train[:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
    plt.plot(disc_train[:,1], label='Disc {} ({})'.format(lossnames[1], losstype[1]))
-   plt.legend()
+   if leg: plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
    plt.ylim(0, ymax[1])  
@@ -154,7 +155,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.plot(epochs, gen_train[start_epoch:,1], label='Gen {} ({}) min={:.4f}'.format(lossnames[1], losstype[1], min_loss))
    fit = np.polyfit(epochs, gen_train[start_epoch:,1], order)
    plt.plot(epochs, np.polyval(fit, epochs), label='Gen fit ({} degree polynomial)'.format(order), linestyle='--')
-   plt.legend()
+   if leg: plt.legend()
    plt.xlabel('Epochs starting from epoch' + str(start_epoch))  
    plt.ylabel('Loss')                            
    plt.ylim(ymax[4], ymax[5])  
@@ -166,7 +167,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.title('{} Testing losses for GAN'.format(losstype[1]))
    plt.plot(gen_test[:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
    plt.plot(disc_test[:,1], label='Disc {} ({})'.format(lossnames[1], losstype[1]))
-   plt.legend()
+   if leg: plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
    plt.ylim(0, ymax[2])  
@@ -179,7 +180,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    for i in np.arange(2, len(lossnames)):
       plt.plot(disc_train[:,i], label='Disc {} ({})'.format(lossnames[i], losstype[i]), color=color[i])
       plt.plot(gen_train[:,i], label='Gen {} ({})'.format(lossnames[i], losstype[i]), color=color[i], linestyle='--')
-   plt.legend(fontsize='x-small')
+   if leg: plt.legend(fontsize='x-small')
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
    plt.ylim(0, ymax[3])  
@@ -193,7 +194,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
       plt.plot(disc_train[:,i] * weights[i], label='Disc {} ({})'.format(lossnames[i], losstype[i]), color=color[i])
       plt.plot(gen_train[:,i] * weights[i], label='Gen {} ({})'.format(lossnames[i], losstype[i]), color=color[i], linestyle='--')
       
-   plt.legend(fontsize='x-small')
+   if leg: plt.legend(fontsize='x-small')
    plt.xlabel('Epochs')
    plt.ylabel('Loss')
    #plt.ylim(0, 0.2 * 15)
@@ -205,7 +206,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.figure(fig)
    plt.title('Diff between Genenerator loss and Discriminator loss for GAN')
    plt.plot(gen_train[:,1] - disc_train[:,1], label='Gen loss - Disc loss ({})'.format(losstype[1]))
-   plt.legend()
+   if leg: plt.legend()
    plt.xlabel('Epochs')  
    plt.ylabel('Loss')                            
    plt.ylim(0, ymax[1])  

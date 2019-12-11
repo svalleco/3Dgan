@@ -150,7 +150,7 @@ def plot_corr_python(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, 
    return corr
 
 #plot correlation using Python
-def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, out_file, label, compare=False, gprev=None, leg=True):
+def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, out_file, label, compare=False, gprev=0, leg=True):
    corr, names = get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3)
    x = np.arange(corr.shape[0]+ 1)
    y = np.arange(corr.shape[1]+ 1)
@@ -171,7 +171,7 @@ def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1
    plt.colorbar()
    if leg: plt.legend()
    plt.savefig(out_file + '_python' + label + '.pdf')
-   if not gprev==None:
+   if isinstance(gprev, np.ndarray):
      plt.figure()
      plt.pcolor(X, Y, corr-gprev, label='Diff_' + dlabel, vmin = -1, vmax = 1)
      plt.xticks(x, names, rotation='vertical', fontsize=5)
@@ -426,7 +426,6 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
       hg.Draw('sames hist')
       c1.Update()
       my.Max(hd, hg)
-      my.stat_pos(hg)
       pos+=1
       c1.Update()
       if statbox: my.stat_pos(hg)
@@ -1203,12 +1202,13 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], s
          legend.AddEntry(hg,"GAN {} K={:.4f} ".format( str(labels[i]), ks) ,"l")
       else:
          legend.AddEntry(hg,"GAN "+ str(labels[i]),"l")
-      if dim == 'z':
-         my.stat_pos(hg)
-      else:   
-         sb1=hg.GetListOfFunctions().FindObject("stats")
-         sb1.SetX1NDC(.4)
-         sb1.SetX2NDC(.6)
+      if statbox:
+         if dim == 'z':
+           my.stat_pos(hg)
+         else:   
+           sb1=hg.GetListOfFunctions().FindObject("stats")
+           sb1.SetX1NDC(.4)
+           sb1.SetX2NDC(.6)
               
       c1.Update()
       my.Max(hd, hg)
@@ -1681,15 +1681,15 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
       for mmt in range(m):
          plot_moment(var["momentX_act" + str(energy)], var["momentX_gan" + str(energy)],
                      os.path.join(mdir, 'x' + str(mmt + 1) + momentfile), 'x', energy, mmt,
-                     labels, p, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono, stest=stest)
+                     labels, p, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono, stest=stest, statbox=statbox)
          plots+=1
          plot_moment(var["momentY_act" + str(energy)], var["momentY_gan" + str(energy)],
                      os.path.join(mdir, 'y' + str(mmt + 1) + momentfile), 'y', energy, mmt,
-                     labels, p, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono, stest=stest)
+                     labels, p, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono, stest=stest, statbox=statbox)
          plots+=1
          plot_moment(var["momentZ_act" + str(energy)], var["momentZ_gan" + str(energy)],
                      os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt,
-                     labels, p, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono, stest=stest)
+                     labels, p, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono, stest=stest, statbox=statbox)
          plots+=1
 
       ecomdir = os.path.join(comdir, 'energy_' + str(energy))
@@ -1959,6 +1959,174 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees', label="
    #my.stat_pos(hz)
    canvas.Update()
    canvas.Print(out_file)
+
+def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees', label="", logz=0):
+   canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,900 ,400) #make
+   x = aevent.shape[0]
+   y = aevent.shape[1]
+   z = aevent.shape[2]
+   lsize = 0.04 # axis label size
+   tsize = 0.08 # axis title size
+   tmargin = 0.02
+   bmargin = 0.15
+   lmargin = 0.15
+   rmargin = 0.17
+   
+   ang1 = MeasPython(np.moveaxis(aevent, 3, 0))
+   ang2 = MeasPython(np.moveaxis(aevent, 3, 0), mod=2)
+   if unit == 'degrees':
+      ang1= np.degrees(ang1)
+      ang2= np.degrees(ang2)
+      theta = np.degrees(theta)
+
+   title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV #theta ={:.2f} #circ".format(energy, theta))
+   title.SetFillStyle(0)
+   title.SetLineColor(0)
+   title.SetBorderSize(1)
+   title.Draw()
+   graphPad = ROOT.TPad("Graphs","Graphs",0.01,0.01,0.95,0.95)
+   graphPad.Draw()
+   graphPad.cd()
+   graphPad.Divide(3,2)
+   hx1 = ROOT.TH2F('x1_{:.2f}GeV_{:.2f}'.format(energy, theta), '', y, 0, y, z, 0, z)
+   hy1 = ROOT.TH2F('y1_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, z, 0, z)
+   hz1 = ROOT.TH2F('z1_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, y, 0, y)
+   hx2 = ROOT.TH2F('x2_{:.2f}GeV_{:.2f}'.format(energy, theta), '', y, 0, y, z, 0, z)
+   hy2 = ROOT.TH2F('y2_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, z, 0, z)
+   hz2 = ROOT.TH2F('z2_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, y, 0, y)
+   hx1.SetStats(0)
+   hy1.SetStats(0)
+   hz1.SetStats(0)
+   hx2.SetStats(0)
+   hy2.SetStats(0)
+   hz2.SetStats(0)
+
+   ROOT.gStyle.SetPalette(1)
+   aevent = np.expand_dims(aevent, axis=0)
+   my.FillHist2D_wt(hx1, np.sum(aevent, axis=1))
+   my.FillHist2D_wt(hy1, np.sum(aevent, axis=2))
+   my.FillHist2D_wt(hz1, np.sum(aevent, axis=3))
+   gevent = np.expand_dims(gevent, axis=0)
+   my.FillHist2D_wt(hx2, np.sum(gevent, axis=1))
+   my.FillHist2D_wt(hy2, np.sum(gevent, axis=2))
+   my.FillHist2D_wt(hz2, np.sum(gevent, axis=3))
+   Min = 1e-4
+   Max = 1e-1
+   graphPad.cd(1)
+   if logz: ROOT.gPad.SetLogz(1)
+   hx1.Draw('col')
+   hx1.GetXaxis().SetTitle("Y")
+   hx1.GetYaxis().SetTitle("Z")
+   hx1.GetYaxis().CenterTitle()
+   hx1.GetXaxis().SetLabelSize(lsize)
+   hx1.GetYaxis().SetLabelSize(lsize)
+   hx1.GetXaxis().SetTitleSize(tsize)
+   hx1.GetYaxis().SetTitleSize(tsize)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetBottomMargin(bmargin)
+   ROOT.gPad.SetLeftMargin(lmargin)
+   ROOT.gPad.SetRightMargin(0)
+   hx1.SetMinimum(Min)
+   hx1.SetMaximum(Max)
+   canvas.Update()
+   canvas.Update()
+   graphPad.cd(2)
+   if logz: ROOT.gPad.SetLogz(1)
+   hy1.Draw('col')
+   hy1.GetXaxis().SetTitle("X")
+   hy1.GetYaxis().SetTitle("Z")
+   hy1.GetYaxis().CenterTitle()
+   hy1.GetXaxis().SetLabelSize(lsize)
+   hy1.GetYaxis().SetLabelSize(lsize)
+   hy1.GetXaxis().SetTitleSize(tsize)
+   hy1.GetYaxis().SetTitleSize(tsize)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetBottomMargin(bmargin)
+   ROOT.gPad.SetLeftMargin(lmargin)
+   ROOT.gPad.SetRightMargin(0)
+   hy1.SetMinimum(Min)
+   hy1.SetMaximum(Max)
+
+   canvas.Update()
+   canvas.Update()
+   graphPad.cd(3)
+   if logz: ROOT.gPad.SetLogz(1)
+   hz1.Draw(opt)
+   hz1.GetXaxis().SetTitle("X")
+   hz1.GetYaxis().SetTitle("Y")
+   hz1.GetYaxis().CenterTitle()
+   hz1.GetXaxis().SetLabelSize(lsize)
+   hz1.GetYaxis().SetLabelSize(lsize)
+   hz1.GetXaxis().SetTitleSize(tsize)
+   hz1.GetYaxis().SetTitleSize(tsize)
+   hz1.GetZaxis().SetLabelSize(lsize)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetBottomMargin(bmargin)
+   ROOT.gPad.SetLeftMargin(lmargin)
+   ROOT.gPad.SetRightMargin(rmargin)
+   hz1.SetMinimum(Min)
+   hz1.SetMaximum(Max)
+
+   canvas.Update()
+   graphPad.cd(4)
+   if logz: ROOT.gPad.SetLogz(1)
+   hx2.Draw('col')
+   hx2.GetXaxis().SetTitle("Y")
+   hx2.GetYaxis().SetTitle("Z")
+   hx2.GetYaxis().CenterTitle()
+   hx2.GetXaxis().SetLabelSize(lsize)
+   hx2.GetYaxis().SetLabelSize(lsize)
+   hx2.GetXaxis().SetTitleSize(tsize)
+   hx2.GetYaxis().SetTitleSize(tsize)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetBottomMargin(bmargin)
+   ROOT.gPad.SetLeftMargin(lmargin)
+   ROOT.gPad.SetRightMargin(0)
+   hx2.SetMinimum(Min)
+   hx2.SetMaximum(Max)
+
+   canvas.Update()
+   graphPad.cd(5)
+   if logz: ROOT.gPad.SetLogz(1)
+   hy2.Draw('col')
+   hy2.GetXaxis().SetTitle("X")
+   hy2.GetYaxis().SetTitle("Z")
+   hy2.GetYaxis().CenterTitle()
+   hy2.GetXaxis().SetLabelSize(lsize)
+   hy2.GetYaxis().SetLabelSize(lsize)
+   hy2.GetXaxis().SetTitleSize(tsize)
+   hy2.GetYaxis().SetTitleSize(tsize)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetBottomMargin(bmargin)
+   ROOT.gPad.SetLeftMargin(lmargin)
+   ROOT.gPad.SetRightMargin(0)
+   hy2.SetMinimum(Min)
+   hy2.SetMaximum(Max)
+
+   canvas.Update()
+   graphPad.cd(6)
+   if logz: ROOT.gPad.SetLogz(1)
+   hz2.Draw(opt)
+   hz2.GetXaxis().SetTitle("X")
+   hz2.GetYaxis().SetTitle("Y")
+   hz2.GetYaxis().CenterTitle()
+   hz2.GetXaxis().SetLabelSize(lsize)
+   hz2.GetYaxis().SetLabelSize(lsize)
+   hz2.GetZaxis().SetLabelSize(lsize)
+   hz2.GetXaxis().SetTitleSize(tsize)
+   hz2.GetYaxis().SetTitleSize(tsize)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetTopMargin(tmargin)
+   ROOT.gPad.SetBottomMargin(bmargin)
+   ROOT.gPad.SetLeftMargin(lmargin)
+   ROOT.gPad.SetRightMargin(rmargin)
+   hz2.SetMinimum(Min)
+   hz2.SetMaximum(Max)
+   canvas.Update()
+
+   canvas.Update()
+   canvas.Print(out_file + '.pdf')
+   canvas.Print(out_file + '.C')
 
 def PlotEventFixed(event, energy, out_file, n, opt="", label="", log=0):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make

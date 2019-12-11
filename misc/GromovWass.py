@@ -13,8 +13,11 @@ import numpy.core.umath_tests as umath
 import time
 import math
 import ROOT
+from scipy.stats import wasserstein_distance as wass
+import ot
+import scipy as sp
 
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
+if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
     tlab = True
 else:
     tlab= False
@@ -28,34 +31,30 @@ import utils.GANutils as gan
 sys.path.insert(0,'../')
 
 def main():
-    # All of the following needs to be adjusted
-    from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_gan_training_Pi0_2_500GeV_decay_p001/params_generator*.hdf5'
+    from AngleArch3dGAN import generator
+    weightdir= '3dgan_weights_gan_training_epsilon_2_500GeV/params_generator*.hdf5'
     if tlab:
-      #datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
-      datapath = '/gkhattak/data/*100GeV/*.h5'
+      datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
       genpath = '/gkhattak/weights/' + weightdir
     else:
       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
-    datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
-    #datapath = '/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5' 
+    #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate 
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results_gan_training/' # plot directory
+    plotsdir = 'results/optimization_gw_2_500' # plot directory
     particle = "Ele" 
     scale = 1
     threshold = 0
     ang = 1
     concat=2
     power=0.85
-    latent = 256
-    g= generator(latent_size=latent)
+    g= generator(latent_size=256)
     start = 0
-    stop = 30
+    stop = 120
     gen_weights=[]
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
-    energies =[110, 150, 120]
+    
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
@@ -66,11 +65,13 @@ def main():
       num = int(filter(str.isdigit, name)[:-1])
       epoch.append(num)
     print("{} weights are found".format(len(gen_weights)))
+
     result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle
-            , scale, power=power, thresh=threshold, ang=ang, concat=concat, latent=latent
-            , preproc = taking_power, postproc=inv_power, energies=energies
+                        , scale, power=power, thresh=threshold, ang=ang, concat=concat
+            , preproc = taking_power, postproc=inv_power
              )
-    PlotResultsRoot(result, plotsdir, start, epoch, fits, ang=ang)
+    print(result)
+    PlotResultsRoot(result, plotsdir, start, epochs=epoch, fits=fits, ang=ang)
 
 def sqrt(n, scale=1):
     return np.sqrt(n * scale)
@@ -84,118 +85,51 @@ def taking_power(n, xscale=1, power=1):
 def inv_power(n, xscale=1, power=1.):
     return np.power(n, 1./power)/xscale
         
+def normalize(array):
+    mina = np.amin(array)
+    maxa = np.amax(array)
+    return (array - mina)/(maxa - mina)
 
 #Plots results in a root file
 def PlotResultsRoot(result, resultdir, start, epochs, fits, ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
-    c1.SetGrid ()
-    legend = ROOT.TLegend(.5, .6, .9, .9)
-    legend.SetTextSize(0.028)
-    mg=ROOT.TMultiGraph()
-    color1 = 2
-    color2 = 8
-    color3 = 4
-    color4 = 6
-    color5 = 7
-    num = len(result)
-    total = np.zeros((num))
-    energy_e = np.zeros((num))
-    mmt_e = np.zeros((num))
-    ang_e = np.zeros((num))
-    sf_e  = np.zeros((num))
-    epoch = np.zeros((num))
-      
-    mine = 100
-    minm = 100
-    mint = 100
-    mina = 100
-    mins = 100
-    for i, item in enumerate(result):
-      epoch[i] = epochs[i]  
-      total[i]=item[0]
-      mmt_e[i]=item[1]
-      energy_e[i]=item[2]
-      sf_e[i]=item[3]
-      if item[0]< mint:
-         mint = item[0]
-         mint_n = epoch[i]
-      if item[1]< minm:
-         minm = item[1]
-         minm_n = epoch[i]
-      if item[2]< mine:
-         mine = item[2]
-         mine_n = epoch[i]
-      if item[3]< mins:
-         mins = item[3]
-         mins_n = epoch[i]
-      if ang:
-         ang_e[i]=item[4]
-         if item[4]< mina:
-           mina = item[4]
-           mina_n = epoch[i]
-                               
-    gt  = ROOT.TGraph( num- start , epoch[start:], total[start:] )
-    gt.SetLineColor(color1)
-    mg.Add(gt)
-    legend.AddEntry(gt, "Total error min = {:.4f} (epoch {})".format(mint, mint_n), "l")
-    ge = ROOT.TGraph( num- start , epoch[start:], energy_e[start:] )
-    ge.SetLineColor(color2)
-    legend.AddEntry(ge, "Energy error min = {:.4f} (epoch {})".format(mine, mine_n), "l")
-    mg.Add(ge)
-    gm = ROOT.TGraph( num- start , epoch[start:], mmt_e[start:])
-    gm.SetLineColor(color3)
-    mg.Add(gm)
-    legend.AddEntry(gm, "Moment error  = {:.4f} (epoch {})".format(minm, minm_n), "l")
-    c1.Update()
-    gs = ROOT.TGraph( num- start , epoch[start:], sf_e[start:])
-    gs.SetLineColor(color4)
-    mg.Add(gs)
-    legend.AddEntry(gs, "Sampling Fraction error  = {:.4f} (epoch {})".format(mins, mins_n), "l")
-    c1.Update()
-                    
-    if ang:
-      ga = ROOT.TGraph( num- start , epoch[start:], ang_e[start:])
-      ga.SetLineColor(color5)
-      mg.Add(ga)
-      legend.AddEntry(ga, "Angle error  = {:4f} (epoch {})".format(mina, mina_n), "l")
-      c1.Update()
-                    
-    mg.SetTitle("Optimization function: Mean Relative Error on shower shapes, moment and sampling fraction;Epochs;Error")
-    mg.Draw('ALP')
-    mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(total))
+    legend = ROOT.TLegend(.5, .75, .9, .9)
+    color = [2, 8, 4, 6, 7]
+    minr = 100
+    l=len(epochs)
+    ep=np.zeros((l))
+    res= np.zeros((l))
+    minr_n = epochs[0]
+    for i, epoch in enumerate(epochs):      
+      if result[i]< minr:
+         minr = result[i]
+         minr_n = epoch
+      ep[i]=epoch
+      res[i]=result[i]
+    print(ep)
+    print(res)
+    gw  = ROOT.TGraph(l , ep, res )
+    gw.SetLineColor(color[0])
+    legend.SetHeader('Smoothing(avg 5)', 'C')
+    legend.AddEntry(gw, "Min Loss {:.4f} (epoch {})".format(minr, minr_n), "l")
+    gw.SetTitle("Optimization function: Entropic Gromov Wasserstein;Epochs;loss")
+    gw.Draw('ALP')
     c1.Update()
     legend.Draw()
     c1.Update()
     c1.Print(os.path.join(resultdir, "result.pdf"))
 
-    fits = ['pol1', 'pol2', 'expo']
+    fits = []#['pol1', 'pol2', 'expo']
     for i, fit in enumerate(fits):
-      mg.SetTitle("Optimization function: Mean Relative Error on shower sahpes, moments and sampling fraction({} fit);Epochs;Error".format(fit))  
-      gt.Fit(fit)
-      gt.GetFunction(fit).SetLineColor(color1)
-      gt.GetFunction(fit).SetLineStyle(2)
-    
-      ge.Fit(fit)
-      ge.GetFunction(fit).SetLineColor(color2)
-      ge.GetFunction(fit).SetLineStyle(2)
-            
-      gm.Fit(fit)
-      gm.GetFunction(fit).SetLineColor(color3)
-      gm.GetFunction(fit).SetLineStyle(2)
-
-      gs.Fit(fit)
-      gs.GetFunction(fit).SetLineColor(color4)
-      gs.GetFunction(fit).SetLineStyle(2)
-
+      gw.Fit(fit)
+      gw.GetFunction(fit).SetLineColor(color[i])
+      gw.GetFunction(fit).SetLineStyle(2)
       if i == 0:
-        legend.AddEntry(gt.GetFunction(fit), 'Total fit', "l")
-        legend.AddEntry(ge.GetFunction(fit), 'Energy fit', "l")
-        legend.AddEntry(gm.GetFunction(fit), 'Moment fit', "l")  
-        legend.AddEntry(gs.GetFunction(fit), 'S. Fr. fit', "l")
+        legend.AddEntry(gt.GetFunction(fit), 'fit', "l")
       legend.Draw()
       c1.Update()
       c1.Print(os.path.join(resultdir, "result_{}.pdf".format(fit)))
-    print ('The plot is saved to {}'.format(resultdir))
+      print ('The plot is saved to {}'.format(resultdir))
 
 def preproc(n, scale=1):
     return n * scale
@@ -203,29 +137,59 @@ def preproc(n, scale=1):
 def postproc(n, scale=1):
     return n/scale
         
+def norm(x, min_val, max_val):
+    return (x-min_val)/(max_val-min_val)
+
+def moving_average(iterable, n=5):
+    d = deque(maxlen=n)
+    for i in iterable:
+        d.append(i)
+        if len(d) == n:
+            yield sum(d)/n
+
+def moving_avg(result, num=5):
+    avg =[]
+    for i, r in enumerate(result):
+        if i==0:
+           avg.append(r)
+        elif i < num:
+           cumsum = np.sum(np.array(result[:i+1]))
+           avg.append(cumsum/(i + 1))
+        else:
+           cumsum = np.sum(np.array(result[i-num:i]))
+           avg.append(cumsum/num)
+    return avg
+                                     
 # results are obtained using metric and saved to a log file
-def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, latent = 256, preproc=preproc, postproc=postproc, energies=[110, 150, 190]):
+def GetResults(metric, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc):
     resultfile = os.path.join(resultdir,  'result_log.txt')
     file = open(resultfile,'w')
     result = []
     for i in range(len(gen_weights)):
        if i==0:
-         result.append(analyse(g, False,True, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, latent=latent, postproc=postproc, energies=energies)) # For the first time when sorted data is not saved we can make use opposite flags
+         res = analyse(g, False, True, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc)
        else:
-         result.append(analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, latent=latent, postproc=postproc, energies=energies))
+         res = analyse(g, True, False, gen_weights[i], datapath, sorted_path, metric, scale, power, particle, thresh=thresh, ang=ang, concat=concat, postproc=postproc)
+       if np.isnan(res):
+         if len(result) > 0:
+           res = result[-1]
+       else:
+           res=0
+          
+       result.append(res)
        #file.write(len(result[i]) * '{:.4f}\t'.format(*result[i]))
-       file.write('\t'.join(str(r) for r in result[i]))
+       file.write('\t'.join(str(result[i])))
        file.write('\n')
                   
     #print all results together at end                                                                               
     for i in range(len(gen_weights)):                                                                                            
        print ('The results for ......',gen_weights[i])
-       print (" The result for {} = ",)
-       print ('\t'.join(str(r) for r in result[i]))
-       print ('\n')
+       print (result[i])
     file.close
-    print ('The results are saved to {}.txt'.format(resultfile))
-    return result
+    smooth = np.array(moving_avg(result))
+    
+    print ('The results are saved to {}'.format(resultfile))
+    return smooth
 
 # If reduced data is to be used in analyse function the line:
 #   var = ang.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
@@ -253,16 +217,19 @@ def postproc(n, scale=1):
     return n/scale
 
 # This function will calculate two errors derived from position of maximum along an axis and the sum of ecal along the axis
-def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, latent = 256, concat=1, preproc=preproc, postproc=postproc, energies=[110, 150, 190]):
+def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, concat=1, preproc=preproc, postproc=postproc):
    print ("Started")
    num_events=2000
    num_data = 140000
    ascale = 1
    Test = True
+   latent= 256
    m = 2
    var = {}
+   energies = [0]#, 150, 190]
+   #energies = [50, 100, 200, 300, 400]
    sorted_path= sorted_path 
-   
+   #g =generator(latent)
    if read_data:
      start = time.time()
      var = gan.load_sorted(sorted_path + "/*.h5", energies, ang = ang)
@@ -275,6 +242,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      else:
        data_files = Trainfiles + Testfiles
      start = time.time()
+     #energies = [50, 100, 200, 250, 300, 400, 500]
      var = gan.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
      data_time = time.time() - start
      print ("{} events were loaded in {} seconds".format(num_data, data_time))
@@ -312,65 +280,47 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      if ang:
         calc["mtheta_act"+ str(energy)]= measPython(var["events_act" + str(energy)])
         calc["mtheta_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
-
-     calc["sf_act" + str(energy)] = np.divide(var["ecal_act"+ str(energy)], var["energy"+ str(energy)])
-     calc["sf_gan" + str(energy)] = np.divide(var["ecal_gan"+ str(energy)], var["energy"+ str(energy)])
-   return optimizer(calc, energies, m, x, y, z, ang=ang)                                        
+     calc["sf_act" + str(energy)] = np.divide(var["ecal_act"+ str(energy)], np.reshape(var["energy"+ str(energy)], (-1, 1)))
+     calc["sf_gan" + str(energy)] = np.divide(var["ecal_gan"+ str(energy)], np.reshape(var["energy"+ str(energy)], (-1, 1)))
+   return optimizer(calc, energies, m, x=x, y=y, z=z, ang=ang)                                        
  
 def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
    metricp = 0
    metrice = 0
    metrica = 0
    metrics = 0
-   cut =0
-   for energy in energies:
-     #Relative error on mean moment value for each moment and each axis
-     x_act= np.mean(var["momentX_act"+ str(energy)], axis=0)
-     x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
-     x_gan= np.mean(var["momentX_gan"+ str(energy)], axis=0)
-     y_act= np.mean(var["momentY_act"+ str(energy)], axis=0)
-     y_gan= np.mean(var["momentY_gan"+ str(energy)], axis=0)
-     z_act= np.mean(var["momentZ_act"+ str(energy)], axis=0)
-     z_gan= np.mean(var["momentZ_gan"+ str(energy)], axis=0)
-     var["posx_error"+ str(energy)]= (x_act - x_gan)/x_act
-     var["posy_error"+ str(energy)]= (y_act - y_gan)/y_act
-     var["posz_error"+ str(energy)]= (z_act - z_gan)/z_act
-     #Taking absolute of errors and adding for each axis then scaling by 3
-     var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
-     #Summing over moments and dividing for number of moments
-     var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
-     metricp += var["pos_total"+ str(energy)]
-     #Take profile along each axis and find mean along events
-     sumxact, sumyact, sumzact = np.mean(var["sumsx_act" + str(energy)], axis=0), np.mean(var["sumsy_act" + str(energy)], axis=0), np.mean(var["sumsz_act" + str(energy)], axis=0)
-     sumxgan, sumygan, sumzgan = np.mean(var["sumsx_gan" + str(energy)], axis=0), np.mean(var["sumsy_gan" + str(energy)], axis=0), np.mean(var["sumsz_gan" + str(energy)], axis=0)
-     var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
-     var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
-     var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
-     #Take absolute of error and mean for all events
-     var["eprofilex_total"+ str(energy)]= np.sum(np.absolute(var["eprofilex_error"+ str(energy)][cut:x-cut]))/(x-(2*cut))
-     var["eprofiley_total"+ str(energy)]= np.sum(np.absolute(var["eprofiley_error"+ str(energy)][cut:y-cut]))/(y-(2*cut))
-     var["eprofilez_total"+ str(energy)]= np.sum(np.absolute(var["eprofilez_error"+ str(energy)]))/z
-     
-     var["eprofile_total"+ str(energy)]= (var["eprofilex_total"+ str(energy)] + var["eprofiley_total"+ str(energy)] + var["eprofilez_total"+ str(energy)])/3
-     metrice += var["eprofile_total"+ str(energy)]
-     if ang:
-        var["angle_error"+ str(energy)] = np.mean(np.absolute((var["mtheta_act" + str(energy)] - var[ "mtheta_gan" + str(energy)])/var["mtheta_act" + str(energy)]))
-        metrica += var["angle_error"+ str(energy)]
-     #sampling fraction relative error
-     mean_sf_g4 = np.mean(var["sf_act"+ str(energy)])
-     mean_sf_gan = np.mean(var["sf_gan"+ str(energy)])
-     sf_error = np.absolute(np.divide(mean_sf_g4 - mean_sf_gan, mean_sf_g4))
-     metrics +=sf_error
-   metricp = metricp/len(energies)
-   metrice = metrice/len(energies)
-   metrics = metrics/len(energies)
-   if ang:metrica = metrica/len(energies)
-   tot = metricp + metrice + metrics
-   if ang:tot = tot +metrica
-   result = [tot, metricp, metrice, metrics]
-   if ang: result.append(metrica)
-   print("Result =", result)
-   return result
+         
+   for i, energy in enumerate([energies[0]]):
+     if i==0:
+         moment_act=np.hstack((var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]))
+         shapes_act = np.hstack((var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)]))
+         if ang: angles_act= np.reshape(var["mtheta_act" + str(energy)], (-1, 1))
+         sampfr_act = np.reshape(var["sf_act"+ str(energy)], (-1, 1))
+         moment_gan=np.hstack((var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)]))
+         shapes_gan = np.hstack((var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)]))
+         if ang: angles_gan= np.reshape(var["mtheta_gan" + str(energy)], (-1, 1))
+         sampfr_gan = np.reshape(var["sf_gan"+ str(energy)], (-1, 1))
+     metric_act = np.hstack((moment_act, shapes_act, angles_act, sampfr_act))
+     metric_gan = np.hstack((moment_gan, shapes_gan, angles_gan, sampfr_gan))
+
+     metric_a = np.transpose(metric_act)
+     metric_g = np.transpose(metric_gan)
+     a = (0.25 /127.)* np.ones(127)
+     b = (0.25/6.) *np.ones(6)
+     c = 0.25 *np.ones(2)
+  
+     p = np.concatenate((a, b, c))
+     q = np.concatenate((a, b, c))
+     C1 = sp.spatial.distance.cdist(metric_a, metric_a, 'correlation')
+     C2 = sp.spatial.distance.cdist(metric_g, metric_g, 'correlation')
+ 
+     C1 = C1/np.amax(C1)
+     C2 = C2/np.amax(C2)
+     #gw0, log0 = ot.gromov.gromov_wasserstein(C1, C2, p, q, 'square_loss', verbose=True, log=True)
+     #gw, log = ot.gromov.entropic_gromov_wasserstein(C1, C2, p, q, 'kl_loss', epsilon=5e-2, log=True, verbose=True)
+     gw, log = ot.gromov.entropic_gromov_wasserstein(C1, C2, p, q, 'square_loss', epsilon=5e-2, log=True, verbose=True)
+     print('Gromov-Wasserstein distances: ' + str(log['gw_dist']))
+   return log['gw_dist']
 
 def measPython(image): # Working version:p1 and p2 are not used. 3D angle with barycenter as reference point
     image = np.squeeze(image)
@@ -433,4 +383,4 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     return ang
 
 if __name__ == "__main__":
-   main()
+    main()

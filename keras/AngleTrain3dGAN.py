@@ -122,13 +122,13 @@ def main():
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--nbepochs', action='store', type=int, default=240, help='Number of epochs to train for.')
+    parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path1', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
     parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
-    parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
+    parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
     parser.add_argument('--xpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
@@ -147,7 +147,7 @@ def get_parser():
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--name', action='store', type=str, default='gan_training_test', help='Unique identifier can be set for each training')
+    parser.add_argument('--name', action='store', type=str, default='gan_training', help='Unique identifier can be set for each training')
     return parser
 
 # A histogram fucntion that counts cells in different bins
@@ -167,18 +167,25 @@ def hist_count(x, p=1.0, daxis=(1, 2, 3)):
     return bins
 
 #get data for training
-def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=4):
+def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    ang = np.array(f.get(angtype))
     X=np.array(f.get('ECAL'))* xscale
     Y=np.array(f.get('energy'))/yscale
     X[X < thresh] = 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
-    ang = ang.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
+    indexes = np.where(ecal > 10.0)
+    X=X[indexes]
+    Y=Y[indexes]
+    if angtype in f:
+      ang = np.array(f.get(angtype))[indexes]
+    else:
+      ang = gan.measPython(X)
     X = np.expand_dims(X, axis=daxis)
+    ecal=ecal[indexes]
+    ecal=np.expand_dims(ecal, axis=daxis)
     if xpower !=1.:
         X = np.power(X, xpower)
     return X, Y, ang, ecal

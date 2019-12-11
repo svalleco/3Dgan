@@ -372,9 +372,14 @@ def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
     ang = np.array(f.get(angtype))
     ang = ang + offset
     X[X < thresh] = 0
-    X = np.expand_dims(X, axis=-1)
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
+    ecal = np.sum(X, axis=(1, 2, 3))
+    indexes = np.where(ecal > 10.0)
+    X=X[indexes]
+    Y=Y[indexes]
+    ang=ang[indexes]
+    X = np.expand_dims(X, axis=-1)
     return X, Y, ang 
 
 # Get sorted data for variable angle
@@ -630,7 +635,7 @@ def preproc(n, xscale=1):
 def postproc(n, xscale=1):
     return n/xscale
 
-def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, xpowers, angscales, dscale, flags, latent, particle='Ele', Data=GetAngleData, events_per_file=5000, angtype='theta', thresh=1e-6, offset=0.0, angloss=1, addloss=0, concat=1, pre=preproc, post=postproc, tolerance2 = 0.1):
+def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datapath, sortdir, gendirs, discdirs, num_data, num_events, m, xscales, xpowers, angscales, dscale, flags, latent, particle='Ele', Data=GetAngleData, events_per_file=5000, angtype='theta', thresh=1e-6, offset=0.0, angloss=1, addloss=0, concat=1, pre=preproc, post=postproc, tolerance2 = 0.1, num_events1=10000):
     sortedpath = os.path.join(sortdir, 'events_*.h5')
     print( flags)
     # assign values to flags that decide if data is to be read from dataset or pre binned data
@@ -644,7 +649,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
     save_disc = flags[5]
     read_disc =  flags[6]
     var= {}
-    num_events1= 10000
+    num_events1= num_events1
     num_events2 = num_events
     ang =1
 
