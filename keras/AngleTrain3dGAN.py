@@ -125,7 +125,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=240, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path4', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path1', help='HDF5 files to train from.')
     parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
     parser.add_argument('--nEvents', action='store', type=int, default=200000, help='Maximum Number of events used for Training')
@@ -147,7 +147,7 @@ def get_parser():
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--name', action='store', type=str, default='gan_training_epsilon_2_500GeV', help='Unique identifier can be set for each training')
+    parser.add_argument('--name', action='store', type=str, default='gan_training_test', help='Unique identifier can be set for each training')
     return parser
 
 # A histogram fucntion that counts cells in different bins
@@ -300,12 +300,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
             file_index +=1
             # Generate Fake events with same energy and angle as data batch
-            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
             # Train discriminator first on real batch and then the fake batch
-            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
             #if ecal sum has 100% loss(generating empty events) then end the training 
             if fake_batch_loss[3] == 100.0 and index >10:
@@ -320,11 +320,11 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
             
-            trick = np.ones(batch_size)
+            trick = np.ones(batch_size).astype(np.float32)
             gen_losses = []
             # Train generator twice using combined model
             for _ in range(2):
-                noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+                noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
                 generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
@@ -378,12 +378,12 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
            file_index +=1
            # Generate fake events                                                            
-           noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+           noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
            generated_images = generator.predict(generator_ip, verbose=False)
            # concatenate to fake and real batches
            X = np.concatenate((image_batch, generated_images))
-           y = np.array([1] * batch_size + [0] * batch_size)
+           y = np.array([1] * batch_size + [0] * batch_size).astype(np.float32)
            ang = np.concatenate((ang_batch, ang_batch))
            ecal = np.concatenate((ecal_batch, ecal_batch))
            aux_y = np.concatenate((energy_batch, energy_batch), axis=0)
