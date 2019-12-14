@@ -27,7 +27,9 @@ import math
 import tensorflow as tf
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 import analysis.utils.GANutils as gan
+from AngleArch3dGAN_tf import generator, discriminator
 tlab= False
+
 
 def GetDataAngle(FileSearch, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
 
@@ -41,6 +43,7 @@ def GetDataAngle(FileSearch, xscale =1, xpower=1, yscale = 100, angscale=1, angt
     X_train = X_train.astype(np.float32)
     Y_train = Y_train.astype(np.float32)
     ecal_train = np.sum(X_train, axis=(1, 2, 3))
+    ecal_train = ecal_train.astype(np.float32)
     indexes = np.where(ecal_train > 10.0)
     X_train=X_train[indexes]
     Y_train=Y_train[indexes]
@@ -83,7 +86,13 @@ def GetDataAngle(FileSearch, xscale =1, xpower=1, yscale = 100, angscale=1, angt
       Y_train=np.concatenate((Y_train,Y))
       ang_train=np.concatenate((ang_train,ang))
       ecal_train=np.concatenate((ecal_train,ecal))
-    return X_train, [Y_train, ang_train, ecal_train]
+    X_train = X_train.astype(np.float32)
+    Y_train = Y_train.astype(np.float32)
+    ecal_train = ecal_train.astype(np.float32)
+    ang_train = ang_train.astype(np.float32)
+    ecal_train=ecal_train.squeeze()
+    return X_train, np.stack([Y_train, ang_train, ecal_train], axis=1)
+
 
 
    
@@ -172,7 +181,7 @@ def get_parser():
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
     parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
-    parser.add_argument('--dformat', action='store', type=str, default='channels_last')
+    parser.add_argument('--dformat', action='store', type=str, default='channels_first')
     parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
@@ -207,15 +216,17 @@ def hist_count(x, p=1.0, daxis=(1, 2, 3)):
     bin5 = np.sum(np.where((x<(limits[3])) & (x>(limits[4])), 1, 0), axis=daxis)
     bin6 = np.sum(np.where((x<(limits[4])) & (x>(limits[5])), 1, 0), axis=daxis)
     bin7 = np.sum(np.where((x<(limits[5])) & (x>0.), 1, 0), axis=daxis)
-    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
+    bin8 = np.empty(bin7.shape)
+    if (np.where(x==0.,1,0) >0):
+      bin8 = np.sum(np.where(x==0., 1, 0), axis=daxis)
+    
     bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
     bins[np.where(bins==0)]=1 # so that an empty bin will be assigned a count of 1 to avoid unstability
     return bins
 
 
-def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=256, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=256, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_first', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
-    from AngleArch3dGAN_tf import generator, discriminator
     f = [0.9, 0.1] # train, test fractions 
     loss_ftn = hist_count # function used for additional loss
     
@@ -227,52 +238,57 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
        daxis=1 # channel axis
        daxis2=(2, 3, 4) # axis for sum
 
-    #resolver = tf.contrib.cluster_resolver.TPUClusterResolver('grpc://' + os.environ['COLAB_TPU_ADDR'])
-    iterations =100
-    num_shards =200
- 
-    resolver = tf.contrib.cluster_resolver.TPUClusterResolver(tpu_name)
+
+    XX,YY=GetDataAngle(datapath)
+    nb_batches = XX.shape[0]/batch_size
+
+    #nb_train_batches = int(nb_Train/batch_size)
+    #nb_test_batches = int(nb_Test/batch_size)
+    train_history = defaultdict(list)
+    test_history = defaultdict(list)
+    init_time = time.time()- start_init
+    analysis_history = defaultdict(list)
+    print('Initialization time is {} seconds'.format(init_time))
     
-    #run_config = tf.contrib.tpu.RunConfig(
-    #  cluster=resolver,
-    #  model_dir=WeightsDir,
-    #  session_config=tf.ConfigProto(
-    #      allow_soft_placement=True, log_device_placement=True),
-    #  tpu_config=tf.contrib.tpu.TPUConfig(iterations, num_shards),
-    #)
+    train_dataset = tf.data.Dataset.from_tensor_slices((XX, YY))
+    SHUFFLE_BUFFER_SIZE = 100 
+    train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER_SIZE).batch(batch_size)
+
+    resolver = tf.contrib.cluster_resolver.TPUClusterResolver(tpu_name)
     tf.contrib.distribute.initialize_tpu_system(resolver)
     strategy = tf.contrib.distribute.TPUStrategy(resolver)
 
     with strategy.scope():
-       generator=generator(latent_size,dformat=dformat)
-       discriminator=discriminator(xpower, dformat=dformat)
+
+      generator=generator(latent_size,dformat=dformat)
+      discriminator=discriminator(xpower, dformat=dformat)
 
        # build the discriminator
-       print('[INFO] Building discriminator')
-       discriminator.compile(
-          optimizer=tf.keras.optimizers.RMSprop(lr),
-          loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-          loss_weights=loss_weights
-       )
+      print('[INFO] Building discriminator')
+      discriminator.compile(
+        optimizer=tf.keras.optimizers.RMSprop(lr),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=loss_weights
+      )
 
-       # build the generator
-       print('[INFO] Building generator')
-       generator.compile(
-          optimizer=tf.keras.optimizers.RMSprop(lr),
-          loss='binary_crossentropy'
-       )
+      # build the generator
+      print('[INFO] Building generator')
+      generator.compile(
+        optimizer=tf.keras.optimizers.RMSprop(lr),
+        loss='binary_crossentropy'
+      )
  
-       # build combined Model
-       latent = tf.keras.layers.Input(shape=(latent_size, ), name='combined_z')   
-       fake_image = generator( latent)
-       discriminator.trainable = False
-       fake, aux, ang, ecal, add_loss= discriminator(fake_image)
-       combined = tf.keras.models.Model([latent], [fake, aux, ang, ecal, add_loss])
-       combined.compile(
-          optimizer=tf.keras.optimizers.RMSprop(lr),
-          loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-          loss_weights=loss_weights
-       )
+      # build combined Model
+      latent = tf.keras.layers.Input(shape=(latent_size, ), name='combined_z')   
+      fake_image = generator( latent)
+      discriminator.trainable = False
+      fake, aux, ang, ecal, add_loss= discriminator(fake_image)
+      combined = tf.keras.models.Model([latent], [fake, aux, ang, ecal, add_loss])
+      combined.compile(
+        optimizer=tf.keras.optimizers.RMSprop(lr),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=loss_weights
+      )
 
     if warm:
         generator.load_weights(prev_gweights)
@@ -281,24 +297,6 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
         print('Discriminator initialized from {}'.format(prev_dweights))
 
 
-
-    XX,YY=GetDataAngle(datapath)
-
-
-
-    #nb_train_batches = int(nb_Train/batch_size)
-    #nb_test_batches = int(nb_Test/batch_size)
-    print('The max train batches is {}  while max test batches is {}'.format(nb_train_batches, nb_test_batches))  
-    train_history = defaultdict(list)
-    test_history = defaultdict(list)
-    init_time = time.time()- start_init
-    analysis_history = defaultdict(list)
-    print('Initialization time is {} seconds'.format(init_time))
-    
-     
-    train_dataset = tf.data.Dataset.from_tensor_slices((XX, YY))
-    SHUFFLE_BUFFER_SIZE = 100 
-    train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER_SIZE).batch(batch_size)
     # Start training
     for epoch in range(nb_epochs):
         epoch_start = time.time()
@@ -317,16 +315,19 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
                     print('processed {} batches'.format(index + 1))
             it_batched_train = next (iter_train_dataset)    
             # Get a single batch    
+  
             image_batch = it_batched_train[0]
-            Y_label_batch = it_batched_train[1] 
-            energy_batch = Y_label_batch[0]
-            ecal_batch = Y_label_batch[1]
-            ang_batch = Y_label_batch[1]
+            Y_label_batch = it_batched_train[1]
+            energy_batch = Y_label_batch[:,0]
+            ang_batch = Y_label_batch[:,1]
+            ecal_batch = Y_label_batch[:,2]
+
+
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
             # Generate Fake events with same energy and angle as data batch
             noise = np.random.normal(0, 1, (batch_size, latent_size-2))
             noise = noise.astype(np.float32) 
-            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
+            generator_ip = np.concatenate((tf.reshape(energy_batch, [-1, 1]), tf.reshape(ang_batch,[-1, 1]), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
             # Train discriminator first on real batch and then the fake batch
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
