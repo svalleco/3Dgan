@@ -27,7 +27,6 @@ import math
 import tensorflow as tf
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 import analysis.utils.GANutils as gan
-from AngleArch3dGAN_tf import generator, discriminator
 tlab= False
 
 
@@ -227,6 +226,7 @@ def hist_count(x, p=1.0, daxis=(1, 2, 3)):
 
 def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=256, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_first', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
+    from AngleArch3dGAN_tf import generator, discriminator
     f = [0.9, 0.1] # train, test fractions 
     loss_ftn = hist_count # function used for additional loss
     
@@ -237,6 +237,45 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
     else:
        daxis=1 # channel axis
        daxis2=(2, 3, 4) # axis for sum
+
+ 
+    
+    generator=generator(latent_size,dformat=dformat)
+    discriminator=discriminator(xpower, dformat=dformat)
+
+    # build the discriminator
+    print('[INFO] Building discriminator')
+    discriminator.compile(
+        optimizer=tf.keras.optimizers.RMSprop(lr),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=loss_weights
+    )
+
+    # build the generator
+    print('[INFO] Building generator')
+    generator.compile(
+       optimizer=tf.keras.optimizers.RMSprop(lr),
+       loss='binary_crossentropy'
+    )
+ 
+    # build combined Model
+    latent = tf.keras.layers.Input(shape=(latent_size, ), name='combined_z')   
+    fake_image = generator( latent)
+    discriminator.trainable = False
+    fake, aux, ang, ecal, add_loss= discriminator(fake_image)
+    combined = tf.keras.models.Model([latent], [fake, aux, ang, ecal, add_loss])
+    combined.compile(
+        optimizer=tf.keras.optimizers.RMSprop(lr),
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=loss_weights
+    )
+
+    if warm:
+        generator.load_weights(prev_gweights)
+        print('Generator initialized from {}'.format(prev_gweights))
+        discriminator.load_weights(prev_dweights)
+        print('Discriminator initialized from {}'.format(prev_dweights))
+
 
 
     XX,YY=GetDataAngle(datapath)
@@ -253,50 +292,6 @@ def Gan3DTrainAngle(tpu_name, datapath, nEvents, WeightsDir, pklfile, nb_epochs=
     train_dataset = tf.data.Dataset.from_tensor_slices((XX, YY))
     SHUFFLE_BUFFER_SIZE = 100 
     train_dataset = train_dataset.shuffle(SHUFFLE_BUFFER_SIZE).batch(batch_size)
-
-    resolver = tf.contrib.cluster_resolver.TPUClusterResolver(tpu_name)
-    tf.contrib.distribute.initialize_tpu_system(resolver)
-    strategy = tf.contrib.distribute.TPUStrategy(resolver)
-
-    with strategy.scope():
-
-      generator=generator(latent_size,dformat=dformat)
-      discriminator=discriminator(xpower, dformat=dformat)
-
-       # build the discriminator
-      print('[INFO] Building discriminator')
-      discriminator.compile(
-        optimizer=tf.keras.optimizers.RMSprop(lr),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=loss_weights
-      )
-
-      # build the generator
-      print('[INFO] Building generator')
-      generator.compile(
-        optimizer=tf.keras.optimizers.RMSprop(lr),
-        loss='binary_crossentropy'
-      )
- 
-      # build combined Model
-      latent = tf.keras.layers.Input(shape=(latent_size, ), name='combined_z')   
-      fake_image = generator( latent)
-      discriminator.trainable = False
-      fake, aux, ang, ecal, add_loss= discriminator(fake_image)
-      combined = tf.keras.models.Model([latent], [fake, aux, ang, ecal, add_loss])
-      combined.compile(
-        optimizer=tf.keras.optimizers.RMSprop(lr),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-        loss_weights=loss_weights
-      )
-
-    if warm:
-        generator.load_weights(prev_gweights)
-        print('Generator initialized from {}'.format(prev_gweights))
-        discriminator.load_weights(prev_dweights)
-        print('Discriminator initialized from {}'.format(prev_dweights))
-
-
     # Start training
     for epoch in range(nb_epochs):
         epoch_start = time.time()
