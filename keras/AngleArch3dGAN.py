@@ -109,13 +109,25 @@ def discriminator(power=1.0, dformat='channels_last'):
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
-    #x = ZeroPadding2D((1, 1))(x)
+    x = ZeroPadding2D((1, 1))(x)
     x = SeparableConv2D(8, (5, 5), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
-    #x = ZeroPadding2D((1, 1))(x)
+    x = ZeroPadding2D((1, 1))(x)
+    x = SeparableConv2D(8, (5, 5), padding='valid')(x)
+    x = LeakyReLU()(x)
+    x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
+    x = Dropout(0.2)(x)
+
+    x = ZeroPadding2D((1, 1))(x)
+    x = SeparableConv2D(8, (5, 5), padding='valid')(x)
+    x = LeakyReLU()(x)
+    x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
+    x = Dropout(0.2)(x)
+
+    x = ZeroPadding2D((1, 1))(x)
     x = SeparableConv2D(8, (5, 5), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
@@ -160,12 +172,20 @@ def generator(latent_size=256, return_intermediate=False, dformat='channels_last
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
         
+        SeparableConv2D(8, (6, 6), padding='same', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+
         #ZeroPadding2D((2, 2)),
         SeparableConv2D(8, (6, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
         ####################################### added layers 
         
+        SeparableConv2D(8, (4, 4), padding='same', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+
         #ZeroPadding2D((2, 2)),
         SeparableConv2D(8, (4, 4), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
