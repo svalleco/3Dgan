@@ -367,9 +367,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             ecal_batch = next(ecal_batches)
             ang_batch = next(ang_batches)
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
-            noise = np.random.normal(0, 1, (batch_size, latent_size-1))
-            noise = np.multiply(energy_batch.reshape(-1, 1), noise) # Same energy as G4
-            generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1)
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
   
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
@@ -391,8 +390,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             gen_losses = []
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size-1))
-                noise = np.multiply(energy_batch.reshape(-1, 1), noise)
-                generator_ip = np.concatenate((ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
+                generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
