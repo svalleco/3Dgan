@@ -6,11 +6,10 @@ from utils.RootPlotsGAN import get_plots_angle         # to make plots with ROOT
 import os
 import h5py
 import numpy as np
-print(np.__version__)
 import math
 import sys
 import argparse
-from memory_profiler import profile
+#from memory_profiler import profile
 if os.environ.get('HOSTNAME') == 'tlab-gpu-oldeeptector.cern.ch': # Here a check for host can be used        
     tlab = True
 else:
@@ -56,15 +55,17 @@ def main():
    leg= params.leg
    statbox= params.statbox
    mono= params.mono
-   gweights= [params.gweights]
-   dweights= [params.dweights]
-   xscales= [params.xscales]
-   ascales= [params.ascales]
+   gweights= params.gweights if isinstance(params.gweights, list) else [params.gweights]
+   dweights= params.dweights if isinstance(params.dweights, list) else [params.dweights]
+   xscales= params.xscales if isinstance(params.xscales, list) else [params.xscales]
+   ascales= params.ascales if isinstance(params.ascales, list) else [params.ascales]
    dscale = params.dscale
    yscale= params.yscale
-   xpowers = [params.xpower]
+   xpowers = params.xpower if isinstance(params.xpower, list) else [params.xpower]
    thresh = params.thresh
    dformat = params.dformat
+
+   print (dweights)
 
    labels=['']
     
@@ -79,6 +80,7 @@ def main():
        datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
        events_per_file = 10000
        energies = [0, 50, 100, 200, 250, 300, 400, 500]
+       #energies =[0, 150, 200, 250, 300]
    elif datapath=='path3':
        datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech
        events_per_file = 10000
@@ -102,7 +104,7 @@ def main():
    var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
                 datapath, sortdir, gendir, discdir, nbEvents, binevents, moments, xscales, xpowers,
                 ascales, dscale, flags, latent, particle, events_per_file=events_per_file, thresh=thresh*50., angtype=angtype, offset=0.0,
-                angloss=angloss, addloss=addloss, concat=concat 
+                angloss=angloss, addloss=addloss, concat=concat #, Data=GetDataAngle2 
                 , pre =taking_power, post =inv_power  # Adding other preprocessing, Default is simple scaling                 
    )
    
@@ -124,9 +126,9 @@ def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='path1', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
-    parser.add_argument('--angtype', action='store', type=str, default='theta', help='Angle used.')
+    parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle used.')
     parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis_gan_training/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
@@ -150,16 +152,16 @@ def get_parser():
     parser.add_argument('--read_disc', action='store', default=False, help='Get discriminator output')
     parser.add_argument('--ifpdf', action='store', default=True, help='Whether generate pdf plots or .C plots')
     parser.add_argument('--grid', action='store', default=False, help='set grid')
-    parser.add_argument('--leg', action='store', default=True, help='add legends')
-    parser.add_argument('--statbox', action='store', default=True, help='add statboxes')
+    parser.add_argument('--leg', action='store', default=False, help='add legends')
+    parser.add_argument('--statbox', action='store', default=False, help='add statboxes')
     parser.add_argument('--mono', action='store', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--gweights', action='store', type=str, default='../weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_059.hdf5', help='comma delimited list for paths to Generator weights.')
-    parser.add_argument('--dweights', action='store', type=str, default='../weights/3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_059.hdf5', help='comma delimited list for paths to Discriminator weights')
-    parser.add_argument('--xscales', action='store', type=int, default=1, help='Multiplication factors for cell energies')
-    parser.add_argument('--ascales', action='store', type=int, default=1, help='Multiplication factors for angles')
+    parser.add_argument('--gweights', action='store', type=str, nargs='+', default=['../weights/3dgan_weights_gan_training/params_generator_epoch_119.hdf5'], help='comma delimited list for paths to Generator weights.')
+    parser.add_argument('--dweights', action='store', type=str, nargs='+', default=['../weights/3dgan_weights_gan_training/params_discriminator_epoch_119.hdf5'], help='comma delimited list for paths to Discriminator weights')
+    parser.add_argument('--xscales', action='store', type=int, nargs='+', default=[1], help='Multiplication factors for cell energies')
+    parser.add_argument('--ascales', action='store', type=int, nargs='+', default=[1], help='Multiplication factors for angles')
     parser.add_argument('--dscale', action='store', type=int, default=50, help='Data = dscale * GeV')
-    parser.add_argument('--yscale', action='store', default=100, help='Division Factor for Primary Energy.')
-    parser.add_argument('--xpower', action='store', default=0.85, help='Power of cell energies')
+    parser.add_argument('--yscale', action='store', default=100., help='Division Factor for Primary Energy.')
+    parser.add_argument('--xpower', action='store', nargs='+', default=[0.85], help='Power of cell energies')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
     return parser
@@ -178,6 +180,30 @@ def GetAngleDataEta_reduced(datafile, thresh=1e-6):
     Y = Y.astype(np.float32)
     ecal = np.sum(X, axis=(1, 2, 3))
     return X, Y, eta, ecal
+#get data for training                                                                                                       
+def GetDataAngle2(datafile, xscale =1, xpower=1, yscale = 1, angscale=1, angtype='theta', offset=0.0, thresh=1e-4, daxis=-1):
+    print ('Loading Data from .....', datafile)
+    f=h5py.File(datafile,'r')
+    X=np.array(f.get('ECAL'))* xscale
+    Y=np.array(f.get('energy'))/yscale
+    X[X < thresh] = 0
+    X = X.astype(np.float32)
+    Y = Y.astype(np.float32)
+    ecal = np.sum(X, axis=(1, 2, 3))
+    indexes = np.where((ecal > 10.0) & (Y > 150) & (Y < 350))
+    print('From {} events {} passed'.format(Y.shape[0], indexes[0].shape[0]))
+    X=X[indexes]
+    Y=Y[indexes]
+    ecal = ecal[indexes]
+    if angtype in f:
+      ang = np.array(f.get(angtype))[indexes]
+    else:
+      ang = gan.measPython(X)
+    X = np.expand_dims(X, axis=daxis)
+    ecal=np.expand_dims(ecal, axis=daxis)
+    if xpower !=1.:
+        X = np.power(X, xpower)
+    return X, Y, ang, ecal
 
 if __name__ == "__main__":
     main()

@@ -105,14 +105,14 @@ def plot_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, gsumx, g
                               out_file, 'GAN{}_{}'.format(labels[i], i), compare=True, gprev=actcorr, leg=leg)
 
 # Compute and plot correlation
-def plot_correlation_small(momentx, momenty, momentz, ecal, gmomentx, gmomenty, gmomentz, gecal, energy, events1, events2, out_file, labels, leg=True):
+def plot_correlation_small(momentx, momenty, momentz, ecal, gmomentx, gmomenty, gmomentz, gecal, energy, events1, events2, out_file, labels, leg=True, stest=True):
    ecal = ecal["n_0"]
    hits = my.get_hits(events1)
    actcorr = plot_corr_python_small(momentx, momenty, momentz, ecal, energy, my.get_hits(events1), my.ratio1_total(events1), my.ratio2_total(events1), my.ratio3_total(events1), out_file, 'G4', leg=leg)
    for i, key in enumerate(gmomentx):
       gcorr = plot_corr_python_small(gmomentx[key], gmomenty[key], gmomentz[key],
                gecal[key], energy, my.get_hits(events2[key]), my.ratio1_total(events2[key]), my.ratio2_total(events2[key]), my.ratio3_total(events2[key]),
-                                     out_file, 'GAN{}'.format(labels[i]), compare=False, gprev=actcorr, leg=leg)
+                                     out_file, 'GAN{}'.format(labels[i]), compare=stest, gprev=actcorr, leg=leg)
                        
 
                                                                               
@@ -260,7 +260,7 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
       my.fill_profile(Gprof, ratio2, y)
       error = np.mean(np.abs(ratio1 - ratio2 ))
       color +=1
-      if color in [10, 18, 19]:
+      if color in [5, 10, 18, 19]:
           color+=1
       Gprof.SetLineColor(color)
       if mono:  Gprof.SetLineStyle(color-2)
@@ -309,7 +309,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
       error = (ecal1["n_0"]- ecal2[key])/ ecal1["n_0"]
       my.fill_profile(Gprof, error, y)
       color +=1
-      if color in [10, 18, 19]:
+      if color in [5, 10, 18, 19]:
         color+=1
       Gprof.SetLineColor(color)
       if mono: Gprof.SetLineStyle(color-2)
@@ -347,15 +347,18 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], stest
        Eprof.GetXaxis().SetTitle("Ep [GeV]")
        Eprof.GetYaxis().SetTitle("(Ep - Ep_{predicted})/Ep")
        Eprof.GetYaxis().CenterTitle()
-       Eprof.GetYaxis().SetRangeUser(-0.3, 0.3)
        error1=(y - 100 *aux1[key])/y
+       if np.amax(np.absolute(error1)) < 0.2:
+          Eprof.GetYaxis().SetRangeUser(-0.3, 0.3)
+       else:
+          Eprof.GetYaxis().SetRangeUser(-1.5, 1.5)
        my.fill_profile(Eprof, error1,  y)
        Eprof.SetLineColor(color)
        Eprof.Draw()
        c1.Update()
        mae1= np.mean(np.abs(error1))
        if stest:
-          label = "G4 MAE={:.4f})".format(labels[i], mae1)
+          label = "G4 {} MAE={:.4f})".format(labels[i], mae1)
        else:
           label = "G4 {} ".format(labels[i])
        legend.AddEntry(Eprof, label,"l")
@@ -366,11 +369,15 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], stest
        Eprof.Draw('sames')
        legend.AddEntry(Eprof,"G4 " + labels[i],"l")
        color+=1
+       if color in [5, 10, 18, 19]:
+        color+=1
      error2=(y - 100 *aux2[key])/y
      my.fill_profile(Gprof, error2, y)
      Gprof.SetLineColor(color)
      if mono:  Gprof.SetLineStyle(color-2)
      color+=1
+     if color in [5, 10, 18, 19]:
+        color+=1
      mae2= np.mean(np.abs(error2))
      Gprof.Draw('sames')
      c1.Update()
@@ -419,6 +426,8 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
       hg.SetLineColor(color)
       if mono: hg.SetLineStyle(color-2)
       color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       c1.Update()
       my.fill_hist(hg, ecal2[key])
       hg =my.normalize(hg, 1)
@@ -486,7 +495,9 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
       hg =my.normalize(hg, 1)
       hg.SetLineColor(color)
       if mono: hg.SetLineStyle(color-2)
-      color+=2
+      color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       hg.Draw('sames')
       hg.Draw('sames hist')
       c1.Update()
@@ -545,6 +556,8 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], if
       if mono: hg.SetLineStyle(color-2)
       hg =my.normalize(hg, 1)
       color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       hg.Draw('sames')
       hg.Draw('sames hist')
       legend.AddEntry(hg, "GAN {}".format(labels[i]), "l")
@@ -588,10 +601,12 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, 
      hg= hgs[i]
      hp.Sumw2()
      hg.Sumw2()
-     if i== 0:
-       if statbox==False:
+     if statbox==False:
           hp.SetStats(0)
           hg.SetStats(0)
+
+     if i== 0:
+
        hp.SetTitle(" Predicted Primary Energy for {}-{} GeV".format(p[0], p[1]))
        hp.GetXaxis().SetTitle("Ep [GeV]")
        my.fill_hist(hp, 100 *aux1[key])
@@ -609,7 +624,8 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, 
        c1.Update()
        legend.AddEntry(hp,"G4" + labels[i],"l")
        color+=1
-          
+       if color in [5, 10, 18, 19]:
+        color+=1   
      my.fill_hist(hg, 100 *aux2[key])
      hp =my.normalize(hp, 1)
      hg =my.normalize(hg, 1)
@@ -669,6 +685,8 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
        hp.Draw('sames hist')
        legend.AddEntry(hp,"G4 " + labels[i],"l")
        color+=1
+       if color in [5, 10, 18, 19]:
+        color+=1
      my.fill_hist(hg,  (y - aux2[key]*100)/y)
      hp =my.normalize(hp, 1)
      hg =my.normalize(hg, 1)
@@ -735,6 +753,8 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifp
        legend.AddEntry(hp,"G4 " + labels[i],"l")
        c1.Update()
        color+=1
+       if color in [5, 10, 18, 19]:
+        color+=1
      c1.Update()
      my.fill_hist(hg,  array2[key])
      hp =my.normalize(hp)
@@ -743,6 +763,8 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifp
      hg.SetLineColor(color)
      if mono: hg.SetLineStyle(color-2)
      color+=1
+     if color in [5, 10, 18, 19]:
+        color+=1
      hg.Draw('sames')
      hg.Draw('sames hist')
      c1.Update()
@@ -898,7 +920,9 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
          ks = h1z.KolmogorovTest(h2z, "WW")
          glabel = "GAN {} Z axis K = {:.4f}".format(labels[i], ks)
          leg.AddEntry(h2z, glabel,"l")
-      color+= 2
+      color+= 1
+      if color in [5, 10, 18, 19]:
+        color+=1
       c1.Update()
       if statbox: my.stat_pos(h2z)
       c1.Update()
@@ -912,23 +936,26 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
    c1.cd(1)
    h1x.Draw()
    h1x.Draw('sames hist')
-   h2x.Draw('sames')
-   h2x.Draw('sames hist')
+   for h2x in h2xs:
+     h2x.Draw('sames')
+     h2x.Draw('sames hist')
    if not log: my.Max(h1x, h2x)
    c1.Update()
         
    c1.cd(2)
    h1y.Draw()
    h1y.Draw('sames hist')
-   h2y.Draw('sames')
-   h2y.Draw('sames hist')
+   for h2y in h2ys:
+     h2y.Draw('sames')
+     h2y.Draw('sames hist')
    if not log: my.Max(h1y, h2y)
    c1.Update()
    c1.cd(3)
    h1z.Draw()
    h1z.Draw('sames hist')
-   h2z.Draw('sames')
-   h2z.Draw('sames hist')
+   for h2z in h2zs:
+     h2z.Draw('sames')
+     h2z.Draw('sames hist')
    if not log: my.Max(h1z, h2z)
    c1.Update()
    c1.cd(4)
@@ -967,7 +994,8 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       h1y.SetStats(0)
       h1z.SetStats(0)
    color+=2
-
+   if color in [5, 10, 18, 19]:
+        color+=1
    canvas.cd(1)
    if log:
       ROOT.gPad.SetLogy()
@@ -1095,7 +1123,9 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
          leg.AddEntry(h2z, glabel,"l")
       canvas.Update()
       if statbox: my.stat_pos(h2z)
-      color+=2
+      color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       h1x.Sumw2()
       h1y.Sumw2()
       h1z.Sumw2()
@@ -1112,22 +1142,25 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    canvas.cd(1)
    h1x.Draw()
    h1x.Draw('sames hist')
-   h2x.Draw('sames')
-   h2x.Draw('sames hist')
+   for h2x in h2xs:
+     h2x.Draw('sames')
+     h2x.Draw('sames hist')
    if not log: my.Max(h1x, h2x)
    canvas.Update()
    canvas.cd(2)
    h1y.Draw()
    h1y.Draw('sames hist')
-   h2y.Draw('sames')
-   h2y.Draw('sames hist')
+   for h2y in h2ys:
+    h2y.Draw('sames')
+    h2y.Draw('sames hist')
    if not log: my.Max(h1y, h2y)
    canvas.Update()
    canvas.cd(3)
    h1z.Draw()
    h1z.Draw('sames hist')
-   h2z.Draw('sames')
-   h2z.Draw('sames hist')
+   for h2z in h2zs:
+     h2z.Draw('sames')
+     h2z.Draw('sames hist')
    if not log: my.Max(h1z, h2z)
    canvas.Update()
    canvas.cd(4)
@@ -1190,6 +1223,8 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], s
       if mono: hg.SetLineStyle(color-2)
       hg =my.normalize(hg, 1)
       color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       hg.Draw('sames')
       hg.Draw('sames hist')
       c1.Update()
@@ -1298,6 +1333,95 @@ def plot_sparsity(events1, events2, out_file, energy, labels, threshmin=-13, thr
    else:
       c1.Print(out_file + '.C')
 
+def plot_sparsity2(events1, events2, out_file, energy, labels, threshmin=-13, threshmax=1, logy=0, min_max=0, ifpdf=True, mono=False, leg=True, grid=True, statbox=True):
+   c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
+   if grid: c1.SetGrid()
+   title = "Sparsity for electrons with 100-200 GeV primary energy"
+   legend = ROOT.TLegend(.8, .8, .9, .9)
+   color =2
+   if logy:
+      ROOT.gPad.SetLogy()
+      title = title + " (log)"
+   thresh = np.arange(threshmin, threshmax, 1)
+   count1 = np.zeros((thresh.shape[0], events1.shape[0]))
+   size = np.float64(events1[0].size)
+   count2=[]
+   for index, key in enumerate(events2):
+     count2.append(np.zeros((thresh.shape[0], events1.shape[0])))
+     # calculating entries for different threshold applied
+     for i in np.arange(thresh.shape[0]):
+       if index==0:
+         t_val = np.power(10.0, thresh[i])
+         x_t = np.where(np.squeeze(events1)>t_val, 1, 0)
+         count1[i] = np.divide(np.sum(x_t, axis=(1, 2, 3)), size)
+       x_gen_t = np.where(np.squeeze(events2[key]) > t_val, 1, 0)
+       count2[index] = np.divide(np.sum(x_gen_t, axis=(1, 2, 3)), size)                                        
+   sparsity1 = ROOT.TGraph()
+   sparsity2 = []
+   sparsity1b = ROOT.TGraph()
+   sparsity2b = []
+
+   mean1=np.mean(count1, axis=1)
+   std1=np.std(count1, axis=1)
+   min1= np.min(count1, axis=1)
+   max1= np.max(count1, axis=1)
+
+   mean2=[]
+   std2 =[]
+   min2 =[]
+   max2 = []
+   for count in count2:
+      mean2.append(np.mean(count, axis=1))
+      std2.append(np.std(count, axis=1))
+      min2.append(np.min(count, axis=1))
+      max2.append(np.max(count, axis=1))
+   my.fill_graph(sparsity1, thresh, mean1)
+   for i, mean in enumerate(mean2):
+     sparsity2.append(ROOT.TGraph())
+     my.fill_graph(sparsity[i], thresh, mean)
+   if min_max:
+      area1 = np.concatenate((min1, flip(max1, 0)), axis=0)
+      area2 =[]
+      for min in min2:
+        area2.append(np.concatenate((min2, flip(max2, 0)), axis=0))
+      ymax=max(np.amax(max2), np.amax(max1))
+      ylim = 1.1 * ymax
+   else:
+      area1 = np.concatenate((mean1+std1, flip(mean1-std1, 0)), axis=0)
+      area2 = []
+      for mean, std in zip(mean2, std2):
+        area2.append(np.concatenate((mean+std, flip(mean-std, 0)), axis=0))
+      ylim = 0.04
+   thresh2=np.concatenate((thresh, flip(thresh, 0)), axis=0)
+   my.fill_graph(sparsity1b, thresh2, area1)
+   for i, s in enumerate(sparsity2b):
+     my.fill_graph(s, thresh2, area2[i])
+   sparsity1.GetXaxis().SetTitle("log10(threshold[GeV])")
+   sparsity1.GetYaxis().SetTitle("Fraction of cells above threshold")
+   sparsity1.SetTitle(title)
+   sparsity1.SetLineColor(color)
+   sparsity1.Draw('APL')
+   sparsity1b.SetFillColorAlpha(color, 0.35)
+   sparsity1b.Draw('f')
+   legend.AddEntry(sparsity1,'G4' ,"l")
+   sparsity1.GetYaxis().SetRangeUser(0, ylim)
+   color+=2
+   for i, s in enumerate(sparsity2b):
+     s.SetLineColor(color)
+     if mono: s.SetLineStyle(2)
+     sparsity2[i].Draw('PL')
+     s.SetFillColorAlpha(color+2, 0.35)
+     s.Draw('F')
+     legend.AddEntry(sparsity2[i],'GAN' + labels[0] ,"l")
+     c1.Update()
+   if leg:
+     legend.Draw()
+     c1.Update()
+   if ifpdf:
+      c1.Print(out_file + '.pdf')
+   else:
+       c1.Print(out_file + '.C')
+
 ################################### Angle Plots ########################################################################
 # Plot histogram of predicted angle
 def plot_ang_hist(ang1, ang2, out_file, angle, angtype, labels, p, ifpdf=True, grid=True, leg=True, statbox=True, mono=False):
@@ -1330,6 +1454,8 @@ def plot_ang_hist(ang1, ang2, out_file, angle, angtype, labels, p, ifpdf=True, g
       hg.SetLineColor(color)
       if mono:  hg.SetLineStyle(color-2)
       color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       hg.Draw('sames')
       hg.Draw('sames hist')
       c1.Update()
@@ -1386,13 +1512,16 @@ def plot_angle_error_hist(ang1, ang2, y, out_file, angle, angtype, labels, p, if
          c1.Update()
          legend.AddEntry(hp,"G4" + labels[i],"l")
          color+=1
-      
+         if color in [5, 10, 18, 19]:
+            color+=1
       my.fill_hist(hg,  (y - ang2[key])/y)
       hp =my.normalize(hp, 1)
       hg =my.normalize(hg, 1)
       hg.SetLineColor(color)
       if mono: hg.SetLineStyle(color)
       color+=1
+      if color in [5, 10, 18, 19]:
+        color+=1
       hg.Draw('sames')
       hg.Draw('sames hist')
       c1.Update()
@@ -1585,7 +1714,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
          plots+=1
          plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], 
                                    var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile),
-                                   labels, p, ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
+                                   labels, p, ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono, stest=stest)
          plots+=1
          if corr==1:                                                                                                                
            plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)],    
@@ -1600,7 +1729,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
          elif corr>1:
            plot_correlation_small(var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["momentX_gan" + str(energy)],
                                   var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)],
-                                  var["events_gan" + str(energy)], os.path.join(comdir, correlationfile+ "small"), labels, leg=leg)
+                                  var["events_gan" + str(energy)], os.path.join(comdir, correlationfile+ "small"), labels, leg=leg, stest=stest)
            plots+=1
                                          
          if cell:
@@ -1702,8 +1831,8 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
       safe_mkdir(egendir)
       for index, a in enumerate(angles):
          #alabels = ['ang_' + str() for _ in aindexes]
-         alabels = ['angle_{}{}'.format(a, _) for _ in labels]
-         a2labels = ['angle2_{}{}'.format(a, _) for _ in labels]
+         alabels = ['angle_{} {}'.format(a, _) for _ in labels]
+         a2labels = ['angle2_{} {}'.format(a, _) for _ in labels]
          plot_energy_hist_root(var["sumsx_act"+ str(energy) + "ang_" + str(a)], var["sumsy_act"+ str(energy)+ "ang_" + str(a)],
                                   var["sumsz_act"+ str(energy) + "ang_" + str(a)], var["sumsx_gan"+ str(energy)+ "ang_" + str(a)],
                                   var["sumsy_gan"+ str(energy)+ "ang_" + str(a)], var["sumsz_gan"+ str(energy)+ "ang_" + str(a)],
