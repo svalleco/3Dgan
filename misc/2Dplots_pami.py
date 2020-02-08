@@ -17,10 +17,10 @@ import analysis.utils.ROOTutils as r
 import analysis.utils.RootPlotsGAN as pl
 
 def main():
-   #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # path to data
-   datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+   datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # path to data
+   #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
    # path to generator weights
-   genweight = "../keras/weights/3dgan_weights_gan_training_chr_pion_2_500GeV/params_generator_epoch_020.hdf5"
+   genweight = "../keras/weights/surfsara_weights/params_generator_epoch_099.hdf5"
    # generator model
    from AngleArch3dGAN import generator
 
@@ -34,18 +34,19 @@ def main():
    num=10 # random events generated
    thetamin = np.radians(60)  # min theta
    thetamax = np.radians(120) # maximum theta
-   energies=[50, 100, 200, 300, 400] # energy bins
-   thetas = [62, 90, 118] # angle bins
+   #energies=[50, 100, 200, 300, 400] # energy bins
+   energies =[110, 150, 190]
+   thetas = [0] # angle bins
    ang = 1 # use all calculation for variable angle
    xscale = 1 # scaling of images
    xpower = 0.85
    concat = 2
    ascale=1
-   particle = 'ChPi'
+   particle = 'Ele'
    ecalscale=50. # scaling in original data set
    post = inv_power # post processing: It can be either scale (without sqrt) or square(sqrt)
-   thresh = 3e-4 # if using threshold
-   plotsdir = 'results/2D_chr_pi_ep20_log_thresh/' # name of folder to save results
+   thresh = 0 # if using threshold
+   plotsdir = 'results/2D_surfsara_ep99/'# name of folder to save results
    gan.safe_mkdir(plotsdir) # make plot directory
    opt="colz" # option for 2D hist
    angtype='theta'
@@ -58,12 +59,18 @@ def main():
       for index, a in enumerate(rad):
          adir = os.path.join(edir, 'angle{}'.format(thetas[index]))
          gan.safe_mkdir(adir)
-         indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2)) # all events with angle within a bin
-         # angle bins are added to dict
-         var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)][indexes]/ecalscale
-         var["energy" + str(energy) + "ang_" + str(index)] = var["energy" + str(energy)][indexes]
-         var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)][indexes]
-         var["index" + str(energy)+ "ang_" + str(index)] = var["events_act" + str(energy) + "ang_" + str(index)].shape[0]
+         if a==0:
+            var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)]/ecalscale
+            var["energy" + str(energy) + "ang_" + str(index)] = var["energy" + str(energy)]
+            var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)]
+            var["index" + str(energy)+ "ang_" + str(index)] = var["events_act" + str(energy) + "ang_" + str(index)].shape[0]
+         else:
+            indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2)) # all events with angle within a bin
+            var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)][indexes]/ecalscale
+            var["energy" + str(energy) + "ang_" + str(index)] = var["energy" + str(energy)][indexes]
+            var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)][indexes]
+            var["index" + str(energy)+ "ang_" + str(index)] = var["events_act" + str(energy) + "ang_" + str(index)].shape[0]
+            
          var["events_gan" + str(energy) + "ang_" + str(index)]= gan.generate(g, var["index" + str(energy)+ "ang_" + str(index)],
                                                                            [var["energy" + str(energy)+ "ang_" + str(index)]/100,
                                                                             (var["angle"+ str(energy)+ "ang_" + str(index)]) * ascale], latent, concat=2)
