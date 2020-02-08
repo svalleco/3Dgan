@@ -1,51 +1,65 @@
-from os import path
+import sys
 from ROOT import TLegend, TCanvas, TGraph, gStyle, TProfile, TMultiGraph, TPaveStats
 #from ROOT import gROOT, gBenchmark
 import h5py
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
+#import matplotlib
+#import matplotlib.pyplot as plt
+#import matplotlib.cm as cm
 from array import array
 import time
+sys.path.insert(0,'../keras')
+from AngleArch3dGAN import generator, discriminator
 
-from ecalvegan import generator, discriminator
+try:
+      import setGPU
+except:
+      pass
 
+import analysis.utils.GANutils as gan
+import analysis.utils.ROOTutils as r
+import analysis.utils.RootPlotsGAN as pl
+
+weightdir = '../keras/weights/'
 #gStyle.SetOptStat(0)
 gStyle.SetOptFit (1111) # superimpose fit results
 c=TCanvas("c" ,"Ecal/Ep versus Ep for Data and Generated Events" ,200 ,10 ,700 ,500) #make nice
-c.SetGrid()
+#c.SetGrid()
 gStyle.SetOptStat(0)
+p =[100, 200]
 #c.SetLogx ()
-Eprof = TProfile("Eprof", "Ratio of Ecal and Ep;Ep;Ecal/Ep", 100, 0, 500)
-num_events=1000
-latent = 200
+Eprof = TProfile("Eprof", "Sampling fraction vs. Ep;Ep [GeV];#S_{f}", 100, p[0], p[1])
+num_events=5000
+latent = 256
+dscale  = 50.0
+power = 0.85
 g = generator(latent)
-#gweight = 'gen_rootfit_2p1p1_ep33.hdf5'
-gweight1 = 'params_generator_epoch_041.hdf5' # 1 gpu
-gweight2 = 'params_generator_epoch_023.hdf5' # 2 gpu
-gweight3 = 'params_generator_epoch_011.hdf5' # 4 gpu
-gweight4 = 'params_generator_epoch_005.hdf5' # 8 gpu
-gweight5 =  '16gpu_gen.hdf5' #'params_generator_epoch_002.hdf5'# 16 gpu
-g.load_weights(gweight1)
-gweights = [gweight1, gweight2, gweight3, gweight4, gweight5]
-label = ['1 gpu', '2 gpu', '4 gpu', '8 gpu', '16 gpu']
-scales = [100, 1, 1, 1, 1]
-color = [4, 2, 3, 6, 7, 8]
-filename = 'ecal_ratio_multi.pdf'
+#gweight = 'gen_rootfit_2p1p1_ep33.hd_gan_trainingf5'
+gweight1 = weightdir + '3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_127.hdf5'
+gweight2 = weightdir + 'surfsara_weights/params_generator_epoch_099.hdf5'
+gweight3 = '256_node_params_generator_epoch_099.hdf5' 
+
+gweights = [gweight1, gweight2]
+label = ['1 node', '32 node']
+scales = [1, 1]
+color = [2, 4, 6, 7, 8]
+filename = 'results/ecal_ratio_multi_32node.pdf'
 #Get Actual Data
-#d=h5py.File("/eos/project/d/dshep/LCD/V1/EleEscan/EleEscan_1_1.h5")
-d=h5py.File("/afs/cern.ch/work/g/gkhattak/public/Ele_v1_1_2.h5",'r')
-X=np.array(d.get('ECAL')[0:num_events], np.float64)
-Y=np.array(d.get('target')[0:num_events][:,1], np.float64)
-X[X < 1e-6] = 0
-Y = Y
-Data = np.sum(X, axis=(1, 2, 3))
+#datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
+datafiles = gan.GetDataFiles(datapath, ['Ele'])
+d=h5py.File(datafiles[0], 'r')
+
+X=np.array(d.get('ECAL')[0:num_events], np.float32)
+Y=np.array(d.get('energy')[0:num_events], np.float32)
+theta=np.array(d.get('mtheta')[0:num_events], np.float32)
+#X[X < 1e-6] = # = Y
+Data = np.sum(X, axis=(1, 2, 3))/dscale
 
 for j in np.arange(num_events):
       Eprof.Fill(Y[j], Data[j]/Y[j])
 Eprof.SetTitle("Ratio of Ecal and Ep")
-Eprof.GetXaxis().SetTitle("Ep")
+Eprof.GetXaxis().SetTitle("Ep [GeV]")
 Eprof.GetYaxis().SetTitle("Ecal/Ep")
 Eprof.Draw()
 Eprof.Fit('pol6')
@@ -53,19 +67,18 @@ c.Update()
 Eprof.GetFunction("pol6").SetLineColor(color[0])
 c.Update()
 Eprof.SetStats(0)
-Eprof.GetYaxis().SetRangeUser(0, 0.04)
+Eprof.GetYaxis().SetRangeUser(0.01, 0.03)
 Eprof.SetLineColor(color[0])
-legend = TLegend(0.7, 0.7, 0.9, 0.9)
-legend.AddEntry(Eprof, "Data", "l")
+legend = TLegend(0.7, 0.7, 0.89, 0.89)
+legend.AddEntry(Eprof, "G4", "l")
+legend.SetBorderSize(0)
 Gprof = []
 for i, gweight in enumerate(gweights):
-   Gprof.append( TProfile("Gprof" +str(i), "Gprof" + str(i), 100, 0, 500))
+   Gprof.append( TProfile("Gprof" +str(i), "Gprof" + str(i), 100, p[0], p[1]))
    #Generate events
    g.load_weights(gweight)
-   noise = np.random.normal(0, 1, (num_events, latent))
-   generator_in = np.multiply(np.reshape(Y/100, (-1, 1)), noise)
-   generated_images = g.predict(generator_in, verbose=False, batch_size=100)
-   GData = np.sum(generated_images, axis=(1, 2, 3))/scales[i]
+   generated_images = np.power(gan.generate(g, num_events, [Y/100., theta], latent=latent, concat=2), 1./power)
+   GData = np.sum(generated_images, axis=(1, 2, 3))/(dscale)
    print GData.shape
    for j in range(num_events):
       Gprof[i].Fill(Y[j], GData[j]/Y[j])
