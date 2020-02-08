@@ -28,9 +28,9 @@ import analysis.utils.GANutils as gan
 
 def main():
     result=[]
-    resultfile = 'result_log.txt'
+    resultfile = 'result_2Dconv.txt'
     file = open(resultfile)
-    plotdir = 'obj_bin_p85'
+    plotdir = 'obj_plots_2Dconv/'
     gan.safe_mkdir(plotdir)
     for line in file:
       fields = line.strip().split()
@@ -46,9 +46,9 @@ def main():
 #Plots results in a root file
 def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfile='obj_result', ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
-    legend = ROOT.TLegend(.5, .6, .9, .9)
-    
-    legend.SetTextSize(0.028)
+    legend = ROOT.TLegend(.5, .6, .89, .89)
+    legend.SetBorderSize(0)
+    legend.SetTextSize(0.035)
     mg=ROOT.TMultiGraph()
     color1 = 2
     color2 = 8
@@ -95,20 +95,20 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
     gt  = ROOT.TGraph( num- start , epoch[start:], total[start:] )
     gt.SetLineColor(color1)
     mg.Add(gt)
-    legend.AddEntry(gt, "Total error min = {:.4f} (epoch {})".format(mint, mint_n), "l")
+    legend.AddEntry(gt, "Total error")# min = {:.4f} (epoch {})".format(mint, mint_n), "l")
     ge = ROOT.TGraph( num- start , epoch[start:], energy_e[start:] )
     ge.SetLineColor(color2)
-    legend.AddEntry(ge, "Energy error min = {:.4f} (epoch {})".format(mine, mine_n), "l")
+    legend.AddEntry(ge, "Energy error")# min = {:.4f} (epoch {})".format(mine, mine_n), "l")
     mg.Add(ge)
     gm = ROOT.TGraph( num- start , epoch[start:], mmt_e[start:])
     gm.SetLineColor(color3)
     mg.Add(gm)
-    legend.AddEntry(gm, "Moment error  = {:.4f} (epoch {})".format(minm, minm_n), "l")
+    legend.AddEntry(gm, "Moment error")#  = {:.4f} (epoch {})".format(minm, minm_n), "l")
     c1.Update()
     gs = ROOT.TGraph( num- start , epoch[start:], sf_e[start:])
     gs.SetLineColor(color4)
     mg.Add(gs)
-    legend.AddEntry(gs, "Sampling Fraction error  = {:.4f} (epoch {})".format(mins, mins_n), "l")
+    legend.AddEntry(gs, "Sampling Fraction error  ")#= {:.4f} (epoch {})".format(mins, mins_n), "l")
     c1.Update()
                     
     if ang:
@@ -121,8 +121,9 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
     mg.SetTitle("Optimization function: Mean Relative Error on shower shapes, moment and sampling fraction;Epochs;Error")
     mg.Draw('ALP')
     mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(total))
+    #mg.GetYaxis().SetLabelSize(0.33)
     c1.Update()
-    #legend.Draw()
+    legend.Draw()
     c1.Update()
     c1.Print(os.path.join(resultdir, plotfile + '.pdf'))
     c1.Print(os.path.join(resultdir, plotfile + '.C'))
@@ -151,7 +152,7 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
         legend.AddEntry(ge.GetFunction(fit), 'Energy fit', "l")
         legend.AddEntry(gm.GetFunction(fit), 'Moment fit', "l")  
         legend.AddEntry(gs.GetFunction(fit), 'S. Fr. fit', "l")
-      #legend.Draw()
+      legend.Draw()
       c1.Update()
       c1.Print(os.path.join(resultdir, plotfile + '_{}.pdf'.format(fit)))
       c1.Print(os.path.join(resultdir, plotfile + '_{}.C'.format(fit)))
