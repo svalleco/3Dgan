@@ -20,3 +20,4 @@ keras/logs/*
 keras/paramScan/*
 keras/misc/*
 keras/archives/*
+keras/misc/results/*
