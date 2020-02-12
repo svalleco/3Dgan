@@ -16,7 +16,7 @@ try:
     import setGPU #if Caltech                                                                                
 except:
     pass
-if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used        
+if 'cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used        
     tlab = True
 else:
     tlab= False
@@ -26,10 +26,10 @@ sys.path.insert(0,'../')
 def main():
    # path to generator weights
    if tlab:
-     genweight= "/gkhattak/weights/3dgan_weights/params_generator_epoch_059.hdf5"
+     genweight= "/gkhattak/weights/3dgan_weights_gan_training_2Dsep_conv_13layers/params_generator_epoch_084.hdf5"
    else:
      genweight = "../weights/3dgan_weights/params_generator_epoch_059.hdf5"
-   plotsdir = 'results/2DhistPlots' # name of folder to save results
+   plotsdir = 'results/2DhistPlots_2D_sep_conv_13layers_ep84_thresh/' # name of folder to save results
    
    # generator model
    from AngleArch3dGAN import generator
@@ -37,7 +37,7 @@ def main():
    # some variables that need to be adjusted according to training configuration
    latent = 256 # latent space for generator
    xpower=0.85 # power used for post processing
-   concat=1 # mode for concatenating
+   concat=2 # mode for concatenating
    num_events = 1000 # Number of events for each bin
    num=10 # random events generated
    thetamin = np.radians(60)  # min theta
@@ -47,7 +47,7 @@ def main():
    ang = 1 # use all calculation for variable angle
    xscale = 1.0 # scaling of images
    post = inv_power # post processing: It can be either scale (without sqrt) or square(sqrt)
-   thresh = 0.0 # if using threshold
+   thresh = 3e-4 # if using threshold
    opt="colz" # option for 2D hist
 
    events = {} # initialize list
@@ -60,7 +60,7 @@ def main():
    for energy in energies:
      events[str(energy)] = {} # create a dict in list
      for t in thetas: # for each angle bin
-         sampled_energies=energy/100 * np.ones((num_events))  # scale energy
+         sampled_energies=energy/100. * np.ones((num_events))  # scale energy
          sampled_thetas = (np.radians(t))* np.ones((num_events)) # get radian
          events[str(energy)][str(t)] = gan.generate(g, num_events, [sampled_energies, sampled_thetas], latent, concat) # generate
          events[str(energy)][str(t)] = post(events[str(energy)][str(t)], xscale=xscale, xpower=xpower)# post processing
@@ -71,7 +71,7 @@ def main():
 
    #################### generate random energy events with a certain theta  ##################################
    for t in thetas:
-      sampled_energies=np.random.uniform(energies[0]/100, energies[-1]/100, size=(num_events)) #sampled energies
+      sampled_energies=np.random.uniform(energies[0]/100., energies[-1]/100., size=(num_events)) #sampled energies
       sampled_thetas = (np.radians(t))* np.ones((num_events)) # theta
       events = gan.generate(g, num_events, [sampled_energies, sampled_thetas], latent, concat)# generate
       events = post(events, xscale) # apply post processing
@@ -85,7 +85,8 @@ def main():
       pl.PlotAngleCut(events, t, os.path.join(plotsdir, 'Theta_cut{}.pdf'.format(t)), opt=opt) # make plots for all events in a bin
 
    ####################### generate random energy events ######################################################
-   sampled_energies=np.random.uniform(energies[0]/100, energies[-1]/100, size=(num)) # sampled energies
+   sampled_energies=np.random.uniform(energies[0]/100., energies[-1]/100., size=(num)) # sampled energies
+   print(sampled_energies)
    sampled_thetas = np.random.uniform(thetamin, thetamax, size=(num))# sampled theta
    events = gan.generate(g, num, [sampled_energies, sampled_thetas], latent, concat)
    events = post(events, xscale)
