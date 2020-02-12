@@ -1,14 +1,14 @@
 import numpy as np
 import keras.backend as K
 from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
-                          Dropout, BatchNormalization, Activation, Embedding)
+                          Dropout, Activation, Embedding, BatchNormalization)
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import (UpSampling3D, UpSampling2D,Conv3D, ZeroPadding3D, ZeroPadding2D,
                                         AveragePooling3D, AveragePooling2D, SeparableConv2D)
 from keras.models import Model, Sequential
 import math
 import tensorflow as tf
-
+from BN2 import BatchNormalization as BatchNormalization2
 # calculate sum of intensities
 def ecal_sum(image, daxis):
     sum = K.expand_dims(K.sum(image, axis=daxis))
@@ -159,9 +159,11 @@ def generator(latent_size=256, return_intermediate=False, dformat='channels_last
     if dformat =='channels_last':
         dim = (18, 18, 16) # shape for dense layer
         baxis=-1 # axis for BatchNormalization
+        daxis2=(1, 2, 3)
     else:
         dim = (8, 9, 9,8)
         baxis=1
+        daxis2=(2, 3, 4)
     K.set_image_data_format(dformat)
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
@@ -172,7 +174,7 @@ def generator(latent_size=256, return_intermediate=False, dformat='channels_last
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
         
-        SeparableConv2D(8, (6, 6), padding='same', kernel_initializer='he_uniform'),
+        SeparableConv2D(8, (6, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
 
@@ -182,33 +184,51 @@ def generator(latent_size=256, return_intermediate=False, dformat='channels_last
         BatchNormalization(axis=baxis, epsilon=1e-6),
         ####################################### added layers 
         
+        SeparableConv2D(8, (4, 4), padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+
         SeparableConv2D(8, (4, 4), padding='same', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
 
         #ZeroPadding2D((2, 2)),
-        SeparableConv2D(8, (4, 4), padding='valid', kernel_initializer='he_uniform'),
+        SeparableConv2D(8, (4, 4), padding='same', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
 
         #ZeroPadding2D((2, 2)),
-        SeparableConv2D(8, (3, 3), padding='valid', kernel_initializer='he_uniform'),
+        SeparableConv2D(8, (3, 3), padding='same', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
 
         #ZeroPadding2D((1, 1)),
-        SeparableConv2D(8, (3, 3), padding='valid', kernel_initializer='he_uniform'),
+        SeparableConv2D(8, (3, 3), padding='same', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+        
+        #ZeroPadding2D((1, 1)),                                                                                                                                                                             
+        SeparableConv2D(8, (3, 3), padding='same', kernel_initializer='he_uniform'),
+        Activation('relu'),
+        BatchNormalization(axis=baxis, epsilon=1e-6),
+
+        #ZeroPadding2D((1, 1)),                                                                                                                                                                             
+        SeparableConv2D(8, (2, 2), padding='same', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
         
         #####################################  
         
-        #ZeroPadding2D((1, 1)),
+        ZeroPadding2D((1, 1)),
         SeparableConv2D(16, (2, 2), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         
+        SeparableConv2D(25, (2, 2),  padding='valid', kernel_initializer='he_uniform'),
+        Activation('relu'),
+
         SeparableConv2D(25, (2, 2),  padding='valid', kernel_initializer='glorot_normal', use_bias=False),
         Activation('relu')
+
     ])
     latent = Input(shape=(latent_size, ))   
     fake_image = loc(latent)
