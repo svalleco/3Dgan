@@ -81,13 +81,13 @@ def ecal_angle(image, power):
     #barycenter for each z position
     x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
     y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
-    x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
-    y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
+    x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), tf.div_no_nan(x_mid,sumz)) # if sum != 0 then divide by sum
+    y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), tf.div_no_nan(y_mid,sumz)) # if sum != 0 then divide by sum
 
     #Angle Calculations
     z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5)  * K.ones_like(z_ref) # Make an array of z indexes for all events
     zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis with stability check
-    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
+    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), tf.div_no_nan((y_mid-y_ref),zproj))# to avoid divide by zero for zproj =0
     m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
     ang = (math.pi/2.0) - tf.atan(m)# angle correction
     zmask = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
@@ -99,8 +99,9 @@ def ecal_angle(image, power):
     #zunmasked = K.sum(zmask, axis=1) # used for simple mean 
     #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
 
-    ang = K.sum(ang, axis=1)/K.sum(sumz_tot, axis=1) # sum ( measured * weights)/sum(weights)
+    ang = tf.div_no_nan(K.sum(ang, axis=1),K.sum(sumz_tot, axis=1)) # sum ( measured * weights)/sum(weights)
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
+    K.tf.where(K.tf.is_nan(ang), K.zeros_like(ang), ang)
     
     ang = K.expand_dims(ang, 1)
     return ang
@@ -122,18 +123,18 @@ def discriminator(power=1.0):
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
+    x = BatchNormalization(momentum=0.9, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
+    x = BatchNormalization(momentum=0.9, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
     x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
+    x = BatchNormalization(momentum=0.9, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = AveragePooling3D((2, 2, 2))(x)
@@ -152,7 +153,7 @@ def discriminator(power=1.0):
     return Model(input=[image], output=[fake, aux, ang, ecal, add_loss])
 
 # Generator
-def generator(latent_size=200, return_intermediate=False):
+def generator(latent_size=256, return_intermediate=False):
     if K.image_data_format() =='channels_last':
         dim = (9,9,8,8)
         baxis=-1 # axis for BatchNormalization
@@ -166,28 +167,28 @@ def generator(latent_size=200, return_intermediate=False):
         
         Conv3D(8, (6, 6, 8), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis, epsilon=1e-6),
+        BatchNormalization(axis=baxis, momentum=0.9, epsilon=1e-6),
         
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis, epsilon=1e-6),
+        BatchNormalization(axis=baxis, momentum=0.9, epsilon=1e-6),
         ####################################### added layers 
         
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis, epsilon=1e-6),
+        BatchNormalization(axis=baxis, momentum=0.9, epsilon=1e-6),
 
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis, epsilon=1e-6),
+        BatchNormalization(axis=baxis, momentum=0.9, epsilon=1e-6),
 
         ZeroPadding3D((1, 1, 0)),
         Conv3D(6, (3, 3, 5), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
-        BatchNormalization(axis=baxis, epsilon=1e-6),
+        BatchNormalization(axis=baxis, momentum=0.9, epsilon=1e-6),
         
         #####################################  
         
@@ -211,5 +212,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-                
