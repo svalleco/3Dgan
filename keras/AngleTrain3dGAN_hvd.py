@@ -138,7 +138,6 @@ def main():
     # hvd config 
     config = tf.compat.v1.ConfigProto(log_device_placement=False)
 
-    config = tf.ConfigProto(log_device_placement=False)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
     os.environ['KMP_BLOCKTIME'] = str(0)
@@ -148,8 +147,6 @@ def main():
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
     os.environ['HOROVOD_LOG_LEVEL'] = str(3)
     K.set_session(tf.compat.v1.Session(config=config))
-    #run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-    #run_metadata = tf.RunMetadata()
     
     #initialize Horovod
     hvd.init()
@@ -158,22 +155,8 @@ def main():
     
     opt = getattr(keras.optimizers, params.optimizer)
     opt = opt(params.lr)# * hvd.size())
-    # os.environ['KMP_AFFINITY'] = 'balanced'
-    os.environ['OMP_NUM_THREADS'] = str(params.intraop)
-    #os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
-    K.set_session(tf.Session(config=config))
-    #run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-    #run_metadata = tf.RunMetadata()
-
-    #initialize Horovod
-    hvd.init()
-
-
-    np.random.seed(42 + hvd.rank())
-    tf.random.set_random_seed(42 + hvd.rank())
-    #random.seed(42 + hvd.rank())
- 
     opt = hvd.DistributedOptimizer(opt)
+    
     global_batch_size = batch_size * hvd.size()
     print('Number of nodes: {}'.format(hvd.size()))
     print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
