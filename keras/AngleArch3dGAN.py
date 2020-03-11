@@ -86,7 +86,9 @@ def ecal_angle(image, daxis):
     #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
 
     ang = tf.div_no_nan(K.sum(ang, axis=1), K.sum(sumz_tot, axis=1)) # sum ( measured * weights)/sum(weights)
+
     ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
+    K.tf.where(K.tf.is_nan(ang), K.zeros_like(ang), ang)
     
     ang = K.expand_dims(ang, 1)
     return ang
@@ -201,5 +203,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-                

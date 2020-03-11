@@ -22,7 +22,7 @@ import time
 import math
 import argparse
 
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
+if 'cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
     tlab = True
 else:
     tlab= False
@@ -137,6 +137,8 @@ def main():
 
     # hvd config 
     config = tf.compat.v1.ConfigProto(log_device_placement=False)
+
+    config = tf.ConfigProto(log_device_placement=False)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
     os.environ['KMP_BLOCKTIME'] = str(0)
@@ -156,6 +158,21 @@ def main():
     
     opt = getattr(keras.optimizers, params.optimizer)
     opt = opt(params.lr)# * hvd.size())
+    # os.environ['KMP_AFFINITY'] = 'balanced'
+    os.environ['OMP_NUM_THREADS'] = str(params.intraop)
+    #os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
+    K.set_session(tf.Session(config=config))
+    #run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    #run_metadata = tf.RunMetadata()
+
+    #initialize Horovod
+    hvd.init()
+
+
+    np.random.seed(42 + hvd.rank())
+    tf.random.set_random_seed(42 + hvd.rank())
+    #random.seed(42 + hvd.rank())
+ 
     opt = hvd.DistributedOptimizer(opt)
     global_batch_size = batch_size * hvd.size()
     print('Number of nodes: {}'.format(hvd.size()))
@@ -345,7 +362,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=140, end_epoch=260, multiplier=3e-2), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=260, end_epoch=380, multiplier=1e-2), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=380, multiplier=1e-3), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=None) \
+        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
     dcb = CallbackList( \
@@ -359,7 +376,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=140, end_epoch=260, multiplier=3e-2), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=260, end_epoch=380, multiplier=1e-2), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=380, multiplier=1e-3), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=None) \
+        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
     ccb = CallbackList( \
@@ -373,7 +390,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=140, end_epoch=260, multiplier=3e-2), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=260, end_epoch=380, multiplier=1e-2), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=380, multiplier=1e-3), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=None) \
+        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
     gcb.set_model( generator )
