@@ -376,26 +376,6 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
                              *train_history['discriminator'][-1]))
         print(ROW_FMT.format('discriminator (test)',
                              *test_history['discriminator'][-1]))
-        mean = 0
-        var = 0
-        with open('BN_log.txt', 'a') as f:
-           print('######  Epoch {} ######'.format(epoch))
-           f.write(os.linesep + '###### Epoch {} ######'.format(epoch))
-           for i, l in enumerate(generator.layers[1].layers):
-             if 'batch_normalization' in l.name:
-               print("#### {} ####".format(l.name))
-               f.write(os.linesep)
-               f.write("#### {} ####".format(l.name) + os.linesep)
-
-               for w in l.weights:
-                 if 'moving_' in w.name:
-                    print("moving average for {}".format(w.name))
-                    f.write(os.linesep + "moving average for {}  ".format(w.name))
-                    print(K.eval(w))
-                    for i in K.eval(w): f.write('{}, '.format(i))
-                    print("layer statistics")
-                    f.write(os.linesep + 'layer statistics   ')
-
         if analysis:
               analysis_history = defaultdict(list)
               noise_test = np.random.normal(0., 1., (nb_test, latent_size))
@@ -428,7 +408,7 @@ def get_parser():
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--weightsdir', action='store', type=str, default='/gkhattak/hvdweights/', help='Directory to store weights.')
     parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
-    parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
+    parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--learningRate', '-lr', action='store', type=float, default=0.001, help='Learning Rate')
     parser.add_argument('--optimizer', action='store', type=str, default='RMSprop', help='Keras Optimizer to use.')
