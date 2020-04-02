@@ -119,21 +119,22 @@ def main():
        prev_gweights = outpath + prev_gweights
        prev_dweights = outpath + prev_dweights
 
-
-    # printing config
-    print('****************** 3DGAN Config ***************************')
-    print('epochs= {}, batch size= {}, latent size= {}, verbose ={}, number of events to use= {}'.format(nb_epochs, batch_size, latent_size, verbose, nEvents))
-    print('data path={} with {} events/file\nout path= {}, weight dir= {}'.format(datapath, events_per_file, outpath, weightdir))
-    print('loss history={}, analysis history={}'.format(pklfile, resultfile))
-    print('cell energy scaled by {} and raised to power {} with threshold at {}'.format(xscale, xpower, thresh))
-    print('analyze={} at energies={}, loss weights={}, image data format= {}, angle type= {}, particle= {}'.format(analyse, energies, loss_weights, dformat, angtype, particle))   
-    K.set_image_data_format(dformat)
-    print('Setting image data format to {}'.format(dformat))
-    if warm:
-       print('Starting from trained weights: discriminator weights={}, generator weights={}'.format(prev_dweights, prev_gweights))
-    print('**************** Horovod config ***************************')
-    print("using optimizer={} warmup epochs={}".format(params.optimizer, warmup_epochs))
-    print('intraop={}, interop= {}'.format(params.intraop, params.interop))
+    hvd.init()
+    if hvd.rank()==0:
+       # printing config
+       print('****************** 3DGAN Config ***************************')
+       print('epochs= {}, batch size= {}, latent size= {}, verbose ={}, max number of events to use= {}'.format(nb_epochs, batch_size, latent_size, verbose, nEvents))
+       print('data path={} with {} events/file\nout path= {}, weight dir= {}'.format(datapath, events_per_file, outpath, weightdir))
+       print('loss history={}, analysis history={}'.format(pklfile, resultfile))
+       print('cell energy scaled by {} and raised to power {} with threshold at {}'.format(xscale, xpower, thresh))
+       print('analyze={} at energies={}, loss weights={}, image data format= {}, angle type= {}, particle= {}'.format(analyse, energies, loss_weights, dformat, angtype, particle))   
+       K.set_image_data_format(dformat)
+       print('Setting image data format to {}'.format(dformat))
+       if warm:
+          print('Starting from trained weights: discriminator weights={}, generator weights={}'.format(prev_dweights, prev_gweights))
+       print('**************** Horovod config ***************************')
+       print("using optimizer={} warmup epochs={}".format(params.optimizer, warmup_epochs))
+       print('intraop={}, interop= {}'.format(params.intraop, params.interop))
 
     # hvd config 
     config = tf.compat.v1.ConfigProto(log_device_placement=False)
@@ -149,7 +150,7 @@ def main():
     K.set_session(tf.compat.v1.Session(config=config))
     
     #initialize Horovod
-    hvd.init()
+    #hvd.init()
     np.random.seed(42 + hvd.rank())
     tf.compat.v1.random.set_random_seed(42 + hvd.rank())
     
@@ -158,9 +159,10 @@ def main():
     opt = hvd.DistributedOptimizer(opt)
     
     global_batch_size = batch_size * hvd.size()
-    print('Number of nodes: {}'.format(hvd.size()))
-    print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
-    print('***********************************************************')
+    if hvd.rank()==0:
+       print('Number of nodes: {}'.format(hvd.size()))
+       print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
+       print('***********************************************************')
 
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
@@ -207,7 +209,7 @@ def get_parser():
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--test', action='store', default=False, help='Include testing for each epoch')
+    parser.add_argument('--test', action='store', default=True, help='Include testing for each epoch')
     parser.add_argument('--name', action='store', type=str, default='gan_dist_training', help='Unique identifier can be set for each training')
     parser.add_argument('--optimizer', action='store', type=str, default='RMSprop', help='Keras Optimizer to use.')
     parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
@@ -386,13 +388,13 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
 
     # Getting Data
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
+    Trainfiles=[Trainfiles[0]]
+    Testfiles=[Testfiles[0]]
     nb_Test = int(nEvents * f[1]) # The number of test files calculated from fraction of nEvents
     nb_Train = int(nEvents * f[0]) # The number of train files calculated from fraction of nEvents     
     if hvd.rank()==0:
         print('Train files:', Trainfiles)
         print('Test files:', Testfiles)
-        print('Number of events to use for training:', nb_Train)
-        print('Number of events to use for testing:', nb_Test)
     if test or analyse:
         if hvd.rank()==0:
            print('Loading test data:') 
@@ -414,11 +416,14 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
                 ang_test = np.concatenate((ang_test, data_temp[angtype]))
                 ecal_test = np.concatenate((ecal_test, data_temp['ecal_sum']))
                 bcount_test = np.concatenate((bcount_test, data_temp['bcount']))
-        X_test = X_test[:nb_Test]
-        Y_test = Y_test[:nb_Test]
-        ang_test = ang_test[:nb_Test]
-        ecal_test = ecal_test[:nb_Test]
-        bcount_test = bcount_test[:nb_Test]
+        if X_test.shape[0] < nb_Test:
+            nb_Test = X_test.shape[0]
+        else:
+            X_test = X_test[:nb_Test]
+            Y_test = Y_test[:nb_Test]
+            ang_test = ang_test[:nb_Test]
+            ecal_test = ecal_test[:nb_Test]
+            bcount_test = bcount_test[:nb_Test]
     
     if hvd.rank()==0:
        print('Loading train data:')
@@ -438,13 +443,19 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
               ang_train = np.concatenate((ang_train, data_temp[angtype]))
               ecal_train = np.concatenate((ecal_train, data_temp['ecal_sum']))
               bcount_train = np.concatenate((bcount_train, data_temp['bcount']))
-    X_train = X_train[:nb_Train]
-    Y_train = Y_train[:nb_Train]
-    ang_train = ang_train[:nb_Train]
-    ecal_train = ecal_train[:nb_Train]
-    bcount_train = bcount_train[:nb_Train]
+    if X_train.shape[0] < nb_Train:
+       nb_Train = X_train.shape[0]
+    else:
+       X_train = X_train[:nb_Train]
+       Y_train = Y_train[:nb_Train]
+       ang_train = ang_train[:nb_Train]
+       ecal_train = ecal_train[:nb_Train]
+       bcount_train = bcount_train[:nb_Train]
     total_batches = nb_Train / global_batch_size
     if hvd.rank()==0:
+       print('Number of events to use for training:', nb_Train)
+       print('Number of events to use for testing:', nb_Test)
+
        print('Total Training batches = {} with {} events'.format(total_batches, nb_Train))
        print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_train), np.amax(ang_train), np.mean(ang_train)))
@@ -557,27 +568,30 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
             # perform a short evaluation based on mean relative errors
             if analyse:
                 var=gan.sortEnergy([np.squeeze(X_test), Y_test, ang_test], ecal_test, energies, ang=1)
-                result = gan.OptAnalysisAngle(var, generator, energies, xpower = xpower, concat=2)    
-                print('Analysing............')
+                result = gan.OptAnalysisAngle(var, generator, energies, xpower = xpower, concat=2)
+                if hvd.rank()==0:
+                   print('Analysing............')
                 analysis_history['total'].append(result[0])
                 analysis_history['energy'].append(result[1])
                 analysis_history['moment'].append(result[2])
                 analysis_history['angle'].append(result[3])
-                print('Result = ', result)
+                if hvd.rank()==0:
+                   print('Result = ', result)
                 pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
 
-        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s} | {6:8s}'.format('component', *discriminator.metrics_names))
-        print('-' * 65)
-        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
-        print(ROW_FMT.format('generator (train)',
+        if hvd.rank()==0:
+           print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s} | {6:8s}'.format('component', *discriminator.metrics_names))
+           print('-' * 65)
+           ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
+           print(ROW_FMT.format('generator (train)',
                         *train_history['generator'][-1]))
-        if test:
-            print(ROW_FMT.format('generator (test)',
+           if test:
+              print(ROW_FMT.format('generator (test)',
                        *test_history['generator'][-1]))
-        print(ROW_FMT.format('discriminator (train)',
+           print(ROW_FMT.format('discriminator (train)',
                        *train_history['discriminator'][-1]))
-        if test:
-            print(ROW_FMT.format('generator (test)',
+           if test:
+              print(ROW_FMT.format('generator (test)',
                        *test_history['generator'][-1]))
 
         # save weights and losses for every epoch
@@ -589,7 +603,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, fEvents, f
         pickle.dump({'train': train_history}, open(pklfile, 'wb'))
         if test:
            pickle.dump({'test': test_history}, open(pklfile, 'wb'))
-           print("The {} epoch test took {} seconds".format(epoch, time.time()-test_start))
+           if hvd.rank()==0:
+              print("The {} epoch test took {} seconds".format(epoch, time.time()-test_start))
 
 if __name__ == '__main__':
     main()
