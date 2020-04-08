@@ -22,12 +22,12 @@ def get_parser():
    parser.add_argument('--xscales',  type=float, nargs='+', default=100., help="scaling factor for cell energies")
    parser.add_argument('--real_data', default='/eos/user/g/gkhattak/FixedAngleData/EleEscan_1_9.h5', help='Data to check the output obtained')
    parser.add_argument('--out_dir', default= 'results/short_analysis/', help='Complete PATH to save the output plot')
-   parser.add_argument('--numevents', action='store', type=int, default=5000, help='Max limit for events used for validation')
+   parser.add_argument('--numevents', action='store', type=int, default=1000, help='Max limit for events used for validation')
    parser.add_argument('--latent', action='store', type=int, default=200, help='size of latent space to sample')
    parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
    parser.add_argument('--error', default=False, help='add relative errors to plots')
    parser.add_argument('--stest', default=False, help='add ktest to plots')
-   parser.add_argument('--norm', default=True, help='add ktest to plots')
+   parser.add_argument('--norm', default=True, help='normalize shower shapes')
    return parser
 
 def main():
@@ -43,6 +43,7 @@ def main():
    keras_dformat= args.dformat
    error = args.error
    stest = args.stest
+   norm = args.norm
    xscales = args.xscales if isinstance(args.xscales, list) else [args.xscales]
    xpower = 0.85
    safe_mkdir(out_dir)
@@ -58,28 +59,31 @@ def main():
    
    # read data
    if ang:
-     X, Y, angle = GetAngleData(real_data, angtype='theta')
+     X, Y, angle = GetAngleData(real_data, angtype='theta', num_events=num_events)
    else:
-     X, Y = GetData(real_data)
-   X=X[:num_events]
-   Y=Y[:num_events]
+     X, Y = GetData(real_data, num_events=num_events)
+   X=X
+   Y=Y
    X = np.squeeze(X)/dscale
    #get shape
    x = X.shape[1]
    y = X.shape[2]
    z = X.shape[3]
    xsum = np.sum(X, axis=(1, 2, 3))
-   indexes = np.where(xsum > (0.2/dscale))
+   indexes = np.where(xsum > (0.2 * dscale))
    X=X[indexes]
    Y = Y[indexes]
    if ang: angle = angle[indexes]
    num_events = X.shape[0]
    images =[]
-   gm=generator()
+   if ang:
+      gm=generator(dformat = keras_dformat)
+   else:
+      gm=generator(keras_dformat = keras_dformat)
    for i, gweight in enumerate(weights_train):
       gm.load_weights(gweight)
       if ang:
-        angle = angle[:num_events]
+        angle = angle
         images.append(generate(gm, num_events, [Y/100., angle], latent=latent, concat=2))
         images[i] = np.power(images[i], 1./xpower)
       else:

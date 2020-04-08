@@ -89,12 +89,12 @@ def GetDataFiles(FileSearch="/data/LCD/*/*.h5",
     return Sample
 
 # get data for fixed angle
-def GetData(datafile, thresh=0):
+def GetData(datafile, thresh=0, num_events=10000):
    #get data for training
     print( 'Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    y=f.get('target')
-    x=np.array(f.get('ECAL'))
+    y=f.get('target')[:num_events]
+    x=np.array(f.get('ECAL')[:num_events])
     y=(np.array(y[:,1]))
     if thresh>0:
        x[x < thresh] = 0
@@ -363,13 +363,13 @@ def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2
     return srt
 
 # get variable angle data
-def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
+def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0, num_events=10000):
     #get data for training                                                                                        
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    X=np.array(f.get('ECAL'))
-    Y=np.array(f.get('energy'))
-    ang = np.array(f.get(angtype))
+    X=np.array(f.get('ECAL')[:num_events])
+    Y=np.array(f.get('energy')[:num_events])
+    ang = np.array(f.get(angtype)[:num_events])
     ang = ang + offset
     X[X < thresh] = 0
     X = np.expand_dims(X, axis=-1)
