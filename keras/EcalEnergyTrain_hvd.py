@@ -140,7 +140,7 @@ def randomize(a, b, c):
     return shuffled_a, shuffled_b, shuffled_c
 
 
-def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_generator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=True):
+def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_batch_size, warmup_epochs, datapath, EventsperFile, nEvents, WeightsDir, resultfile, energies,mod=0, nb_epochs=30, batch_size=128, latent_size=128, gen_weight=6, aux_weight=0.2, ecal_weight=0.1, lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, verbose=True, keras_dformat='channels_last', analysis=True):
     start_init = time.time()
     verbose = False
     if hvd.rank()==0:
@@ -314,10 +314,10 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
            safe_mkdir(WeightsDir)
 
            print ("saving weights of gen")
-           generator.save_weights(WeightsDir + '/generator_{0}{1:03d}.hdf5'.format(g_weights, epoch), overwrite=True)
+           generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch), overwrite=True)
             
            print ("saving weights of disc")
-           discriminator.save_weights(WeightsDir + '/discriminator_{0}{1:03d}.hdf5'.format(d_weights, epoch), overwrite=True)
+           discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch), overwrite=True)
 
            epoch_time = time.time()-epoch_start
            print("The {} epoch took {} seconds".format(epoch, epoch_time))
@@ -360,7 +360,7 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
         train_history['discriminator'].append(discriminator_train_loss)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
-        pickle.dump({'train': train_history, 'test': test_history}, open('/gkhattak/hvd-history.pkl', 'wb'))
+        pickle.dump({'train': train_history, 'test': test_history}, open('hvd-history.pkl', 'wb'))
         
         print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
             'component', *discriminator.metrics_names))
