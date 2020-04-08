@@ -100,7 +100,8 @@ def GetData(datafile, xscale =1, yscale = 100, dimensions = 3, keras_dformat="ch
     X = X.astype(np.float32)
     if dimensions == 2:
         X = np.sum(X, axis=(1))
-        X = xscale * X
+
+    X = xscale * X
 
     Y = Y.astype(np.float32)
     Y = Y/yscale
@@ -109,6 +110,7 @@ def GetData(datafile, xscale =1, yscale = 100, dimensions = 3, keras_dformat="ch
        ecal = np.sum(X, axis=(2, 3, 4))
     else:
        ecal = np.sum(X, axis=(1, 2, 3))
+    print('ecal', ecal[:5])
     return X, Y, ecal
 
 
@@ -213,30 +215,29 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
     dcb.on_train_begin()
     ccb.on_train_begin()
     
-
-    datapath = '/eos/user/g/gkhattak/FixedAngleData/*.h5'
     # Getting Data
     Trainfiles, Testfiles = DivideFiles(datapath, nEvents=nEvents, EventsperFile = EventsperFile, datasetnames=["ECAL"], Particles =["Ele"])
     print(Trainfiles)
     print(Testfiles)
+
     if hvd.rank()==0:
         print("Train files: {0} \nTest files: {1}".format(Trainfiles, Testfiles))
     
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
-           X_test, Y_test, ecal_test = GetData(dtest, keras_dformat=keras_dformat)
+           X_test, Y_test, ecal_test = GetData(dtest, keras_dformat=keras_dformat, xscale=xscale)
        else:
-           X_temp, Y_temp, ecal_temp = GetData(dtest, keras_dformat=keras_dformat)
+           X_temp, Y_temp, ecal_temp = GetData(dtest, keras_dformat=keras_dformat, xscale=xscale)
            X_test = np.concatenate((X_test, X_temp))
            Y_test = np.concatenate((Y_test, Y_temp))
            ecal_test = np.concatenate((ecal_test, ecal_temp))
     
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
-            X_train, Y_train, ecal_train = GetData(dtrain, keras_dformat=keras_dformat)
+            X_train, Y_train, ecal_train = GetData(dtrain, keras_dformat=keras_dformat, xscale=xscale)
         else:
-            X_temp, Y_temp, ecal_temp = GetData(dtrain, keras_dformat=keras_dformat)
+            X_temp, Y_temp, ecal_temp = GetData(dtrain, keras_dformat=keras_dformat, xscale=xscale)
             X_train = np.concatenate((X_train, X_temp))
             Y_train = np.concatenate((Y_train, Y_temp))
             ecal_train = np.concatenate((ecal_train, ecal_temp))
@@ -276,13 +277,11 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
             image_batch = next(image_batches)
             energy_batch = next(energy_batches)
             ecal_batch = next(ecal_batches)
-
             noise = np.random.normal(0, 1, (batch_size, latent_size))
             sampled_energies = np.random.uniform(0.1, 5,( batch_size, 1))
             generator_ip = np.multiply(sampled_energies, noise)
             # ecal sum from fit
             ecal_ip = GetEcalFit(sampled_energies, mod, xscale)
-
             generated_images = generator.predict(generator_ip, verbose=0)        
             real_batch_loss = discriminator.train_on_batch(image_batch, [BitFlip(np.ones(batch_size)), energy_batch, ecal_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [BitFlip(np.zeros(batch_size)), sampled_energies, ecal_ip])
@@ -343,11 +342,11 @@ def GanTrain(discriminator, generator, opt,run_options, run_metadata, global_bat
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
         discriminator_test_loss_true = discriminator.evaluate(
             X_test, [np.array([1] * nb_test), Y_test, ecal_test], verbose=False, batch_size=batch_size)
-        print('discriminator_test_loss_true=', discriminator_test_loss_true)
+        #print('discriminator_test_loss_true=', discriminator_test_loss_true)
 
         discriminator_test_loss_fake = discriminator.evaluate(
             generated_images, [np.array([0] * nb_test), sampled_energies, ecal_ip], verbose=False, batch_size=batch_size) 
-        print('discriminator_test_loss_fake=', discriminator_test_loss_fake)
+        #print('discriminator_test_loss_fake=', discriminator_test_loss_fake)
 
         noise = np.random.normal(0.1, 1, (2 * nb_test, latent_size))
         sampled_energies = np.random.uniform(0.1, 5, (2 * nb_test, 1))
@@ -402,7 +401,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=25, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/eos/project/d/dshep/LCD/V1/*scan/*.h5', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='/eos/user/g/gkhattak/FixedAngleData/*.h5', help='HDF5 files to train from.')
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
@@ -476,7 +475,7 @@ if __name__ == '__main__':
     resultfile = '3dgan_analysis.pkl' # analysis result
 
     global_batch_size = batch_size * hvd.size()
-    print(hvd.size())
+
     print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
     latent_size = params.latentsize #latent vector size
     verbose = params.verbose
