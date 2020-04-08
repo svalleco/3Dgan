@@ -114,7 +114,7 @@ def GetData(datafile, xscale =1, yscale = 100, dimensions = 3, keras_dformat="ch
 
 def GetEcalFit(sampled_energies, mod=1, xscale=1):
     if mod==0:
-      return np.multiply(2, sampled_energies)
+      return np.multiply(2, sampled_energies) * xscale
     elif mod==1:
       root_fit = [0.0018, -0.023, 0.11, -0.28, 2.21]
       ratio = np.polyval(root_fit, sampled_energies)
@@ -407,7 +407,7 @@ def get_parser():
     parser.add_argument('--nbperfile', action='store', type=int, default=10000, help='Number of events in a file.')
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--weightsdir', action='store', type=str, default='/gkhattak/hvdweights/', help='Directory to store weights.')
-    parser.add_argument('--mod', action='store', type=int, default=0, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
+    parser.add_argument('--mod', action='store', type=int, default=1, help='How to calculate Ecal sum corressponding to energy.\n [0].. factor 50 \n[1].. Fit from Root')
     parser.add_argument('--xscale', action='store', type=int, default=100, help='Multiplication factor for ecal deposition')
     parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--learningRate', '-lr', action='store', type=float, default=0.001, help='Learning Rate')
@@ -488,7 +488,6 @@ if __name__ == '__main__':
     weightdir = params.weightsdir
     xscale = params.xscale
     warmup_epochs = params.warmupepochs
-    mod=0
     opt = getattr(keras.optimizers, params.optimizer)
     #opt = RMSprop()
     opt = opt(params.learningRate * hvd.size())
