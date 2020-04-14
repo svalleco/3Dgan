@@ -453,7 +453,7 @@ def plot_ecal_hist(ecal1, ecal2, out_file, energy, labels, p=[2, 500], ifpdf=Tru
    else:
       c1.Print(out_file + '.C')
 
-def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True, log=0, leg=True, grid=True, statbox=True, mono=False):
+def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500], ifpdf=True, log=0, leg=True, grid=True, statbox=True, mono=False, num_events=1000):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    if grid: c1.SetGrid()
    color =2
@@ -465,7 +465,7 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
    if not statbox: hd.SetStats(0)
    my.BinLogX(hd)
    hd.Sumw2()
-   data1= event1.flatten()
+   data1= event1[:num_events].flatten()
    my.fill_hist(hd, data1)
    hd =my.normalize(hd,1)
    if energy == 0:
@@ -490,7 +490,7 @@ def plot_ecal_flatten_hist(event1, event2, out_file, energy, labels, p=[2, 500],
       hg = hgs[i]
       my.BinLogX(hg)
       hg.Sumw2()
-      data2= event2[key].flatten()
+      data2= event2[key][:num_events].flatten()
       my.fill_hist(hg, data2)
       hg =my.normalize(hg, 1)
       hg.SetLineColor(color)
@@ -972,7 +972,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       c1.Print(out_file3 + '.C')
 
 def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, x, y, z, out_file1, out_file2, out_file3, energy, labels,
-                          log=0, p=[2, 500], ifpdf=True, stest=True, grid=True, leg=True, statbox=True, mono=False):
+                          log=0, p=[2, 500], ifpdf=True, stest=True, grid=True, leg=True, statbox=True, mono=False, norm=False):
    canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
    canvas.SetTitle('Weighted Histogram for energy deposition along x, y, z axis')
    color = 2
@@ -1002,7 +1002,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if grid:
       ROOT.gPad.SetGrid()
    my.fill_hist_wt(h1x, array1x)
-   h1x=my.normalize(h1x)
+   if norm: h1x=my.normalize(h1x)
    h1x.Draw()
    h1x.Draw('sames hist')
    h1x.GetXaxis().SetTitle("position along x axis")
@@ -1013,7 +1013,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if grid:
       ROOT.gPad.SetGrid()
    my.fill_hist_wt(h1y, array1y)
-   h1y=my.normalize(h1y)
+   if norm: h1y=my.normalize(h1y)
    h1y.Draw()
    h1y.Draw('sames hist')
    h1y.GetXaxis().SetTitle("position along y axis")
@@ -1024,7 +1024,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    if grid:
       ROOT.gPad.SetGrid()
    my.fill_hist_wt(h1z, array1z)
-   h1z=my.normalize(h1z)
+   if norm: h1z=my.normalize(h1z)
    h1z.Draw()
    h1z.Draw('sames hist')
    h1z.GetXaxis().SetTitle("position along z axis")
@@ -1067,7 +1067,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
         h2z.SetStats(0)
       canvas.cd(1)
       my.fill_hist_wt(h2x, array2x[key])
-      h2x=my.normalize(h2x)
+      if norm: h2x=my.normalize(h2x)
       if i==0:
         h2x.Draw()
         h2x.Draw('sames hist')
@@ -1087,7 +1087,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(2)
       my.fill_hist_wt(h2y, array2y[key])
-      h2y=my.normalize(h2y)
+      if norm : h2y=my.normalize(h2y)
       if i==0:
         h2y.Draw()
         h2y.Draw('sames hist')
@@ -1106,7 +1106,7 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
       canvas.Update()
       canvas.cd(3)
       my.fill_hist_wt(h2z, array2z[key])
-      h2z=my.normalize(h2z)
+      if norm: h2z=my.normalize(h2z)
       if i==0:
         h2z.Draw()
         h2z.Draw('sames hist')
