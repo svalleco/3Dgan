@@ -369,7 +369,11 @@ def GetAngleData(datafile, thresh=1e-6, angtype='eta', offset=0.0):
     f=h5py.File(datafile,'r')
     X=np.array(f.get('ECAL'))
     Y=np.array(f.get('energy'))
-    ang = np.array(f.get(angtype))
+    if angtype in f:
+      ang = np.array(f.get(angtype))
+    else:
+      if angtype=='mtheta':
+        ang = measPython(X)
     ang = ang + offset
     X[X < thresh] = 0
     X = X.astype(np.float32)
@@ -672,7 +676,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
        else:
           data_files = Trainfiles  # else train data will be used
        start = time.time()
-       var = get_sorted_angle(data_files, energies, True, num_events1, num_events2, Data=Data, angtype=angtype, thresh=thresh, offset=offset) # returning a dict with sorted data. 
+       var = get_sorted_angle(data_files, energies, True, num_events1, num_events2, Data=Data, angtype=angtype, thresh=thresh*dscale, offset=offset) # returning a dict with sorted data. 
        print ("{} events were loaded in {} seconds".format(num_data, time.time() - start))
        
        # If saving the binned data. This will only run if reading from data directly
@@ -780,8 +784,12 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
              g.load_weights(gen_weights)
              start = time.time()
              var["events_gan" + str(energy)]['n_'+ str(i)] = generate(g, var["index" + str(energy)], [var["energy" + str(energy)]/100, (var["angle"+ str(energy)]) * ascale], latent, concat)
+             var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale, power)
+             var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh * dscale] = 0
+
              if save_gen:
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], [var["energy" + str(energy)], var["angle"+ str(energy)]], energy, gendir)
+             var["events_gan" + str(energy)]['n_'+ str(i)] = pre (var["events_gan" + str(energy)]['n_'+ str(i)], scale, power)
              gen_time = time.time() - start
              print( "Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)]))
           if read_disc:
@@ -835,7 +843,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
                save_discriminated(discout, energy, discdir, angloss, addloss, ang)
           print ('Calculations for ....', energy)
           var["events_gan" + str(energy)]['n_'+ str(i)] = post(var["events_gan" + str(energy)]['n_'+ str(i)], scale, power)/dscale
-          var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0
+          #var["events_gan" + str(energy)]['n_'+ str(i)][var["events_gan" + str(energy)]['n_'+ str(i)]< thresh] = 0
           var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["angle_act"+ str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_act" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_act" + str(energy)]['n_'+ str(i)]), np.squeeze((var["angle_act"+ str(energy)]['n_'+ str(i)]))/ascale, np.squeeze(var["ecal_act"+ str(energy)]['n_'+ str(i)]/(dscale * scale))
           var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["angle_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= np.squeeze(var["isreal_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["aux_gan" + str(energy)]['n_'+ str(i)]), np.squeeze(var["angle_gan"+ str(energy)]['n_'+ str(i)] )/ascale, np.squeeze(var["ecal_gan"+ str(energy)]['n_'+ str(i)]/(dscale * scale))
           if angloss==2:
