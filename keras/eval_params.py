@@ -20,7 +20,7 @@ def get_parser():
    parser.add_argument('--ang', default=0, help="If using angle vefsion")
    parser.add_argument('--labels', type=str, nargs='+', default='', help="labels for different weights")
    parser.add_argument('--xscales',  type=float, nargs='+', default=100., help="scaling factor for cell energies")
-   parser.add_argument('--real_data', default='/eos/user/g/gkhattak/FixedAngleData/EleEscan_1_9.h5', help='Data to check the output obtained')
+   parser.add_argument('--real_data', default='/eos/user/g/gkhattak/FixedAngleData/EleEscan_1_1.h5', help='Data to check the output obtained')
    parser.add_argument('--out_dir', default= 'results/short_analysis/', help='Complete PATH to save the output plot')
    parser.add_argument('--numevents', action='store', type=int, default=1000, help='Max limit for events used for validation')
    parser.add_argument('--latent', action='store', type=int, default=200, help='size of latent space to sample')
@@ -56,7 +56,6 @@ def main():
      dscale = 1.
 
    K.set_image_data_format(keras_dformat)
-   
    # read data
    if ang:
      X, Y, angle = GetAngleData(real_data, angtype='theta', num_events=num_events)
@@ -70,12 +69,14 @@ def main():
    y = X.shape[2]
    z = X.shape[3]
    xsum = np.sum(X, axis=(1, 2, 3))
-   indexes = np.where(xsum > (0.2 * dscale))
+   indexes = np.where(xsum > (0.2))
    X=X[indexes]
    Y = Y[indexes]
+
    if ang: angle = angle[indexes]
    num_events = X.shape[0]
    images =[]
+
    if ang:
       gm=generator(dformat = keras_dformat)
    else:
