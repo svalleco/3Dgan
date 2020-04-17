@@ -90,12 +90,12 @@ def main():
       else:
         images.append(generate(gm, num_events, [Y/100.], latent=latent))
       images[i] = np.squeeze(images[i])/(xscales[i] * dscale)
-   plotSF(X, images, Y, labels, out_file=out_dir +'SamplingFraction', error=error)
+   plotSF(X, images, Y, labels, out_file=out_dir +'SamplingFraction', error=error, stest=stest)
    plotshapes(X, images, x, y, z, Y, out_file=out_dir +'ShowerShapes',labels=labels, log=0, stest=stest, error=error, norm=norm)
    plotshapes(X, images, x, y, z, Y, out_file=out_dir +'ShowerShapes_log',labels=labels, log=1, stest=stest, error=error, norm=norm)
    print('The plots are saved in {}'.format(out_dir))
 
-def plotSF(Data, gan_images, Y, labels, out_file, error=True):
+def plotSF(Data, gan_images, Y, labels, out_file, error=True, stest=True):
    gStyle.SetOptFit (1111) # superimpose fit results
    c=TCanvas("c" ,"Sampling Fraction vs. Primary energy" ,200 ,10 ,700 ,500) #make nice
    c.SetGrid()
@@ -132,7 +132,7 @@ def plotSF(Data, gan_images, Y, labels, out_file, error=True):
       legend.AddEntry(Gprof[i], glabel, "l")
       if stest:
          ks = Eprof.KolmogorovTest(Gprof[i])
-         legend.AddEntry(Gprof[i], 'K test={:.4f)'.format(ks), "l")
+         legend.AddEntry(Gprof[i], 'K test={}'.format(ks), "l")
       legend.Draw()
       c.Update()
    c.Print(out_file+'.pdf')
