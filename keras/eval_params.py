@@ -22,7 +22,7 @@ def get_parser():
    parser.add_argument('--xscales',  type=float, nargs='+', default=100., help="scaling factor for cell energies")
    parser.add_argument('--real_data', default='/eos/user/g/gkhattak/FixedAngleData/EleEscan_1_1.h5', help='Data to check the output obtained')
    parser.add_argument('--out_dir', default= 'results/short_analysis/', help='Complete PATH to save the output plot')
-   parser.add_argument('--numevents', action='store', type=int, default=1000, help='Max limit for events used for validation')
+   parser.add_argument('--numevents', action='store', type=int, default=5000, help='Max limit for events used for validation')
    parser.add_argument('--latent', action='store', type=int, default=200, help='size of latent space to sample')
    parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
    parser.add_argument('--error', default=False, help='add relative errors to plots')
@@ -90,9 +90,10 @@ def main():
       else:
         images.append(generate(gm, num_events, [Y/100.], latent=latent))
       images[i] = np.squeeze(images[i])/(xscales[i] * dscale)
-   plotSF(X, images, Y, labels, out_file=out_dir +'SamplingFraction.pdf', error=error)
+   plotSF(X, images, Y, labels, out_file=out_dir +'SamplingFraction', error=error)
    plotshapes(X, images, x, y, z, Y, out_file=out_dir +'ShowerShapes',labels=labels, log=0, stest=stest, error=error, norm=norm)
    plotshapes(X, images, x, y, z, Y, out_file=out_dir +'ShowerShapes_log',labels=labels, log=1, stest=stest, error=error, norm=norm)
+   print('The plots are saved in {}'.format(out_dir))
 
 def plotSF(Data, gan_images, Y, labels, out_file, error=True):
    gStyle.SetOptFit (1111) # superimpose fit results
@@ -129,10 +130,13 @@ def plotSF(Data, gan_images, Y, labels, out_file, error=True):
       if error:
          glabel = glabel + ' MRE={:.4f}'.format(np.mean(sf_error))
       legend.AddEntry(Gprof[i], glabel, "l")
+      if stest:
+         ks = Eprof.KolmogorovTest(Gprof[i])
+         legend.AddEntry(Gprof[i], 'K test={:.4f)'.format(ks), "l")
       legend.Draw()
       c.Update()
-   c.Print(out_file)
-   print (' The plot is saved in: {}'.format(out_file))
+   c.Print(out_file+'.pdf')
+   c.Print(out_file+'.C')
 
 def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=[2, 500], norm=False, ifpdf=True, stest=True, error=True):
    canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
@@ -251,19 +255,17 @@ def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=
    canvas.Update()
    canvas.cd(4)
    leg.SetHeader("#splitline{Weighted Histograms for energies}{ deposited along x, y, z axis}", "C")
-   if not stest:
-      for i, h in enumerate(h2xs):
-        glabel = 'GAN ' + labels[i]
-        if error:
-           tot_error = (np.mean(errorx) + np.mean(errory) + np.mean(errorz))/3.
-           glabel = glabel + ' MRE {:.4f}'.format(np.mean(errorz))
-        leg.AddEntry(h, glabel + labels[i],"l")     
+   
+   for i, h in enumerate(h2xs):
+       glabel = 'GAN ' + labels[i]
+       if error:
+          tot_error = (np.mean(errorx) + np.mean(errory) + np.mean(errorz))/3.
+          glabel = glabel + ' MRE {:.4f}'.format(np.mean(errorz))
+       leg.AddEntry(h, glabel + labels[i],"l")     
    leg.Draw()
    canvas.Update()
-   if ifpdf:
-      canvas.Print(out_file + '.pdf')
-   else:
-      canvas.Print(out_file + '.C')
+   canvas.Print(out_file + '.pdf')
+   canvas.Print(out_file + '.C')
 
 if __name__ == '__main__':
   main()
