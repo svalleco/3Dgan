@@ -13,144 +13,114 @@ import utils.ROOTutils as r
 import utils.GANutils as gan
 
 def main():
-    data1 = h5py.File("/afs/cern.ch/user/g/gkhattak/3Dgan/misc/validation_results_new.h5", 'r')
-    data2 = h5py.File("/afs/cern.ch/user/g/gkhattak/3Dgan/misc/validation_results.h5", 'r')
-    for key in data1:
-         print(key)
+    validation_files =["validation_GANtrain_G4test.h5", "validation_GANtrain_GANtest.h5", "validation_G4train_G4test.h5", "validation_G4train_GANtest.h5"]
+    data = []
+    for f in validation_files:
+     data.append(h5py.File(f, 'r'))
+    
+    save_path = 'results/triforce_validation2/'
+    gan.safe_mkdir(save_path)
+    ###################################################
     Ele_ID = 11
     ChPi_ID = 211
     GAN_ID = 0
     GEANT_ID = 1
     num_events  = 5000
-    save_path = 'results/triforce_plots_gan_train_g4_test2_tf_gan_chpi_withouthcal/' 
-    gan.safe_mkdir(save_path)
     leg = True
-    particle = 'Ele'
+    particles = ['electrons', 'charged pions']
+
+    ###################################################
+    results =[]
+    for i, d in enumerate(data):
+      params ={}
+      Ele_indices = np.absolute(np.array(d['pdgID'])) == Ele_ID
+      ChPi_indices = np.absolute(np.array(d['pdgID'])) == ChPi_ID
+      params['Ele_energy'] = d['energy'][Ele_indices][:num_events]
+      params['ChPi_energy'] = d['energy'][ChPi_indices][:num_events]
+      params['ChPi_ecal'] = d['ECAL_E'][ChPi_indices][:num_events]
+      params['ChPi_hcal'] = d['HCAL_E'][ChPi_indices][:num_events]
+      params['Ele_ecal'] = d['ECAL_E'][Ele_indices][:num_events]
+      params['Ele_hcal'] = d['HCAL_E'][Ele_indices][:num_events]
+      params['Ele_reg_energy_prediction'] = d['reg_energy_prediction'][Ele_indices][:num_events]
+      params['ChPi_reg_energy_prediction'] = d['reg_energy_prediction'][ChPi_indices][:num_events]
+      params['Ele_raw'] = inv_tf(params['Ele_reg_energy_prediction'], params['Ele_ecal'] + params['Ele_hcal'], f=10)
+      params['ChPi_raw'] = inv_tf(params['ChPi_reg_energy_prediction'], params['ChPi_ecal'] + params['ChPi_hcal'], f=10)
+      params['Ele_class_prediction'] = d['class_prediction'][Ele_indices][:num_events]
+      params['ChPi_class_prediction'] = d['class_prediction'][ChPi_indices][:num_events]
+      params['Ele_class_prediction_accuracy'] = float(sum(params['Ele_class_prediction'])) / float(len(params['Ele_class_prediction']))
+      params['ChPi_class_prediction_accuracy'] = 1.0 - (float(sum(params['ChPi_class_prediction'])) / float(len(params['ChPi_class_prediction'])))
+      params['Ele_error'] = (np.sqrt(params['Ele_class_prediction'].shape[0]) * params['Ele_class_prediction_accuracy'])/params['Ele_class_prediction'].shape[0]
+      params['ChPi_error'] =(np.sqrt(params['ChPi_class_prediction'].shape[0]) * params['ChPi_class_prediction_accuracy'])/params['ChPi_class_prediction'].shape[0]
+      print('The validation results for {}'.format(validation_files[i]))
+      print('The number of electrons events was {}'.format(params['Ele_class_prediction'].shape[0]))
+      print('The number of charged pions events was {}'.format(params['ChPi_class_prediction'].shape[0]))
+      print('minimum Ele energy is {}'.format(np.amin(params['Ele_energy'])))
+      print('minimum ChPi energy is {}'.format(np.amin(params['ChPi_energy'])))
+      print('The number of electrons events was {}'.format(params['Ele_class_prediction'].shape[0]))
+      print('The number of charged pions events was {}'.format(params['ChPi_class_prediction'].shape[0]))
+      print('maximum Ele energy is {}'.format(np.amax(params['Ele_energy'])))
+      print('maximum ChPi energy is {}'.format(np.amax(params['ChPi_energy'])))
+      print('##################################################################################')
+
+      results.append(params)
+    p = particles[0]
+    title = 'trained on GAN $e^{-}$ and G4 $\pi$'
+    rtitle = 'trained on GAN e and G4 pions' 
+    PLotClassBarPython([results[0]['Ele_class_prediction_accuracy'], results[1]['Ele_class_prediction_accuracy']], 
+                        [results[0]['Ele_error'], results[1]['Ele_error']], 
+                        ['G4', 'GAN'], p, title, save_path + p + '_GAN_train_class_accuracy')
+    PlotRegressionProf([results[0]['Ele_reg_energy_prediction'], results[1]['Ele_reg_energy_prediction']],
+                       [results[0]['Ele_energy'], results[1]['Ele_energy']], 
+                       p, ['G4', 'GAN'], rtitle, save_path + p + "_GAN_train_regression_prof.pdf", leg=leg)
+    PlotRegressionScat([results[0]['Ele_reg_energy_prediction'], results[1]['Ele_reg_energy_prediction']],
+                       [results[0]['Ele_energy'], results[1]['Ele_energy']], p, ['G4', 'GAN'], rtitle, save_path + p + "_GAN_train_regression_scat.pdf", leg=leg )
     
-    GAN_indices = np.array(data2['pdgID']) == GAN_ID
-    GEANT_indices = np.array(data2['pdgID']) == GEANT_ID
-    
-    GAN_energy = data2['energy'][GAN_indices][:num_events]
-    GEANT_energy = data2['energy'][GEANT_indices][:num_events]
-    GAN_reg_energy_prediction = data2['reg_energy_prediction'][GAN_indices][:num_events]
-    GEANT_reg_energy_prediction = data2['reg_energy_prediction'][GEANT_indices][:num_events]
-    GAN_raw = inv_tf(GAN_reg_energy_prediction, data2['ECAL_E'][GAN_indices][:num_events])
-    GEANT_raw = inv_tf(GEANT_reg_energy_prediction,data2['ECAL_E'][GEANT_indices][:num_events])
+    title = 'trained on G4 $e^{-}$ and G4 $\pi$'
+    rtitle = 'trained on G4 e and G4 pions'
+    PLotClassBarPython([results[2]['Ele_class_prediction_accuracy'], results[3]['Ele_class_prediction_accuracy']],
+                        [results[2]['Ele_error'], results[3]['Ele_error']],
+                        ['G4', 'GAN'], p, title, save_path + p + '_G4_train_class_accuracy')
+    PlotRegressionProf([results[2]['Ele_reg_energy_prediction'], results[3]['Ele_reg_energy_prediction']],
+                       [results[2]['Ele_energy'], results[3]['Ele_energy']],
+                       p, ['G4', 'GAN'], rtitle, save_path + p + "_G4_train_regression_prof.pdf", leg=leg)
 
-    Ele_indices = np.absolute(np.array(data1['pdgID'])) == Ele_ID
-    ChPi_indices = np.absolute(np.array(data1['pdgID'])) == ChPi_ID
-    Ele_energy = data1['energy'][Ele_indices][:num_events]
-    ChPi_energy = data1['energy'][ChPi_indices][:num_events]
-    ChPi_ecal = data1['ECAL_E'][ChPi_indices][:num_events]
-    ChPi_hcal = data1['HCAL_E'][ChPi_indices][:num_events]
-    ChPi_ratio = ChPi_ecal/ChPi_hcal
+    PlotRegressionScat([results[2]['Ele_reg_energy_prediction'], results[3]['Ele_reg_energy_prediction']],
+                       [results[2]['Ele_energy'], results[3]['Ele_energy']], p, ['G4', 'GAN'], rtitle, save_path + p + "_G4_train_regression_scat.pdf", leg=leg )
 
-    Ele_ecal = data1['ECAL_E'][Ele_indices][:num_events]
-    Ele_hcal = data1['HCAL_E'][Ele_indices][:num_events]
-    Ele_ratio = Ele_ecal/Ele_hcal
+    p = particles[1]
+    title = 'trained on GAN $e^{-}$ and G4 $\pi$'
+    rtitle = 'trained on GAN e and G4 pi'
+    PLotClassBarPython([results[0]['ChPi_class_prediction_accuracy'], results[2]['ChPi_class_prediction_accuracy']],
+                        [results[0]['ChPi_error'], results[2]['ChPi_error']],
+                        ['net 1', 'net 2'], p, "", save_path + p + '_class_accuracy')
+    PlotRegressionProf([results[0]['ChPi_reg_energy_prediction'], results[2]['ChPi_reg_energy_prediction']], 
+                       [results[0]['ChPi_energy'], results[2]['ChPi_energy']],
+                       p, ['net 1', 'net 2'], "", save_path + p + "_regression_prof.pdf", leg=leg)
+    PlotRegressionScat([results[0]['ChPi_reg_energy_prediction'], results[2]['ChPi_reg_energy_prediction']], 
+                       [results[0]['ChPi_energy'], results[2]['ChPi_energy']],
+                       p, ['net1', 'net2'], rtitle, save_path + p + "_regression_scat.pdf", leg=leg )
 
-    Ele_reg_energy_prediction = data1['reg_energy_prediction'][Ele_indices][:num_events]
-    ChPi_reg_energy_prediction = data1['reg_energy_prediction'][ChPi_indices][:num_events]
-    Ele_raw = inv_tf(Ele_reg_energy_prediction, Ele_ecal, f=10)
-    ChPi_raw = inv_tf(ChPi_reg_energy_prediction, ChPi_ecal + ChPi_hcal, f=10)
-    print('minimum Ele energy is {}'.format(np.amin(Ele_energy)))
-    print('minimum ChPi energy is {}'.format(np.amin(ChPi_energy)))
-
-
-    z = np.polyfit(Ele_energy, Ele_raw, 1)
-    print(z)
-    fit = np.poly1d(z)
-
-    rcParams['axes.titlepad'] = 20
-    x = np.arange(500)
-    plt.scatter(Ele_energy, Ele_reg_energy_prediction, s=1, label='Ele trained on GAN & evaluated on G4')
-    plt.scatter(ChPi_energy, ChPi_reg_energy_prediction, s=1, label='ChPi trained on GAN & evaluated on G4')
-    plt.scatter(GEANT_energy, GEANT_reg_energy_prediction, s=1, label='Ele trained on G4 & evaluated on G4')
-    plt.scatter(GAN_energy,  GAN_reg_energy_prediction, s=1, label='Ele trained on G4 & evaluated on GAN')
-    plt.plot( x, x, color='r', label='Truth')
-    plt.xlim([0, 500])
-    #plt.ylim([0, 700])
-    plt.title("Energy Predictions from Regression Nets")
-    plt.xlabel("True Energy")
-    plt.ylabel("Predicted Energy")
-    plt.legend()
-    plt.savefig(save_path + "Energy_regression_comparison_Ele.pdf")
-    print('minimum G4 energy is {}'.format(np.amin(GEANT_energy)))
-    print('minimum GAN energy is {}'.format(np.amin(GAN_energy)))
-
-    plt.clf()
-    plt.scatter(Ele_energy, Ele_raw, s=1, label='Ele trained on GAN & evaluated on G4')
-    plt.scatter(ChPi_energy, ChPi_raw, s=1, label='ChPi trained on GAN & evaluated on G4')
-    plt.scatter(GEANT_energy, GEANT_raw, s=1, label='Ele trained on G4 & evaluated on G4')
-    plt.scatter(GAN_energy,  GAN_raw, s=1, label='Ele trained on G4 & evaluated on GAN')
-    plt.plot( x, np.zeros_like(x), color='r')
-    plt.plot( Ele_energy, fit(Ele_energy), color='r', label='Fit {:.3f} {:.3f}'.format(z[0], z[1]))
-    plt.xlim([0, 500])
-    #plt.ylim([0, 700])                                                                                                                                                                                     
-    plt.title("Raw net Predictions from Regression Nets")
-    plt.xlabel("True Energy")
-    plt.ylabel("Net output")
-    plt.legend()
-    plt.savefig(save_path + "Energy_raw_comparison_Ele.pdf")
-
-    Ele_tf = tf(Ele_raw, np.zeros_like(Ele_raw))
-    ChPi_tf = tf(ChPi_raw, np.zeros_like(ChPi_raw))
-    plt.clf()
-    plt.scatter(Ele_energy, Ele_tf, s=1, label='Ele trained on GAN & evaluated on G4')
-    plt.scatter(ChPi_energy, ChPi_tf, s=1, label='ChPi trained on GAN & evaluated on GEANT')
-    #plt.scatter(GEANT_energy, GEANT_raw, s=1, label='trained on G4 & evaluated on G4')
-    #plt.scatter(GAN_energy,  GAN_raw, s=1, label='trained on G4 & evaluated on GAN')
-    plt.plot( x, np.zeros_like(x), color='r')
-    plt.plot( x, x, color='r', label='Truth')
-    plt.xlim([0, 500])
-    #plt.ylim([0, 700])                                                                                                                                                                                    \
-                                                                                                                                                                                                            
-    plt.title("Transformed raw net Predictions from Regression Nets")
-    plt.xlabel("True Energy")
-    plt.ylabel("Net output")
-    plt.legend()
-    plt.savefig(save_path + "tf_raw_comparison_Ele.pdf")
-
-    
-
-    GAN_class_prediction = data2['class_prediction'][GAN_indices][:num_events]
-    GEANT_class_prediction = data2['class_prediction'][GEANT_indices][:num_events]
-
-    GAN_class_prediction_accuracy = np.sum(GAN_class_prediction) / len(GAN_class_prediction)
-    GEANT_class_prediction_accuracy = np.sum(GEANT_class_prediction) / len(GEANT_class_prediction)
-    GAN_error = (np.sqrt(GAN_class_prediction.shape[0]) * GAN_class_prediction_accuracy)/GAN_class_prediction.shape[0]
-    GEANT_error =(np.sqrt(GEANT_class_prediction.shape[0]) * GEANT_class_prediction_accuracy)/GEANT_class_prediction.shape[0]
-    
-    Ele_class_prediction = data1['class_prediction'][Ele_indices][:num_events]
-    ChPi_class_prediction = data1['class_prediction'][ChPi_indices][:num_events]
-    Ele_class_prediction_accuracy = float(sum(Ele_class_prediction)) / float(len(Ele_class_prediction))
-    ChPi_class_prediction_accuracy = 1.0 - (float(sum(ChPi_class_prediction)) / float(len(ChPi_class_prediction)))
-    print((np.sqrt(Ele_class_prediction.shape[0]) * Ele_class_prediction_accuracy)/Ele_class_prediction.shape[0])
-    print((np.sqrt(ChPi_class_prediction.shape[0]) * ChPi_class_prediction_accuracy)/ChPi_class_prediction.shape[0])
-    Ele_error = (np.sqrt(Ele_class_prediction.shape[0]) * Ele_class_prediction_accuracy)/Ele_class_prediction.shape[0]
-    ChPi_error =(np.sqrt(ChPi_class_prediction.shape[0]) * ChPi_class_prediction_accuracy)/ChPi_class_prediction.shape[0]
-    print(GEANT_error)
-    plt.clf()
-    width = 0.4
-    x_val = np.arange(4)
-    plt.bar(1, [Ele_class_prediction_accuracy], width, yerr = Ele_error, align='center', alpha=0.5, color='b', capsize=4)
-    plt.bar(2, [GEANT_class_prediction_accuracy], width, yerr = GEANT_error, align='center', alpha=0.5, color='r', capsize=4)
-    plt.xticks(range(4), ["", "GEANT trained on GAN", "GEANT trained on GEANT", ""])
-    for i, v in enumerate([Ele_class_prediction_accuracy, GEANT_class_prediction_accuracy]):
-       plt.text(x_val[i+1]-0.03 , v+0.03 , '{:.2f}'.format(v))
-    plt.ylim([0., max(Ele_class_prediction_accuracy, GEANT_class_prediction_accuracy) * 1.1])
-    plt.title("Accuracy of Classification Nets on {} Samples".format(particle))
-    plt.savefig(save_path + particle + "_GAN_GEANT_class_accuracy_comparison.pdf")
-    PlotRegressionProf(GEANT_reg_energy_prediction, GEANT_energy, GAN_reg_energy_prediction, GAN_energy, particle, save_path + particle + "_regression_prof.pdf", leg=leg)
-    PlotRegressionScat(GEANT_reg_energy_prediction, GEANT_energy, GAN_reg_energy_prediction, GAN_energy, particle, save_path + particle + "_regression_scat.pdf", leg=leg)
-    PlotScat([ChPi_ecal, ChPi_hcal], [ChPi_energy, ChPi_energy],  ['ChPi', 'ChPi'], ['ChPi ecal', 'ChPi hcal'], 'energy deposition', 'Total energy deposited in calorimeter', save_path + "ecal_scat.pdf", leg=leg)
-    PlotHist([ChPi_ecal, ChPi_hcal], ['ChPi', 'ChPi'], ['ChPi ecal', 'ChPi hcal'], 'energy deposition GeV/50', 'Total energy deposited in calorimeter', save_path + "ecal_hist.pdf", leg=leg)
- 
 def inv_tf(energy, ecal_sum, f=10.0):
     return (energy - ecal_sum)/f
 
 def tf(raw, ecal_sum, f=10.0):
     return((raw * f) + ecal_sum) 
+
+def PLotClassBarPython(class_list, error_list, labels, particle, title, out_file):
+    plt.figure()
+    width = 0.4
+    x_val = np.arange(len(class_list) + 2)
+    color = ['b', 'r', 'g']
+    for i, class_pred in enumerate(class_list):
+       plt.bar(i+1, [class_pred], width, yerr = error_list[i], align='center', alpha=0.5, color=color[i], capsize=4)
+    
+    plt.xticks(range(len(class_list) + 2), [""] + labels + [""])
+    for i, v in enumerate(class_list):
+       plt.text(x_val[i+1]-0.03 , v+0.03 , '{:.4f}'.format(v))
+    plt.ylim([0.,  1.1])
+    plt.title("Classification accuracy {} ({})".format(particle, title))
+    plt.savefig(out_file + ".pdf")
+
 
 def PlotClassBar(g4_class, g4_class_error, gan_class, gan_class_error, particle, out_file, leg=True):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
@@ -229,62 +199,63 @@ def PlotClassBar2(g4_class, g4_class_error, gan_class, gan_class_error, particle
     if leg:legend.Draw()
     c1.Print(out_file)
 
-def PlotRegressionProf(g4_reg, g4_e, gan_reg, gan_e, particle, out_file, leg=True):
+def PlotRegressionProf(reg_list, e_list, particle, labels, title, out_file, leg=True, reverse=0):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
-    p =[int(np.amin(g4_e)), int(np.amax(g4_e))]
-    title = "Predicted primary energy for {}".format(particle)
-    legend = ROOT.TLegend(.1, .7, .3, .9)
+    p =[int(np.amin(reg_list[0])), int(np.amax(reg_list[0]))]
+    title = "Predicted primary energy for {} ({})".format(particle, title)
+    legend = ROOT.TLegend(.2, .6, .4, .8)
+    legend.SetBorderSize(0)
     color =2
-   
-    pg4 = ROOT.TProfile("G4", "G4", 100, p[0], p[1]*1.1)
-    pgan = ROOT.TProfile("GAN", "GAN", 100, p[0], p[1]*1.1)
-    pg4.SetStats(0)
-    pgan.SetStats(0)
-    r.fill_profile(pg4, g4_e, g4_reg)
-    r.fill_profile(pgan, gan_e, gan_reg)
-    pg4.SetLineColor(2)
-    pgan.SetLineColor(4)
-    pg4.SetTitle(title)
-    pg4.GetXaxis().SetTitle("Ep [GeV]")
-    pg4.GetYaxis().SetTitle("Predicted Ep [GeV]")
-    pg4.GetYaxis().CenterTitle()
-    pg4.Draw()
-    pg4.Draw('sames hist')
-    pgan.Draw('sames')
-    pgan.Draw('sames hist')
-    legend.AddEntry(pg4, 'G4' ,"l")
-    legend.AddEntry(pgan, 'GAN' ,"l")
-    c1.Modified()
-    c1.Update()
-
+    profs =[]
+    if reverse:
+      reg_list, e_list, labels = reg_list[::-1], e_list[::-1], labels[::-1]
+    for i, reg in enumerate(reg_list):
+      profs.append(ROOT.TProfile(labels[i], labels[i], 100, p[0], p[1]*1.1))
+      profs[i].SetStats(0)
+      r.fill_profile(profs[i], e_list[i], reg_list[i])
+      profs[i].SetLineColor(color)
+      if i== 0:
+        profs[i].SetTitle(title)
+        profs[i].GetXaxis().SetTitle("Ep [GeV]")
+        profs[i].GetYaxis().SetTitle("Predicted Ep [GeV]")
+        profs[i].GetYaxis().CenterTitle()
+        profs[i].Draw()
+        profs[i].Draw('sames hist')
+      else:
+        profs[i].Draw('sames')
+        profs[i].Draw('sames hist')
+      legend.AddEntry(profs[i], labels[i] ,"l")
+      c1.Modified()
+      c1.Update()
+      color+=2
     if leg:legend.Draw()
     c1.Print(out_file)
 
-def PlotRegressionScat(g4_reg, g4_e, gan_reg, gan_e, particle, out_file, leg=True):
-    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                                                                                                                                                    
-    p =[int(np.amin(g4_e)), int(np.amax(g4_e))]
-    title = "Predicted primary energy for {}".format(particle)
-    legend = ROOT.TLegend(.1, .7, .3, .9)
+def PlotRegressionScat(reg_list, e_list, particle, labels, title, out_file, leg=True, reverse=0):
+    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
+    p =[int(np.amin(e_list[0])), int(np.amax(e_list[0]))]
+    title = "Predicted primary energy for {} ({})".format(particle, title)
+    legend = ROOT.TLegend(.15, .7, .3, .85)
     legend.SetBorderSize(0)
-    color =2
+    color = 2
     mg = ROOT.TMultiGraph()
-    pg4 = ROOT.TGraph()
-    pgan = ROOT.TGraph()
-
-    r.fill_graph(pg4, g4_e, g4_reg)
-    r.fill_graph(pgan, gan_e, gan_reg)
-    pg4.SetMarkerColor(2)
-    pgan.SetMarkerColor(4)
-    mg.Add(pgan)
-    mg.Add(pg4)
-    mg.SetTitle(title)
-    mg.GetXaxis().SetTitle("Ep [GeV]")
-    mg.GetYaxis().SetTitle("Predicted Ep [GeV]")
-    mg.GetYaxis().CenterTitle()
+    graphs=[]
+    if reverse:
+      reg_list, e_list, labels = reg_list[::-1], e_list[::-1], labels[::-1]
+    for i, reg in enumerate(reg_list):
+      graphs.append(ROOT.TGraph())
+      r.fill_graph(graphs[i], e_list[i], reg_list[i])
+      graphs[i].SetMarkerColor(color)
+      graphs[i].SetLineColor(color)
+      mg.Add(graphs[i])
+      if i== 0:
+        mg.SetTitle(title)
+        mg.GetXaxis().SetTitle("Ep [GeV]")
+        mg.GetYaxis().SetTitle("Predicted Ep [GeV]")
+        mg.GetYaxis().CenterTitle()
+      legend.AddEntry(graphs[i], labels[i] ,"l")
+      color+=2
     mg.Draw('AP')
-    
-    legend.AddEntry(pg4, 'G4' ,"p")
-    legend.AddEntry(pgan, 'GAN' ,"p")
     c1.Modified()
     c1.Update()
 
