@@ -132,7 +132,7 @@ def stat_pos(a, pos=0):
 # Fill root profile
 def fill_profile(prof, x, y):
   for i in range(len(y)):
-      prof.Fill(y[i], x[i])
+      prof.Fill(x[i], y[i])
 
 
 # return max
