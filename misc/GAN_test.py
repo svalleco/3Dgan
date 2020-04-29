@@ -60,6 +60,8 @@ def main():
       print('The number of charged pions events was {}'.format(params['ChPi_class_prediction'].shape[0]))
       print('maximum Ele energy is {}'.format(np.amax(params['Ele_energy'])))
       print('maximum ChPi energy is {}'.format(np.amax(params['ChPi_energy'])))
+      print('maximum Ele predicted energy is {}'.format(np.amax(params['Ele_reg_energy_prediction'])))
+      print('maximum ChPi predicted energy is {}'.format(np.amax(params['ChPi_reg_energy_prediction'])))
       print('##################################################################################')
 
       results.append(params)
@@ -201,9 +203,9 @@ def PlotClassBar2(g4_class, g4_class_error, gan_class, gan_class_error, particle
 
 def PlotRegressionProf(reg_list, e_list, particle, labels, title, out_file, leg=True, reverse=0):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
-    p =[int(np.amin(reg_list[0])), int(np.amax(reg_list[0]))]
+    p =[int(np.amin(e_list[0])), int(np.amax(e_list[0]))]
     title = "Predicted primary energy for {} ({})".format(particle, title)
-    legend = ROOT.TLegend(.2, .6, .4, .8)
+    legend = ROOT.TLegend(.2, .6, .5, .8)
     legend.SetBorderSize(0)
     color =2
     profs =[]
@@ -235,7 +237,7 @@ def PlotRegressionScat(reg_list, e_list, particle, labels, title, out_file, leg=
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
     p =[int(np.amin(e_list[0])), int(np.amax(e_list[0]))]
     title = "Predicted primary energy for {} ({})".format(particle, title)
-    legend = ROOT.TLegend(.15, .7, .3, .85)
+    legend = ROOT.TLegend(.15, .7, .5, .85)
     legend.SetBorderSize(0)
     color = 2
     mg = ROOT.TMultiGraph()
@@ -243,8 +245,9 @@ def PlotRegressionScat(reg_list, e_list, particle, labels, title, out_file, leg=
     if reverse:
       reg_list, e_list, labels = reg_list[::-1], e_list[::-1], labels[::-1]
     for i, reg in enumerate(reg_list):
+      error = np.absolute((e_list[i]-reg)/e_list[i])
       graphs.append(ROOT.TGraph())
-      r.fill_graph(graphs[i], e_list[i], reg_list[i])
+      r.fill_graph(graphs[i], e_list[i], reg)
       graphs[i].SetMarkerColor(color)
       graphs[i].SetLineColor(color)
       mg.Add(graphs[i])
@@ -253,7 +256,7 @@ def PlotRegressionScat(reg_list, e_list, particle, labels, title, out_file, leg=
         mg.GetXaxis().SetTitle("Ep [GeV]")
         mg.GetYaxis().SetTitle("Predicted Ep [GeV]")
         mg.GetYaxis().CenterTitle()
-      legend.AddEntry(graphs[i], labels[i] ,"l")
+      legend.AddEntry(graphs[i], labels[i] + ' MAE {:.4f}({:.4f})'.format(np.mean(error), np.std(error)),"l")
       color+=2
     mg.Draw('AP')
     c1.Modified()
