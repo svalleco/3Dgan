@@ -89,12 +89,12 @@ def GetDataFiles(FileSearch="/data/LCD/*/*.h5",
     return Sample
 
 # get data for fixed angle
-def GetData(datafile, thresh=0):
+def GetData(datafile, thresh=0, num_events=10000):
    #get data for training
     print( 'Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    y=f.get('target')
-    x=np.array(f.get('ECAL'))
+    y=f.get('target')[:num_events]
+    x=np.array(f.get('ECAL')[:num_events])
     y=(np.array(y[:,1]))
     if thresh>0:
        x[x < thresh] = 0
