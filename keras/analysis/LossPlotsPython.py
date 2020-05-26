@@ -1,3 +1,4 @@
+# Plot losses using python
 import os
 import numpy as np
 import matplotlib
@@ -16,39 +17,55 @@ def main():
    parser = get_parser()
    params = parser.parse_args()
    
-   historyfile = params.historyfile
-   outdir = params.outdir
-   ylim = [params.ylim1, params.ylim2, params.ylim3, params.ylim4, params.ylim5, params.ylim6, params.ylim7]
-   start_epoch =params.start_epoch
-   fit_order = params.fit_order
-   num_ang_losses = params.num_ang_losses
-   num_add_loss = params.num_add_loss
-   gen_weight = params.gen_weight
-   aux_weight = params.aux_weight
-   ecal_weight = params.ecal_weight
-   ang_weight = params.ang_weight
-   add_weight = params.add_weight
-   leg = params.leg
+   historyfile = params.historyfile  #pkl file with loss history
+   outdir = params.outdir #dir for plots
+   ylim = [params.ylim1, params.ylim2, params.ylim3, params.ylim4, params.ylim5, params.ylim6, params.ylim7] #limits for different plots
+   start_epoch =params.start_epoch #starting from epoch
+   fit_order = params.fit_order #order of fit
+   num_ang_losses = params.num_ang_losses # number of angle losses
+   num_add_loss = params.num_add_loss # additional losses
+   gen_weight = params.gen_weight # weight of GAN loss
+   aux_weight = params.aux_weight # weight for auxilliary regression loss
+   ecal_weight = params.ecal_weight # weight for sum of pixel intensities
+   ang_weight = params.ang_weight # weight for angle loss
+   add_weight = params.add_weight # weight for additional loss
+   leg = params.leg # legend
+   ang = params.ang # angle
    #Loss names 
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
    bloss= 'Binary cross entropy'
    # angle name
-   angtype = 'theta'
-   
-   if num_ang_losses==1:
-       weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
-       losstypes = ['Weighted sum', bloss, ploss, aloss, ploss]
-       lossnames = ['tot', 'gen', 'aux', '{}'.format(angtype), 'ecal sum']
-      
-   elif num_ang_losses==2:
-       weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
-       losstypes = ['Weighted sum', bloss, ploss, aloss, aloss, ploss]
-       lossnames = ['tot', 'gen', 'aux', '{}1'.format(angtype), '{}2'.format(angtype), 'ecal sum']
-   if num_add_loss==1:
-       weights.append(add_weight)
-       losstypes.append(ploss)
-       lossnames.append('bin')
+   angtype ='theta'
+   if not gen_weight:
+      gen_weight=3.0 if ang else 2.0
+   if not aux_weight:
+       aux_weight=0.1
+   if not ecal_weight:
+       ecal_weight=0.1
+   if not ang_weight:
+       ang_weight=25
+   if not add_weight:
+       add_weight=0.1
+
+   if not ang:
+       weights = [1, gen_weight, aux_weight, ecal_weight]
+       losstypes = ['Weighted sum', bloss, ploss, ploss]
+       lossnames = ['tot', 'gen', 'aux', 'ecal sum']
+   else:
+     if num_ang_losses==1:
+        weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
+        losstypes = ['Weighted sum', bloss, ploss, aloss, ploss]
+        lossnames = ['tot', 'gen', 'aux', '{}'.format(angtype), 'ecal sum']
+
+     elif num_ang_losses==2:
+        weights = [1, gen_weight, aux_weight, ang_weight, ecal_weight]
+        losstypes = ['Weighted sum', bloss, ploss, aloss, aloss, ploss]
+        lossnames = ['tot', 'gen', 'aux', '{}1'.format(angtype), '{}2'.format(angtype), 'ecal sum']
+     if num_add_loss==1:
+        weights.append(add_weight)
+        losstypes.append(ploss)
+        lossnames.append('bin')
 
    safe_mkdir(outdir)
    plot_loss(historyfile, ylim, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order, leg=leg)
@@ -56,31 +73,33 @@ def main():
    
 def get_parser():
     parser = argparse.ArgumentParser(description='Loss plots' )
-    parser.add_argument('--historyfile', action='store', type=str, default='../results/3dgan_history_gan_training.pkl', help='Pickle file for loss history')
-    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots_gan_training', help='directory for results')
-    parser.add_argument('--ylim1', type=float, default=20, help='y max for combined train loss')
-    parser.add_argument('--ylim2', type=float, default=2, help='y max for BCE train loss')
-    parser.add_argument('--ylim3', type=float, default=2, help='y max for BCE test loss')
-    parser.add_argument('--ylim4', type=float, default=40, help='y max for Axilliary training losses')
-    parser.add_argument('--ylim5', type=float, default=0.85, help='y min for Generator BCE only')
-    parser.add_argument('--ylim6', type=float, default=0.95, help='y max for Generator BCE only')
-    parser.add_argument('--ylim7', type=float, default=10., help='y max for combined test & train losses')
+    parser.add_argument('--historyfile', action='store', type=str, default='../results/3dgan_history.pkl', help='Pickle file for loss history')
+    parser.add_argument('--outdir', action='store', type=str, default='results/loss_plots/', help='directory for results')
+    parser.add_argument('--ylim1', type=float, default=30, help='y max for combined train loss')
+    parser.add_argument('--ylim2', type=float, default=4, help='y max for BCE train loss')
+    parser.add_argument('--ylim3', type=float, default=4, help='y max for BCE test loss')
+    parser.add_argument('--ylim4', type=float, default=50, help='y max for Axilliary training losses')
+    parser.add_argument('--ylim5', type=float, default=0.75, help='y min for Generator BCE only')
+    parser.add_argument('--ylim6', type=float, default=1.25, help='y max for Generator BCE only')
+    parser.add_argument('--ylim7', type=float, default=50., help='y max for combined test & train losses')
     parser.add_argument('--start_epoch', type=int, default=0, help='can be used to remove initial epochs')
     parser.add_argument('--fit_order', type=int, default=3, help='order of polynomial used for fit')
     parser.add_argument('--num_ang_losses', type=int, default=1, help='number of losses used for angle')
     parser.add_argument('--num_add_loss', type=int, default=1, help='number of additional losses')
-    parser.add_argument('--gen_weight', type=float, default=3, help='weight of GAN loss')
-    parser.add_argument('--aux_weight', type=float, default=0.1, help='weight of auxilliary energy regression loss')
-    parser.add_argument('--ecal_weight', type=float, default=0.1, help='weight of ecal sum loss')
-    parser.add_argument('--ang_weight', type=float, default=25, help='weight of angle loss')
-    parser.add_argument('--add_weight', type=float, default=0.1, help='weight of bin count loss')
-    parser.add_argument('--leg', default=True, help='draw legend')    
+    parser.add_argument('--gen_weight', type=float, help='weight of GAN loss')
+    parser.add_argument('--aux_weight', type=float, help='weight of auxilliary energy regression loss')
+    parser.add_argument('--ecal_weight', type=float, help='weight of ecal sum loss')
+    parser.add_argument('--ang_weight', type=float, help='weight of angle loss')
+    parser.add_argument('--add_weight', type=float, help='weight of bin count loss')
+    parser.add_argument('--leg', action='store_true', help='draw legend') 
+    parser.add_argument('--ang', action='store_true', help='if variable angle')   
     return parser
 
 def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3, leg=True):
                              
    with open(lossfile, 'rb') as f:
     			x = pickle.load(f)
+
    gen_test = np.asarray(x['test']['generator'])
    gen_train = np.asarray(x['train']['generator'])
    disc_test = np.asarray(x['test']['discriminator'])
@@ -89,7 +108,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
            '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
                          '#bcbd22', '#17becf']
    loop = np.arange(len(lossnames))
- 
+
    #Plots for Testing and Training Losses
    plt.figure(fig)
    plt.subplot(221)
@@ -124,7 +143,7 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    #Training losses
    fig = fig + 1
    plt.figure(fig)
-   plt.title('Weighted Training losses: Loss weights = (%0.2f, %.2f, %.2f,  %.2f)'%(weights[1], weights[2], weights[3],  weights[4]))
+   plt.title('Weighted Training losses: Loss weights = ({})'.format(weights))
    for i in loop:
        plt.plot(weights[i] * disc_train[:,i], label='Disc {} ({})'.format(lossnames[i], losstype[i]), color=color[i])
        plt.plot(weights[i] * gen_train[:,i], label='Gen {} ({})'.format(lossnames[i], losstype[i]), color=color[i], linestyle='--')
