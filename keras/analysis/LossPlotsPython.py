@@ -91,8 +91,8 @@ def get_parser():
     parser.add_argument('--ecal_weight', type=float, help='weight of ecal sum loss')
     parser.add_argument('--ang_weight', type=float, help='weight of angle loss')
     parser.add_argument('--add_weight', type=float, help='weight of bin count loss')
-    parser.add_argument('--leg', action='store_true', help='draw legend') 
-    parser.add_argument('--ang', action='store_true', help='if variable angle')   
+    parser.add_argument('--leg', default=1, help='draw legend') 
+    parser.add_argument('--ang', default=1, help='if variable angle')   
     return parser
 
 def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3, leg=True):
