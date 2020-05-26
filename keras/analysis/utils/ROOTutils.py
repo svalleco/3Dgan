@@ -25,6 +25,11 @@ def fill_graph(graph, x, y):
    for i in np.arange(n):
       graph.SetPoint(int(i), x[i], y[i])
 
+def fill_hist_2D(h, x, y):
+   n = x.shape[0]
+   for i in np.arange(n):
+      h.Fill(x[i], y[i])
+
 # normalize in different modes
 def normalize(hist, mod=0):
    if mod==0:
@@ -42,6 +47,7 @@ def fill_hist_wt(hist, weight):
    for i in array:
      for j in np.arange(weight.shape[0]):
         hist.Fill(i, weight[j, i])
+
 
 #2D weighted histogram        
 def FillHist2D_wt(hist, array):

@@ -238,7 +238,7 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
    Eprof.GetXaxis().SetTitle("Ep [GeV]")
    # Since the Angle Data has energies multiplied by 50 for ecal depositions
    ratio1=ecal1["n_0"]/y 
-   my.fill_profile(Eprof, ratio1, y) 
+   my.fill_profile(Eprof, y, ratio1) 
    Eprof.GetYaxis().SetTitle("Ecal/Ep")
    Eprof.GetYaxis().CenterTitle()
    if p[0] < 100:
@@ -257,7 +257,7 @@ def plot_ecal_ratio_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], ifpdf
       Gprof = Gprofs[i]
       Gprof.Sumw2()
       if statbox==False:  Gprof.SetStats(0)
-      my.fill_profile(Gprof, ratio2, y)
+      my.fill_profile(Gprof, y, ratio2)
       error = np.mean(np.abs(ratio1 - ratio2 ))
       color +=1
       if color in [5, 10, 18, 19]:
@@ -290,7 +290,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
    Eprof.Sumw2()
    if statbox==False:  Eprof.SetStats(0)
    Eprof.SetTitle("Relative Error for sum of  Ecal energies and Ep {}-{} GeV".format(p[0], p[1]))
-   my.fill_profile(Eprof, (ecal1["n_0"] - ecal1["n_0"])/ ecal1["n_0"], y)
+   my.fill_profile(Eprof, y, (ecal1["n_0"] - ecal1["n_0"])/ ecal1["n_0"])
    Eprof.GetXaxis().SetTitle("Ep GeV")
    Eprof.GetYaxis().SetTitle("(Ecal_{G4} - Ecal_{GAN})/Ecal_{G4}")
    Eprof.GetYaxis().CenterTitle()
@@ -307,7 +307,7 @@ def plot_ecal_relative_profile(ecal1, ecal2, y, labels, out_file, p=[2, 500], if
       Gprof.Sumw2()
       if statbox==False:  Gprof.SetStats(0)
       error = (ecal1["n_0"]- ecal2[key])/ ecal1["n_0"]
-      my.fill_profile(Gprof, error, y)
+      my.fill_profile(Gprof, y, error)
       color +=1
       if color in [5, 10, 18, 19]:
         color+=1
@@ -352,7 +352,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], stest
           Eprof.GetYaxis().SetRangeUser(-0.3, 0.3)
        else:
           Eprof.GetYaxis().SetRangeUser(-1.5, 1.5)
-       my.fill_profile(Eprof, error1,  y)
+       my.fill_profile(Eprof, y, error1)
        Eprof.SetLineColor(color)
        Eprof.Draw()
        c1.Update()
@@ -365,7 +365,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], stest
        c1.Update()
        color+=2
      else:
-       my.fill_profile(Eprof, (y - 100 *aux1[key])/y, y)
+       my.fill_profile(Eprof, y, (y - 100 *aux1[key])/y)
        Eprof.Draw('sames')
        legend.AddEntry(Eprof,"G4 " + labels[i],"l")
        color+=1
@@ -1605,7 +1605,7 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
        correlationfile = 'Corr'
        start = time.time()
        if energy==0:
-          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), ang=ang, stest=stest)
+          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), stest=stest)
           plots+=1
           plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
           plots+=1
