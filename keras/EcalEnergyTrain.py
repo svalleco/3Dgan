@@ -87,8 +87,8 @@ def main():
     print(weightdir)
     # Building discriminator and generator
     K.set_image_data_format(dformat) #setting data format)
-    d=discriminator(keras_dformat=dformat)
-    g=generator(latent_size=latent_size, keras_dformat=dformat)
+    d=discriminator(dformat=dformat)
+    g=generator(latent_size=latent_size, dformat=dformat)
     Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size 
                , loss_weights=lossweights, xscale = xscale, thresh=thresh, analysis=analysis, energies=energies, tf_flags=tf_flags, dformat=dformat)
 
@@ -97,7 +97,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=128, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=200, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='/bigdata/shared/LCD/NewV1/*scan/*.h5', help='HDF5 files to train from.') # Caltech
+    parser.add_argument('--datapath', action='store', type=str, default='/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5', help='HDF5 files to train from.') # Caltech
     parser.add_argument('--nbEvents', action='store', type=int, default=200000, help='Number of Data points to use')
     parser.add_argument('--verbose', action='store_true', default=False, help='Whether or not to use a progress bar')
     parser.add_argument('--tf_flags', action='store', default=False, help='Setting Tensorflow flags')
