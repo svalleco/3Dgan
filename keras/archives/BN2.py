@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Normalization layers.
+"""custom Normalization layers.
 """
 from __future__ import absolute_import
 from __future__ import division
