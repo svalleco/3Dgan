@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""custom Normalization layers.
+"""custom Normalization layers with sample wise normalization.
 """
 from __future__ import absolute_import
 from __future__ import division
