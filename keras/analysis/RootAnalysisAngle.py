@@ -31,7 +31,7 @@ def main():
    latent = params.latentsize
    particle= params.particle
    angtype= params.angtype
-   plotdir= params.plotdir
+   plotdir= params.outdir + '/'
    sortdir= params.sortdir
    gendir= params.gendir
    discdir= params.discdir
@@ -53,23 +53,33 @@ def main():
    read_disc= params.read_disc
    ifpdf= params.ifpdf
    grid = params.grid
-   leg= params.leg
+   leg= 1 if stest else params.leg
    statbox= params.statbox
    mono= params.mono
    labels = params.labels if isinstance(params.labels, list) else [params.labels]
    gweights= params.gweights if isinstance(params.gweights, list) else [params.gweights]
    dweights= params.dweights if isinstance(params.dweights, list) else [params.dweights]
-   xscales= params.xscales if isinstance(params.xscales, list) else [params.xscales]*len(gweights)
-   ascales= params.ascales if isinstance(params.ascales, list) else [params.ascales]*len(gweights)
+   xscales= params.xscales 
+   ascales= params.ascales 
    yscale= params.yscale
-   xpowers = params.xpower if isinstance(params.xpower, list) else [params.xpower]*len(gweights)
+   xpowers = params.xpower 
    thresh = params.thresh
    dformat = params.dformat
    ang = params.ang
+   
    #Architecture 
    if ang:
      from AngleArch3dGAN import generator, discriminator
      dscale=50.
+     if not xscales:
+       xscales=1.
+     if not xpowers:
+       xpowers = 0.85
+     if not latent:
+       latent = 256
+     if not ascales:
+       ascales = 1
+       
      if datapath=='path1':
        datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
        events_per_file = 5000
@@ -90,6 +100,15 @@ def main():
    else:
      from EcalEnergyGan import generator, discriminator
      dscale=1
+     if not xscales:
+       xscales=100.
+     if not xpowers:
+       xpowers = 1.
+     if not latent:
+       latent =200
+     if not ascales:
+       ascales = 1
+
      if datapath=='path1':
        datapath ='/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5'
      events_per_file = 10000
@@ -100,11 +119,15 @@ def main():
      gweights= ["/gkhattak/weights/3dgan_weights_gan_training/params_generator_epoch_059.hdf5"]
      datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
      events_per_file = 5000
+   xscales = xscales if isinstance(xscales, list) else [xscales]*len(gweights)
+   ascales = ascales if isinstance(ascales, list) else [ascales]*len(gweights)
+   xpowers = xpowers if isinstance(xpowers, list) else [xpowers]*len(gweights)
    angles = [62, 90, 118]
    flags =[test, save_data, read_data, save_gen, read_gen, save_disc, read_disc]
+
    if ang:
-     d = discriminator(xpowers[0])
-     g = generator(latent)
+     d = discriminator(xpowers[0], dformat=dformat)
+     g = generator(latent, dformat=dformat)
    
      var= perform_calculations_angle(g, d, gweights, dweights, energies, angles, 
                 datapath, sortdir, gendir, discdir, nbEvents, binevents, moments, xscales, xpowers,
@@ -117,11 +140,12 @@ def main():
                len(gweights), ifpdf=ifpdf, grid=grid, stest=stest, angloss=angloss, 
                 addloss=addloss, cell=cell, corr=corr, leg=leg, statbox=statbox, mono=mono)
    else:
-     d = discriminator()
-     g = generator(latent)
+     d = discriminator( dformat=dformat)
+     g = generator(latent,  dformat=dformat)
      var= perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sortdir, gendir, discdir, num_data=nbEvents
          , num_events=binevents, m=moments, scales=xscales, thresh=thresh, flags=flags, latent=latent, particle=particle, dformat=dformat)
-     get_plots_multi(var, labels, plotdir, energies, moments, len(gweights), ifpdf, stest, cell)
+     get_plots_multi(var, labels, plotdir, energies, moments, len(gweights), cell=cell, corr=corr,
+                     ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
 
 def sqrt(n, scale=1):
    return np.sqrt(n * scale)
@@ -138,11 +162,11 @@ def inv_power(n, scale=1.0, power=1.0):
 def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
+    parser.add_argument('--latentsize', action='store', type=int, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='path1', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle used.')
-    parser.add_argument('--plotdir', action='store', type=str, default='results/3dgan_Analysis_wt_aux_ep35/', help='Directory to store the analysis plots.')
+    parser.add_argument('--outdir', action='store', type=str, default='results/3dgan_Analysis/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--gendir', action='store', type=str, default='Gen', help='Directory to store the generated images.')
     parser.add_argument('--discdir', action='store', type=str, default='Disc', help='Directory to store the discriminator outputs.')
@@ -155,29 +179,29 @@ def get_parser():
     parser.add_argument('--concat', action='store', type=int, default=2, help='Modes related to combining conditions with latent 0)not cancatenated.. 1)concatenate angle...3) concatenate energy and angle')
     parser.add_argument('--cell', action='store', type=int, default=0, help='Whether to plot cell energies..0)Not plotted...1)Only for bin with uniform spectrum.....2)For all energy bins')
     parser.add_argument('--corr', action='store', type=int, default=0, help='Plot correlation plots..0)Not plotted...1)detailed features ...2) reduced features.. 3) reduced features for each energy bin')
-    parser.add_argument('--test', action='store_false', help='Use Test data')
-    parser.add_argument('--stest', action='store_true', help='Statistics test for shower profiles')
+    parser.add_argument('--test', action='store', type=int, default=1,  help='Use Test data')
+    parser.add_argument('--stest', action='store', type=int, default=0, help='Statistics test for shower profiles')
     parser.add_argument('--save_data', default=False, action='store_true', help='Save sorted data')
     parser.add_argument('--read_data', default=False, action='store_true', help='Get saved and sorted data')
     parser.add_argument('--save_gen', default=False, action='store_true', help='Save generated images')
     parser.add_argument('--read_gen', default=False, action='store_true', help='Get saved generated images')
     parser.add_argument('--save_disc', default=False, action='store_true', help='Save discriminator output')
     parser.add_argument('--read_disc', default=False, action='store_true', help='Get discriminator output')
-    parser.add_argument('--ifpdf', default=True, action='store_true', help='Whether generate pdf plots or .C plots')
-    parser.add_argument('--grid', default=False, action='store_true', help='set grid')
-    parser.add_argument('--leg', default=True, action='store_true', help='add legends')
-    parser.add_argument('--statbox', default=False, action='store_true', help='add statboxes')
+    parser.add_argument('--ifpdf', default=1, type=int, action='store', help='Whether generate pdf plots or .C plots')
+    parser.add_argument('--grid', default=0, type=int, action='store', help='set grid')
+    parser.add_argument('--leg', default=0, type=int, action='store', help='add legends')
+    parser.add_argument('--statbox', default=0, type=int, action='store', help='add statboxes')
     parser.add_argument('--mono',  default=False, action='store_true', help='changing line style as well as color for comparison')
     parser.add_argument('--labels',  default='', type=str, nargs='+', help='id for particular weights when comparing multiple training')
     parser.add_argument('--gweights', action='store', type=str, nargs='+', default=['../weights/3dgan_weights_wt_aux/params_generator_epoch_035.hdf5'], help='comma delimited list for paths to Generator weights.')
     parser.add_argument('--dweights', action='store', type=str, nargs='+', default=['../weights/3dgan_weights_wt_aux/params_discriminator_epoch_035.hdf5'], help='comma delimited list for paths to Discriminator weights')
-    parser.add_argument('--xscales', action='store', type=int, nargs='+', default=1, help='Multiplication factors for cell energies')
-    parser.add_argument('--ascales', action='store', type=int, nargs='+', default=1, help='Multiplication factors for angles')
+    parser.add_argument('--xscales', action='store', type=int, nargs='+', help='Multiplication factors for cell energies')
+    parser.add_argument('--ascales', action='store', type=int, nargs='+', help='Multiplication factors for angles')
     parser.add_argument('--yscale', action='store', default=100., help='Division Factor for Primary Energy.')
-    parser.add_argument('--xpower', action='store', nargs='+', default= 0.85, help='Power of cell energies')
+    parser.add_argument('--xpower', action='store', help='Power of cell energies')
     parser.add_argument('--thresh', action='store', default=0, help='Threshold for cell energies')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
-    parser.add_argument('--ang', action='store', default=1, help='if variable angle')
+    parser.add_argument('--ang', action='store', default=1, type=int, help='if variable angle')
     return parser
    
 # If using reduced Ecal 25x25x25 then use the following function as argument to perform_calculations_angle, Data=GetAngleDataEta_reduced
