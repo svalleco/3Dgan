@@ -8,8 +8,7 @@ import numpy as np
 from array import array
 import time
 import keras.backend as K
-from utils.GANutils import GetData, GetAngleData, generate, safe_mkdir
-from utils.RootPlotsGAN import plot_energy_hist_root as eplot
+from utils.GANutils import GetData, GetAngleData, GetDataFiles, generate, safe_mkdir
 import utils.ROOTutils as my
 import time
 sys.path.insert(0,'../')
@@ -21,61 +20,75 @@ except:
 def get_parser():
    # To parse the input parameters to the script
    parser = argparse.ArgumentParser()
-   parser.add_argument('--weights_train', type=str, nargs='+', default=['../weights/fixed_best/params_generator_epoch_041.hdf5', '../weights/BSC_weights_fp32/generator_params_generator_epoch_056.hdf5'], help="Complete PATH to the trained weights to test with hdf5 extension")
-   parser.add_argument('--ang', default=0, help="If using angle vefsion")
-   parser.add_argument('--labels', type=str, nargs='+', default=['3DGAN', 'fp32'], help="labels for different weights")
+   parser.add_argument('--gweights', type=str, nargs='+', default=['../weights/fixed_best/params_generator_epoch_041.hdf5'], help="Complete PATH to the trained weights to test with hdf5 extension")
+   parser.add_argument('--ang', default=1, type=int, help="If using angle vefsion")
+   parser.add_argument('--particle', default='Ele', type=str, help="particle type")
+   parser.add_argument('--labels', type=str, nargs='+', default=[''], help="labels for different weights")
    parser.add_argument('--xscales',  type=float, nargs='+', help="scaling factor for cell energies")
-   parser.add_argument('--real_data', default='/storage/group/gpu/bigdata/LCD/NewV1/EleEscan/EleEscan_1_1.h5', help='Data to check the output obtained')
-   parser.add_argument('--out_dir', default= 'results/short_analysis_BSC_fp32/', help='Complete PATH to save the output plot')
+   parser.add_argument('--data', default='full', help='Data to check the output obtained')
+   parser.add_argument('--outdir', default= 'results/short_analysis/', help='Complete PATH to save the output plot')
    parser.add_argument('--numevents', action='store', type=int, default=5000, help='Max limit for events used for validation')
-   #parser.add_argument('--latent', action='store', type=int, default=200, help='size of latent space to sample')
+   parser.add_argument('--latent', action='store', type=int, help='size of latent space to sample')
    parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
-   parser.add_argument('--error', action='store_true', help='add relative errors to plots')
-   parser.add_argument('--stest', action='store_true', help='add ktest to plots')
-   parser.add_argument('--norm', default=True, help='normalize shower shapes')
+   parser.add_argument('--error', type=int, default=0, help='add relative errors to plots')
+   parser.add_argument('--stest', type=int, default=0, help='add ktest to plots')
+   parser.add_argument('--norm', type=int, default=1, help='normalize shower shapes')
+   parser.add_argument('--C', type=int, default=0, help='generate .C files')
+   parser.add_argument('--leg', type=int, default=1, help='draw legend')
+   parser.add_argument('--grid', type=int, default=0, help='draw grid')
    return parser
 
 def main():
    parser = get_parser()
    args = parser.parse_args()
-   weights_train = args.weights_train if isinstance(args.weights_train, list) else [args.weights_train]
+   gweights = args.gweights if isinstance(args.gweights, list) else [args.gweights]
    labels = args.labels if isinstance(args.labels, list) else [args.labels]
    ang = args.ang
-   real_data = args.real_data
-   out_dir = args.out_dir
-   num_events= args.numevents
-   keras_dformat= args.dformat
+   particle = args.particle
+   latent = args.latent
+   data = args.data
+   outdir = args.outdir
+   numevents= args.numevents
+   dformat= args.dformat
    error = args.error
    stest = args.stest
    norm = args.norm
+   C = args.C
+   leg = args.leg
+   grid = args.grid
    if args.xscales:
-     xscales = args.xscales 
-   xpower = 0.85
-   safe_mkdir(out_dir)
-   print('{} dir created'.format(out_dir))
+     xscales = args.xscales if isinstance(args.xscales, list) else [args.xscales] 
+   safe_mkdir(outdir)
+   print('{} dir created'.format(outdir))
+   K.set_image_data_format(dformat)
    if ang:
-     from AngleArch3dGAN import generator, discriminator
+     from AngleArch3dGAN import generator
      dscale = 50.
-     latent = 256
+     if not latent:
+       latent = 256
      if not args.xscales:
-       xscales = 1 
-       
+       xscales = [1] * len(gweights) 
+     xpower = 0.85
+     if data=='reduced':
+       datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                                        
+     elif data=='full':
+       datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate                                
+     datafiles = GetDataFiles(datapath, particle, 1)
+     data = datafiles[0]
+     X, Y, angle = GetAngleData(data, angtype='theta', num_events=numevents)
    else:
-     from EcalEnergyGan import generator, discriminator
+     from EcalEnergyGan import generator
      dscale = 1.
-     latent = 200
+     if not latent:
+       latent = 200
      if not args.xscales:
-       xscales = 100.
+       xscales = [100.] * len(gweights)
+     if data=='full':
+       datapath = "/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5"
+       datafiles =GetDataFiles(datapath,particle, 1)
+     data = datafiles[0]
+     X, Y = GetData(data, num_events=numevents)
 
-   xscales = xscales if isinstance(xscales, list) else [xscales] * len(weights_train)     
-   K.set_image_data_format(keras_dformat)
-   # read data
-   if ang:
-     X, Y, angle = GetAngleData(real_data, angtype='theta', num_events=num_events)
-   else:
-     X, Y = GetData(real_data, num_events=num_events)
-   X=X
-   Y=Y
    X = np.squeeze(X)/dscale
    #get shape
    x = X.shape[1]
@@ -85,16 +98,11 @@ def main():
    indexes = np.where(xsum > (0.2))
    X=X[indexes]
    Y = Y[indexes]
-
    if ang: angle = angle[indexes]
    num_events = X.shape[0]
    images =[]
-
-   if ang:
-      gm=generator(dformat = keras_dformat)
-   else:
-      gm=generator(keras_dformat = keras_dformat)
-   for i, gweight in enumerate(weights_train):
+   gm=generator(latent_size=latent, dformat = dformat)
+   for i, gweight in enumerate(gweights):
       gm.load_weights(gweight)
       if ang:
         angle = angle
@@ -103,15 +111,16 @@ def main():
       else:
         images.append(generate(gm, num_events, [Y/100.], latent=latent))
       images[i] = np.squeeze(images[i])/(xscales[i] * dscale)
-   plotSF(X, images, Y, labels, out_file=out_dir +'/SamplingFraction', error=error, stest=stest)
-   plotshapes(X, images, x, y, z, Y, out_file=out_dir +'/ShowerShapes',labels=labels, log=0, stest=stest, error=error, norm=norm)
-   plotshapes(X, images, x, y, z, Y, out_file=out_dir +'/ShowerShapes_log',labels=labels, log=1, stest=stest, error=error, norm=norm)
-   print('The plots are saved in {}'.format(out_dir))
+   plotSF(X, images, Y, labels, out_file=outdir +'/SamplingFraction', error=error, stest=stest, ifC=C, grid=grid, leg=leg)
+   plotshapes(X, images, x, y, z, Y, out_file=outdir +'/ShowerShapes',labels=labels, log=0, stest=stest, error=error, norm=norm, ifC=C, grid=grid, leg=leg)
+   plotshapes(X, images, x, y, z, Y, out_file=outdir +'/ShowerShapes_log',labels=labels, log=1, stest=stest, error=error, norm=norm, ifC=C, grid=grid, leg=leg)
+   print('The plots are saved in {}'.format(outdir))
 
-def plotSF(Data, gan_images, Y, labels, out_file, error=True, stest=True):
+#Plotting sampling fraction vs. Ep
+def plotSF(Data, gan_images, Y, labels, out_file, error=0, stest=0, ifC=0, grid=0, leg=1):
    gStyle.SetOptFit (1111) # superimpose fit results
    c=TCanvas("c" ,"Sampling Fraction vs. Primary energy" ,200 ,10 ,700 ,500) #make nice
-   c.SetGrid()
+   if grid: c.SetGrid()
    color =2
    gStyle.SetOptStat(0)
    Eprof = TProfile("Eprof", "Ratio of Ecal and Ep;Ep;Ecal/Ep", 100, 0, 500)
@@ -125,7 +134,10 @@ def plotSF(Data, gan_images, Y, labels, out_file, error=True, stest=True):
    Eprof.GetYaxis().SetRangeUser(0, 0.03)
    Eprof.SetLineColor(color)
    Eprof.Draw()
-   legend = TLegend(0.7, 0.7, 0.9, 0.9)
+   if stest:
+     legend = TLegend(0.6, 0.1, 0.9, 0.4)
+   else:
+     legend = TLegend(0.7, 0.1, 0.9, 0.3)
    legend.AddEntry(Eprof, "Data", "l")
    Gprof = []
    for i, images in enumerate(gan_images):
@@ -144,24 +156,29 @@ def plotSF(Data, gan_images, Y, labels, out_file, error=True, stest=True):
          glabel = glabel + ' MRE={:.4f}'.format(np.mean(sf_error))
       legend.AddEntry(Gprof[i], glabel, "l")
       if stest:
-         ks = Eprof.KolmogorovTest(Gprof[i], 'UU NORM')
+         ks = Eprof.KolmogorovTest(Gprof[i], 'UU')
          legend.AddEntry(Gprof[i], 'k={:e}'.format(ks), "l")
-      legend.Draw()
+      if leg: legend.Draw()
       c.Update()
    c.Print(out_file+'.pdf')
-   c.Print(out_file+'.C')
+   if ifC:
+      c.Print(out_file+'.C')
 
-def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=[2, 500], norm=False, ifpdf=True, stest=True, error=True):
+# plotting shower shapes
+def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=[2, 500], norm=0, ifC=0, stest=0, error=0, grid=0, leg=1):
    canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
    canvas.SetTitle('Weighted Histogram for energy deposition along x, y, z axis')
-   canvas.SetGrid()
+   if grid: canvas.SetGrid()
    color = 2
    canvas.Divide(2,2)
    array1x = np.sum(X, axis=(2,3))
    array1y = np.sum(X, axis=(1,3))
    array1z = np.sum(X, axis=(1,2))
-   leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
-   leg.SetTextSize(0.06)
+   if stest:
+     leg = ROOT.TLegend(0.1,0.1,0.9,0.9)
+   else:
+     leg = ROOT.TLegend(0.1,0.4,0.9,0.9)
+   #leg.SetTextSize(0.06)
    h1x = ROOT.TH1F('G4x' + str(energy), '', x, 0, x)
    h1y = ROOT.TH1F('G4y' + str(energy), '', y, 0, y)
    h1z = ROOT.TH1F('G4z' + str(energy), '', z, 0, z)
@@ -264,7 +281,7 @@ def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=
       color+=2
    canvas.Update()
    canvas.cd(4)
-   leg.SetHeader("#splitline{Weighted Histograms for energies}{ deposited along x, y, z axis}", "C")
+   leg.SetHeader("Energy deposited along x, y, z axis", "C")
    
    for i, h in enumerate(h2xs):
        glabel = 'GAN ' + labels[i]
@@ -276,7 +293,8 @@ def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=
    leg.Draw()
    canvas.Update()
    canvas.Print(out_file + '.pdf')
-   canvas.Print(out_file + '.C')
+   if ifC:
+      canvas.Print(out_file + '.C')
 
 if __name__ == '__main__': 
    main()
