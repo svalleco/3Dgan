@@ -48,7 +48,7 @@ def main():
      if not latent:
        latent = 256
      if not ascale:
-       ascales = 1
+       ascale = 1
 
      if datapath=='reduced':
        datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
@@ -58,7 +58,7 @@ def main():
        datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
        events_per_file = 10000
        energies = [50, 100, 200, 300, 400, 500]
-     angles = [62, 90, 118]      
+     thetas = [62, 90, 118]      
    else:
      from EcalEnergyGan import generator, discriminator
      dscale=1
@@ -69,7 +69,7 @@ def main():
      if not latent:
        latent = 200
      if not ascale:
-       ascales = 1
+       ascale = 1
 
      if datapath=='full':
        datapath ='/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5'
@@ -78,7 +78,7 @@ def main():
      
    datafiles = gan.GetDataFiles(datapath, Particles=[particle]) # get list of files
    if ang:
-     var = gan.get_sorted_angle(datafiles[-2:], energies, True, num_events1=50, num_events2=50, angtype=angtype, thresh=0.0)#
+     var = gan.get_sorted_angle(datafiles[-5:], energies, True, num_events1=1000, num_events2=1000, angtype=angtype, thresh=0.0)#
      g = generator(latent, dformat=dformat)
      g.load_weights(gweight)
      for energy in energies:
@@ -94,17 +94,18 @@ def main():
             var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)]
             var["index" + str(energy)+ "ang_" + str(index)] = var["events_act" + str(energy) + "ang_" + str(index)].shape[0]
           else:
-            indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2)) # all events with angle within a bin                                      
-            var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)][indexes]/ecalscale
+            indexes = np.where(((var["angle" + str(energy)]) > a - tolerance2) & ((var["angle" + str(energy)]) < a + tolerance2)) # all events with angle within a bin                                     
+            var["events_act" + str(energy) + "ang_" + str(index)] = var["events_act" + str(energy)][indexes]/dscale
             var["energy" + str(energy) + "ang_" + str(index)] = var["energy" + str(energy)][indexes]
             var["angle" + str(energy) + "ang_" + str(index)] = var["angle" + str(energy)][indexes]
             var["index" + str(energy)+ "ang_" + str(index)] = var["events_act" + str(energy) + "ang_" + str(index)].shape[0]
 
           var["events_act" + str(energy) + "ang_" + str(index)] = applythresh(var["events_act" + str(energy) + "ang_" + str(index)], thresh)
+
           var["events_gan" + str(energy) + "ang_" + str(index)]= gan.generate(g, var["index" + str(energy)+ "ang_" + str(index)],
                                                                            [var["energy" + str(energy)+ "ang_" + str(index)]/100,
                                                                             (var["angle"+ str(energy)+ "ang_" + str(index)]) * ascale], latent, concat=2)
-          var["events_gan" + str(energy) + "ang_" + str(index)]= post(var["events_gan" + str(energy) + "ang_" + str(index)], xpower=xpower, xscale=xscale)/dscale
+          var["events_gan" + str(energy) + "ang_" + str(index)]= inv_power(var["events_gan" + str(energy) + "ang_" + str(index)], xpower=xpower)/dscale
           var["events_gan" + str(energy) + "ang_" + str(index)]= applythresh(var["events_gan" + str(energy) + "ang_" + str(index)], thresh)
           for n in np.arange(num):
             pl.PlotEvent2(var["events_act" + str(energy) + "ang_" + str(index)][n], var["events_gan" + str(energy) + "ang_" + str(index)][n],
