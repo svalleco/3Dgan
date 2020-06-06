@@ -23,39 +23,41 @@ try:
     import setGPU #if Caltech
 except:
     pass
-
-import utils.GANutils as gan
 sys.path.insert(0,'../')
+import analysis.utils.GANutils as gan
 
 def main():
     # All of the following needs to be adjusted
     from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_gan_training_Pi0_2_500GeV_decay_p001/params_generator*.hdf5'
+    weightdir = '3dgan_weights_wt_aux/params_generator*.hdf5'
     if tlab:
-      #datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
-      datapath = '/gkhattak/data/*100GeV/*.h5'
+      datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
+      #datapath = '/gkhattak/data/*100GeV/*.h5'
       genpath = '/gkhattak/weights/' + weightdir
     else:
-      datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
+      datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
-    datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
-    #datapath = '/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5' 
+    #datapath = '/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5'
+    datapath = '/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5'
+    #datapath = '/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5' 
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results_gan_training/' # plot directory
+    plotsdir = 'results/optimization_results_wt_aux/' # plot directory
     particle = "Ele" 
-    scale = 1
+    scale = 1.
     threshold = 0
     ang = 1
     concat=2
-    power=0.85
-    latent = 256
+    power= 0.85
+    latent = 256 #256
     g= generator(latent_size=latent)
     start = 0
-    stop = 30
+    stop = 340
     gen_weights=[]
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
-    energies =[110, 150, 120]
+    #energies =[200, 250, 300]
+    energies =[110, 150, 190]
+    #energies = [100, 200, 300, 400]
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
@@ -258,7 +260,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    num_events=2000
    num_data = 140000
    ascale = 1
-   Test = True
+   Test = False
    m = 2
    var = {}
    sorted_path= sorted_path 
@@ -273,7 +275,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      if Test:
        data_files = Testfiles
      else:
-       data_files = Trainfiles + Testfiles
+       data_files = Trainfiles[-5:]
      start = time.time()
      var = gan.get_sorted_angle(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)
      data_time = time.time() - start
