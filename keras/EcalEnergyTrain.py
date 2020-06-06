@@ -53,7 +53,7 @@ def write_log(callback, common_tag, tags, logs, batch_no):
 def main():
 
     #Architectures to import
-    from EcalEnergyGan_old import generator, discriminator
+    from EcalEnergyGan import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
