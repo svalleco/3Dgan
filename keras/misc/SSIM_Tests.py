@@ -21,9 +21,11 @@ except:
   pass
 
 def main():
-  datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+  #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+  datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
+  energies = [0, 110, 150, 190] 
+  #energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
   angles=[62, 90, 118]
 
   latent = 256  #latent space
@@ -36,12 +38,12 @@ def main():
   get_shuffled= True # whether to make plots for shuffled
   
   labels =["G4", "GAN"] # labels
-  plotsdir = 'results/IQA_pami_ep21_ssim_large' # dir for results
+  plotsdir = 'results/SSIMi_ep127_gan_training/' # dir for results
   gan.safe_mkdir(plotsdir) 
   L=[1, 1e-2, 1e-4, 1e-6, 1e-8]
 
   g = generator(latent)       # build generator
-  gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
+  gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_127.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
   sorted_data = gan.get_sorted_angle(data_files[-20:], energies, thresh=thresh) # load data in a dict
   
