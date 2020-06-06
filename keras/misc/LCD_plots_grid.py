@@ -21,11 +21,11 @@ def main():
     from AngleArch3dGAN import generator, discriminator
 
     #Weights
-    disc_weight1="../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_discriminator_epoch_021.hdf5"
-    gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5"
+    disc_weight1="../keras/weights/surfsara_weights/params_discriminator_epoch_099.hdf5"
+    gen_weight1= "../keras/weights/surfsara_weights/params_generator_epoch_099.hdf5"
 
     #Path to store results
-    plotsdir = "results/icmla_grid_ep21_large"
+    plotsdir = "results/analysis_grid_surfara_32nd"
     safe_mkdir(plotsdir)
     #Parameters
     latent = 256 # latent space
@@ -40,14 +40,15 @@ def main():
     concat = 2 # if concatenting angle to latent space
     cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
     corr=1 # if making correlation plots
-    energies=[0, 50, 100, 200, 300, 400, 500] # energy bins
+    # energies=[0, 50, 100, 200, 300, 400, 500] # energy bins
+    energies = [0, 110, 150, 190] 
     angles = [62, 90, 118] #[math.radians(x) for x in [62, 90, 118]] # angle bins
-    angtype = 'theta'# the angle data to be read from file
+    angtype = 'mtheta'# the angle data to be read from file
     particle='Ele'# partcile type
     thresh=0 # Threshold for ecal energies
     #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-    #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
-    datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+    datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+    #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
     sortdir = 'SortedAngleData'  # if saving sorted data
     gendir = 'SortedAngleGen'  # if saving generated events
     discdir = 'SortedAngleDisc' # if saving disc outputs
