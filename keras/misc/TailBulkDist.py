@@ -9,24 +9,28 @@ import time
 import glob
 import sys
 import numpy.core.umath_tests as umath
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan/analysis')
-sys.path.insert(0,'/nfshome/gkhattak/3Dgan')
-sys.path.insert(0,'/nfshome/gkhattak/keras/architectures_tested/')
+sys.path.insert(0,'../keras/analysis')
+sys.path.insert(0,'../keras')
+#sys.path.insert(0,'/nfshome/gkhattak/keras/architectures_tested/')
 import utils.GANutils as gan
 import utils.ROOTutils as r
 import setGPU
 
 def main():
-   datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
-   #datapath2 = "/data/shared/LCDLargeWindow/fixedangle/EleEscan/EleEscan_1_1.h5"
+   #datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
+   datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/EleEscan/EleEscan_RandomAngle_1_1.h5"
    #datapath3 = '/bigdata/shared/LCD/NewV1/EleEscan/EleEscan_1_1.h5'
-   genweight = "/nfshome/gkhattak/3Dgan/weights/3dgan_weights_newarch3_lr/params_generator_epoch_050.hdf5"
-
-   from AngleArch3dGAN_newarch3 import generator
+   #genweight1 = "../keras/weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_127.hdf5"
+   #genweight2 = "../keras/weights/surfsara_weights/params_generator_epoch_099.hdf5"
+   #genweight3 = "../keras/weights/surfsara_128n/params_generator_epoch_193.hdf5"
+   #genweight4 = "../keras/weights/surfsara_256n/params_generator_epoch_139.hdf5"
+   genweight1 = '../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5'
+   genweight2 = '../keras/weights/surfsara_2_500GeV/params_generator_epoch_068.hdf5'
+   from AngleArch3dGAN import generator
 
    numdata = 1000
    scale=1
-   outdir = 'results/ecal_tails_bulk_newarch3_lr/'
+   outdir = 'results/ecal_tails_bulk_80n/'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
    x, y, ang=GetAngleData(datapath, numdata)
@@ -38,19 +42,36 @@ def main():
    concat=2
    
    g=generator(latent) # build generator
-   g.load_weights(genweight) # load weights        
+   g.load_weights(genweight1) # load weights        
    x_gen1 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
    x_gen1 = (1./50.) * np.power(x_gen1, 1./0.85)
-   
-   labels = ['G4', 'GAN']
-   plot_ecal_flatten_hist([x, x_gen1], outfile, y, labels)
-   plot_ecal_flatten_hist([x, x_gen1], outfile + '_log', y, labels, logy=1)
-   plot_ecal_flatten_hist([x[:, 10:40, 10:40, :], x_gen1[:, 10:40, 10:40, :]], outfile + 'bulk', y, labels, logy=0)
-   plot_ecal_flatten_hist([x[:, 10:40, 10:40, :], x_gen1[:, 10:40, 10:40, :]], outfile + 'bulk_log', y, labels, logy=1)
-   plot_ecal_flatten_hist([x[:, :10, :10, :], x_gen1[:, :10, :10, :]], outfile + 'tail1', y, labels, set_range=1, logy=0)
-   plot_ecal_flatten_hist([x[:, :10, :10, :], x_gen1[:, :10, :10, :]], outfile + 'tail1_log', y, labels, set_range=1,logy=1)
-   plot_ecal_flatten_hist([x[:, 40:, 40:, :], x_gen1[:, 40:, 40:, :]], outfile + 'tail2', y, labels, set_range=1,logy=0)
-   plot_ecal_flatten_hist([x[:, 40:, 40:, :], x_gen1[:, 40:, 40:, :]], outfile + 'tail2_log', y, labels, set_range=1,logy=1)
+
+   #g=generator(latent) # build generator
+   g.load_weights(genweight2) # load weights
+   x_gen2 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
+   x_gen2 = (1./50.) * np.power(x_gen2, 1./0.85)
+
+   #g=generator(latent) # build generator
+   #g.load_weights(genweight3) # load weights
+   #x_gen3 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
+   #x_gen3 = (1./50.) * np.power(x_gen3, 1./0.85)
+
+   #g=generator(latent) # build generator
+   #g.load_weights(genweight4) # load weights 
+   #x_gen4 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
+   #x_gen4 = (1./50.) * np.power(x_gen4, 1./0.85)
+
+
+  
+   labels = ['G4', 'GAN single node', 'GAN 80 node']
+   plot_ecal_flatten_hist([x, x_gen1, x_gen2], outfile, y, labels)
+   plot_ecal_flatten_hist([x, x_gen1, x_gen2], outfile + '_log', y, labels, logy=1)
+   plot_ecal_flatten_hist([x[:, 10:40, 10:40, :], x_gen1[:, 10:40, 10:40, :], x_gen2[:, 10:40, 10:40, :]], outfile + 'bulk', y, labels, logy=0)
+   plot_ecal_flatten_hist([x[:, 10:40, 10:40, :], x_gen1[:, 10:40, 10:40, :], x_gen2[:, 10:40, 10:40, :]], outfile + 'bulk_log', y, labels, logy=1)
+   plot_ecal_flatten_hist([x[:, :10, :10, :], x_gen1[:, :10, :10, :], x_gen2[:, :10, :10, :]], outfile + 'tail1', y, labels, set_range=1, logy=0)
+   plot_ecal_flatten_hist([x[:, :10, :10, :], x_gen1[:, :10, :10, :], x_gen2[:, :10, :10, :]], outfile + 'tail1_log', y, labels, set_range=1,logy=1)
+   plot_ecal_flatten_hist([x[:, 40:, 40:, :], x_gen1[:, 40:, 40:, :], x_gen2[:, 40:, 40:, :]], outfile + 'tail2', y, labels, set_range=1,logy=0)
+   plot_ecal_flatten_hist([x[:, 40:, 40:, :], x_gen1[:, 40:, 40:, :], x_gen2[:, 40:, 40:, :]], outfile + 'tail2_log', y, labels, set_range=1,logy=1)
    print('Histogram is saved in ', outfile)
        
 def postproc(event, f, scale):
