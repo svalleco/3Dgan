@@ -80,23 +80,16 @@ def main():
      if not ascales:
        ascales = 1
        
-     if datapath=='path1':
+     if datapath=='reduced':
        datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
        events_per_file = 5000
        energies = [0, 110, 150, 190]
-     elif datapath=='path2':
+     elif datapath=='full':
        datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
        events_per_file = 10000
        energies = [0, 50, 100, 200, 250, 300, 400, 500]
        #energies =[0, 160, 200, 250, 290]
-     elif datapath=='path3':
-       datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech
-       events_per_file = 10000
-       energies = [0, 50, 100, 200, 250, 300, 400, 500]
-     elif datapath=='path4':
-       datapath = "/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
-       events_per_file = 5000
-       energies = [0, 110, 150, 190]
+
    else:
      from EcalEnergyGan import generator, discriminator
      dscale=1
@@ -109,7 +102,7 @@ def main():
      if not ascales:
        ascales = 1
 
-     if datapath=='path1':
+     if datapath=='full':
        datapath ='/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5'
      events_per_file = 10000
      energies = [0, 50, 100, 200, 250, 300, 400, 500]  
@@ -163,7 +156,7 @@ def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
     parser.add_argument('--latentsize', action='store', type=int, help='size of random N(0, 1) latent space to sample')    #parser.add_argument('--model', action='store', default=AngleArch3dgan, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path1', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='full', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle used.')
     parser.add_argument('--outdir', action='store', type=str, default='results/3dgan_Analysis/', help='Directory to store the analysis plots.')
@@ -178,7 +171,7 @@ def get_parser():
     parser.add_argument('--angloss', action='store', type=int, default=1, help='Number of loss terms related to angle')
     parser.add_argument('--concat', action='store', type=int, default=2, help='Modes related to combining conditions with latent 0)not cancatenated.. 1)concatenate angle...3) concatenate energy and angle')
     parser.add_argument('--cell', action='store', type=int, default=0, help='Whether to plot cell energies..0)Not plotted...1)Only for bin with uniform spectrum.....2)For all energy bins')
-    parser.add_argument('--corr', action='store', type=int, default=0, help='Plot correlation plots..0)Not plotted...1)detailed features ...2) reduced features.. 3) reduced features for each energy bin')
+    parser.add_argument('--corr', action='store', type=int, default=2, help='Plot correlation plots..0)Not plotted...1)detailed features ...2) reduced features.. 3) reduced features for each energy bin')
     parser.add_argument('--test', action='store', type=int, default=1,  help='Use Test data')
     parser.add_argument('--stest', action='store', type=int, default=0, help='Statistics test for shower profiles')
     parser.add_argument('--save_data', default=False, action='store_true', help='Save sorted data')
