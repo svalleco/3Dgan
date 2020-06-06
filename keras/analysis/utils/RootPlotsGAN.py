@@ -69,10 +69,10 @@ def get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1,
          array = np.hstack((momentx[:, i].reshape(-1, 1), momenty[:, i].reshape(-1, 1), momentz[:, i].reshape(-1, 1)))
       else:
          array = np.hstack((array, momentx[:, i].reshape(-1, 1), momenty[:, i].reshape(-1, 1), momentz[:, i].reshape(-1, 1)))
-      names = names + ['momentx' + str(i), 'momenty' + str(i), 'momentz' + str(i)]
+      names = names + ['Mx' + str(i+1), 'My' + str(i+1), 'Mz' + str(i+1)]
    array = np.hstack((array, ecal.reshape(-1, 1), energy.reshape(-1, 1)))
    array = np.hstack((array, hits.reshape(-1, 1), ratio1.reshape(-1, 1), ratio2.reshape(-1, 1), ratio3.reshape(-1, 1)))
-   names = names + ['ecal sum', 'p energy', 'hits', 'ratio1_total', 'ratio2_total', 'ratio3_total']
+   names = names + ['$E_{sum}$', '$E_p$', 'H', 'R1', 'R2', 'R3']
    cor= np.corrcoef(array, rowvar=False)
    cor = get_dia2(cor)
    return flip(cor, axis=0), names
@@ -165,8 +165,8 @@ def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1
       dlabel=label
    plt.figure()
    plt.pcolor(X, Y, corr, label=dlabel, vmin = -1, vmax = 1)
-   plt.xticks(x, names, rotation='vertical', fontsize=5)
-   plt.yticks(x, names[::-1], fontsize=5)
+   plt.xticks(x, names, rotation='vertical', fontsize=8)
+   plt.yticks(x, names[::-1], fontsize=8)
    plt.margins(0.1)
    plt.colorbar()
    if leg: plt.legend()
@@ -174,8 +174,8 @@ def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1
    if isinstance(gprev, np.ndarray):
      plt.figure()
      plt.pcolor(X, Y, corr-gprev, label='Diff_' + dlabel, vmin = -1, vmax = 1)
-     plt.xticks(x, names, rotation='vertical', fontsize=5)
-     plt.yticks(x, names[::-1], fontsize=5)
+     plt.xticks(x, names, rotation='vertical', fontsize=8)
+     plt.yticks(x, names[::-1], fontsize=8)
      plt.margins(0.1)
      plt.colorbar()
      if leg: plt.legend()
@@ -348,7 +348,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], stest
        Eprof.GetYaxis().SetTitle("(Ep - Ep_{predicted})/Ep")
        Eprof.GetYaxis().CenterTitle()
        error1=(y - 100 *aux1[key])/y
-       if np.amax(np.absolute(error1)) < 0.2:
+       if np.mean(np.absolute(error1)) < 0.2:
           Eprof.GetYaxis().SetRangeUser(-0.3, 0.3)
        else:
           Eprof.GetYaxis().SetRangeUser(-1.5, 1.5)
@@ -372,7 +372,7 @@ def plot_aux_relative_profile(aux1, aux2, y, out_file, labels, p=[2, 500], stest
        if color in [5, 10, 18, 19]:
         color+=1
      error2=(y - 100 *aux2[key])/y
-     my.fill_profile(Gprof, error2, y)
+     my.fill_profile(Gprof, y, error2)
      Gprof.SetLineColor(color)
      if mono:  Gprof.SetLineStyle(color-2)
      color+=1
@@ -584,7 +584,7 @@ def plot_ecal_hits_hist(event1, event2, out_file, energy, labels, p=[2, 500], if
    else:
       c1.Print(out_file + '.C')
 
-def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, leg=True, grid=True, statbox=True, mono=False):
+def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, leg=True, grid=True, stest=False, statbox=True, mono=False):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    if grid: c1.SetGrid()
    color = 2
@@ -614,18 +614,21 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, 
        hp.Draw('sames hist')
        hp.SetLineColor(color)
        c1.Update()
-       legend.AddEntry(hp,"G4" + labels[i],"l")
        color+=2
      else:
        my.fill_hist(hp, 100 *aux1[key])
        hp.SetTitle("Predicted Primary Energy Histogram for {}+/- 5 GeV".format(energy) )
+       hp.SetLineColor(color)
        hp.Draw('sames')
        hp.Draw('sames hist')
        c1.Update()
        legend.AddEntry(hp,"G4" + labels[i],"l")
        color+=1
        if color in [5, 10, 18, 19]:
-        color+=1   
+         color+=1
+     
+     label = "G4 " + labels[i]
+     legend.AddEntry(hp, label,"l")
      my.fill_hist(hg, 100 *aux2[key])
      hp =my.normalize(hp, 1)
      hg =my.normalize(hg, 1)
@@ -638,7 +641,12 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, 
      c1.Update()
      if statbox:  my.stat_pos(hg)
      c1.Update()
-     legend.AddEntry(hg, "GAN {}".format(labels[i]), "l")
+     if stest:
+       ks = hp.KolmogorovTest(hg, 'UU NORM')
+       label = "GAN {}  K={:.6f}".format(labels[i], ks)
+     else:
+       label = "GAN " + labels[i]
+     legend.AddEntry(hg, label, "l")
    if leg: legend.Draw()
    c1.Modified()
    c1.Update()
@@ -647,7 +655,7 @@ def plot_aux_hist(aux1, aux2, out_file, energy, labels, p=[2, 500], ifpdf=True, 
    else:
       c1.Print(out_file + '.C')
 
-def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500], ifpdf=True, leg=True, grid=True, statbox=True, mono=False):
+def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500], ifpdf=True, leg=True, grid=True, stest= False, statbox=True, mono=False):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    if grid: c1.SetGrid()
    color = 2
@@ -713,7 +721,7 @@ def plot_primary_error_hist(aux1, aux2, y, out_file, energy, labels, p=[2, 500],
    else:
       c1.Print(out_file + '.C')
 
-def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifpdf=True, leg=True, grid=True, statbox=True, mono=False):
+def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifpdf=True, leg=True, grid=True, stest= False, statbox=True, mono=False):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    if grid:  c1.SetGrid()
    color = 2
@@ -742,25 +750,34 @@ def plot_realfake_hist(array1, array2, out_file, energy, labels, p=[2, 500], ifp
        hp.GetYaxis().CenterTitle()
        hp.SetLineColor(color)
        c1.Update()
-       legend.AddEntry(hp,"G4" + labels[i],"l")
-       c1.Update()
        color+=2
      else:
        my.fill_hist(hp, array1[key])
        hp.Draw('sames')
        hp.Draw('sames hist')
-       c1.Update()
-       legend.AddEntry(hp,"G4 " + labels[i],"l")
+       hp.SetLineColor(color)
        c1.Update()
        color+=1
        if color in [5, 10, 18, 19]:
         color+=1
+     if stest:
+        mean= np.mean(array1[key])
+        label = 'G4 {} (mean={})'.format(labels[i], mean)
+     else:
+        label ='G4 {})'.format(labels[i])
+     legend.AddEntry(hp, label,"l")
      c1.Update()
      my.fill_hist(hg,  array2[key])
      hp =my.normalize(hp)
      hg =my.normalize(hg)
      hp.GetYaxis().SetRangeUser(0, 0.5)
      hg.SetLineColor(color)
+     if stest:
+        mean= np.mean(array2[key])
+        label ='GAN {} (mean={})'.format(labels[i], mean)
+     else:
+        label ='GAN {})'.format(labels[i])
+     legend.AddEntry(hg, label,"l")
      if mono: hg.SetLineStyle(color-2)
      color+=1
      if color in [5, 10, 18, 19]:
@@ -972,7 +989,7 @@ def plot_max(array1, array2, x, y, z, out_file1, out_file2, out_file3, energy, l
       c1.Print(out_file3 + '.C')
 
 def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, x, y, z, out_file1, out_file2, out_file3, energy, labels,
-                          log=0, p=[2, 500], ifpdf=True, stest=True, grid=True, leg=True, statbox=True, mono=False, norm=False):
+                          log=0, p=[2, 500], ifpdf=True, stest=True, grid=True, leg=True, statbox=True, mono=False, norm=True):
    canvas = ROOT.TCanvas("canvas" ,"" ,200 ,10 ,700 ,500) #make
    canvas.SetTitle('Weighted Histogram for energy deposition along x, y, z axis')
    color = 2
@@ -1177,21 +1194,22 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
    else:
       canvas.Print(out_file3 + '.C')
 
-def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], stest=False, ifpdf=True, grid=True, leg=True, statbox=True, mono=False):
+def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], stest=False, ifpdf=True, grid=True, leg=True, statbox=True, mono=False, ang=1):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    array1= array1[:, m]
-   if m==0:
-     if dim=='x' or dim=='y':
-        bins = 51
-        maxbin = 51
-     else:
-        bins = 25
-        maxbin = 25
-     minbin = 0
+   
+   if dim=='x' or dim=='y':
+      bins = 51 if ang else 25
+      maxbin = 51 if ang else 25
+      minbin= 0
+   elif m==0:
+      bins = 25
+      maxbin = 25
+      minbin= 0
    else:
-     bins = 50
      maxbin = np.amax(array1)+ 2
      minbin = min(0, np.amin(array1))
+     bins = 50
    if grid: c1.SetGrid()
    color = 2
    legend = ROOT.TLegend(.7, .1, .9, .3)
@@ -1257,7 +1275,7 @@ def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], s
    else:
       c1.Print(out_file + '.C')
 
-def plot_sparsity(events1, events2, out_file, energy, labels, threshmin=-13, threshmax=1, logy=0, min_max=0, ifpdf=True, mono=False, leg=True, grid=True, statbox=True):
+def plot_sparsity(events1, events2, out_file, energy, labels, threshmin=-13, threshmax=1, logy=0, min_max=0, ifpdf=True, mono=False, leg=True, grid=True, statbox=True, ang=1):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    if grid: c1.SetGrid()
    title = "Sparsity for electrons with 100-200 GeV primary energy"
@@ -1302,7 +1320,7 @@ def plot_sparsity(events1, events2, out_file, energy, labels, threshmin=-13, thr
    else:
       area1 = np.concatenate((mean1+std1, flip(mean1-std1, 0)), axis=0)
       area2 = np.concatenate((mean2+std2, flip(mean2-std2, 0)), axis=0)
-      ylim = 0.04
+      ylim = 0.04 if ang else 0.2
    thresh2=np.concatenate((thresh, flip(thresh, 0)), axis=0)
    my.fill_graph(sparsity1b, thresh2, area1)
    my.fill_graph(sparsity2b, thresh2, area2)
@@ -1568,7 +1586,7 @@ def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True, g
 
 ##################################### Get plots for Fixed angle #####################################################################
 
-def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=True, cell=0, corr=0, grid=True, leg=True, statbox=True):
+def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=True, cell=0, corr=0, grid=True, leg=True, statbox=True, mono=0):
 
     actdir = plots_dir + 'Actual'
     safe_mkdir(actdir)
@@ -1605,9 +1623,11 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
        correlationfile = 'Corr'
        start = time.time()
        if energy==0:
-          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), stest=stest)
+          plot_ecal_ratio_profile(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], labels, os.path.join(comdir, allecalfile), 
+                                  ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
           plots+=1
-          plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels)
+          plot_aux_relative_profile(var["aux_act" + str(energy)], var["aux_gan"+ str(energy)], var["energy"+ str(energy)], os.path.join(comdir, allauxrelativefile), labels,
+                                  ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
           plots+=1
           if corr==1:
              plot_correlation(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, correlationfile), labels)
@@ -1617,40 +1637,62 @@ def get_plots_multi(var, labels, plots_dir, energies, m, n, ifpdf=True, stest=Tr
              plots+=1
                                                                               
           if cell:
-             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels,
+                                    ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
              plots+=1
-             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels, log=1)
+             plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat_log' + ecalfile), energy, labels, log=1,
+                                    ifpdf=ifpdf,  grid=grid, leg=leg, statbox=statbox, mono=mono)
              plots+=1
-       plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy, labels, stest=stest)
+          plot_sparsity(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'spartsity'), energy, labels,
+                       threshmin=-13, threshmax=1, logy=0, min_max=0, ifpdf=ifpdf, mono=mono,
+                        leg=leg, grid=grid, statbox=statbox, ang=0)
+
+       plot_ecal_hist(var["ecal_act" + str(energy)], var["ecal_gan" + str(energy)], os.path.join(discdir, ecalfile), energy, labels, 
+                      ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
        if cell>1:
-          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels,
+                                  ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
           plots+=1
-          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels)
+          plot_ecal_flatten_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'flat' + ecalfile), energy, labels,
+                                  ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
           plots+=1
                     
-       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy, labels, stest=stest)
+       plot_ecal_hits_hist(var["events_act" + str(energy)], var["events_gan" + str(energy)], os.path.join(comdir, 'hits' + ecalfile), energy, labels, 
+                                  ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_aux_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)] , os.path.join(discdir, energyfile), energy, labels)
+       plot_aux_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)] , os.path.join(discdir, energyfile), energy, labels,
+                     ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxfile), os.path.join(gendir, maxfile), os.path.join(comdir, maxfile), energy, labels, stest=stest)
+       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxfile), os.path.join(gendir, maxfile), os.path.join(comdir, maxfile), energy, labels, 
+               ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxlfile), os.path.join(gendir, maxlfile), os.path.join(comdir, 'log' + maxlfile), energy, labels, log=1, stest=stest)
+       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)], x, y, z, os.path.join(actdir, maxlfile), os.path.join(gendir, maxlfile), os.path.join(comdir, 'log' + maxlfile), 
+               energy, labels, log=1, ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histfile), os.path.join(gendir,histfile), os.path.join(comdir, histfile), energy, labels, stest=stest)
+       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], 
+               var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histfile), os.path.join(gendir,histfile), os.path.join(comdir, histfile), energy, labels, 
+               ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, labels, log=1, stest=stest)
+       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], 
+               var["sumsz_gan"+ str(energy)], x, y, z, os.path.join(actdir, histlfile), os.path.join(gendir, histlfile), os.path.join(comdir, histlfile), energy, labels, 
+                             log=1, ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_realfake_hist(var["isreal_act" + str(energy)], var["isreal_gan" + str(energy)], os.path.join(discdir, realfile), energy, labels)
+       plot_realfake_hist(var["isreal_act" + str(energy)], var["isreal_gan" + str(energy)], os.path.join(discdir, realfile), energy, labels,
+                          ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
-       plot_primary_error_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)], var["energy" + str(energy)], os.path.join(discdir, 'error_' + energyfile), energy, labels)
+       plot_primary_error_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)], var["energy" + str(energy)], os.path.join(discdir, 'error_' + energyfile), 
+                               energy, labels, ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono)
        plots+=1
        for mmt in range(m):
-          plot_moment(var["momentX_act" + str(energy)], var["momentX_gan" + str(energy)], os.path.join(mdir, 'x' + str(mmt + 1) + momentfile), 'x', energy, mmt, labels, stest=stest)
+          plot_moment(var["momentX_act" + str(energy)], var["momentX_gan" + str(energy)], os.path.join(mdir, 'x' + str(mmt + 1) + momentfile), 'x', energy, mmt, labels, 
+                      ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono, ang=0)
           plots+=1
-          plot_moment(var["momentY_act" + str(energy)], var["momentY_gan" + str(energy)], os.path.join(mdir, 'y' + str(mmt + 1) + momentfile), 'y', energy, mmt, labels, stest=stest)
+          plot_moment(var["momentY_act" + str(energy)], var["momentY_gan" + str(energy)], os.path.join(mdir, 'y' + str(mmt + 1) + momentfile), 'y', energy, mmt, labels, 
+                      ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono, ang=0)
           plots+=1
-          plot_moment(var["momentZ_act" + str(energy)], var["momentZ_gan" + str(energy)], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt, labels, stest=stest)
+          plot_moment(var["momentZ_act" + str(energy)], var["momentZ_gan" + str(energy)], os.path.join(mdir, 'z' + str(mmt + 1) + momentfile), 'z', energy, mmt, labels, 
+                      ifpdf=ifpdf, stest=stest, grid=grid, leg=leg, statbox=statbox, mono=mono, ang=0)
           plots+=1
 
     print 'Plots are saved in ', plots_dir
@@ -1791,7 +1833,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
                             ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
       plots+=1
       plot_realfake_hist(var["isreal_act" + str(energy)], var["isreal_gan" + str(energy)],
-                         os.path.join(discdir, realfile), energy, labels, p,
+                         os.path.join(discdir, realfile), energy, labels, p, stest=stest,
                          ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
       plots+=1
       plot_primary_error_hist(var["aux_act" + str(energy)], var["aux_gan" + str(energy)],
@@ -2090,25 +2132,29 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees', label="
    canvas.Print(out_file)
 
 def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees', label="", logz=0):
-   canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,900 ,400) #make
    x = aevent.shape[0]
    y = aevent.shape[1]
    z = aevent.shape[2]
+   if x==25:
+     canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,800 ,400)
+   else:
+     canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,900 ,400)
    lsize = 0.04 # axis label size
    tsize = 0.08 # axis title size
    tmargin = 0.02
    bmargin = 0.15
    lmargin = 0.15
    rmargin = 0.17
-   
-   ang1 = MeasPython(np.moveaxis(aevent, 3, 0))
-   ang2 = MeasPython(np.moveaxis(aevent, 3, 0), mod=2)
-   if unit == 'degrees':
-      ang1= np.degrees(ang1)
-      ang2= np.degrees(ang2)
-      theta = np.degrees(theta)
-
-   title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV #theta ={:.2f} #circ".format(energy, theta))
+   if theta:
+     ang1 = MeasPython(np.moveaxis(aevent, 3, 0))
+     ang2 = MeasPython(np.moveaxis(aevent, 3, 0), mod=2)
+     if unit == 'degrees':
+        ang1= np.degrees(ang1)
+        ang2= np.degrees(ang2)
+        theta = np.degrees(theta)
+     title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV #theta ={:.2f} #circ".format(energy, theta))
+   else:
+     title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV".format(energy))
    title.SetFillStyle(0)
    title.SetLineColor(0)
    title.SetBorderSize(1)
@@ -2117,12 +2163,12 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    graphPad.Draw()
    graphPad.cd()
    graphPad.Divide(3,2)
-   hx1 = ROOT.TH2F('x1_{:.2f}GeV_{:.2f}'.format(energy, theta), '', y, 0, y, z, 0, z)
-   hy1 = ROOT.TH2F('y1_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, z, 0, z)
-   hz1 = ROOT.TH2F('z1_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, y, 0, y)
-   hx2 = ROOT.TH2F('x2_{:.2f}GeV_{:.2f}'.format(energy, theta), '', y, 0, y, z, 0, z)
-   hy2 = ROOT.TH2F('y2_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, z, 0, z)
-   hz2 = ROOT.TH2F('z2_{:.2f}GeV_{:.2f}'.format(energy, theta), '', x, 0, x, y, 0, y)
+   hx1 = ROOT.TH2F('x1_{:.2f}GeV'.format(energy), '', y, 0, y, z, 0, z)
+   hy1 = ROOT.TH2F('y1_{:.2f}GeV'.format(energy), '', x, 0, x, z, 0, z)
+   hz1 = ROOT.TH2F('z1_{:.2f}GeV'.format(energy), '', x, 0, x, y, 0, y)
+   hx2 = ROOT.TH2F('x2_{:.2f}GeV'.format(energy), '', y, 0, y, z, 0, z)
+   hy2 = ROOT.TH2F('y2_{:.2f}GeV'.format(energy), '', x, 0, x, z, 0, z)
+   hz2 = ROOT.TH2F('z2_{:.2f}GeV'.format(energy), '', x, 0, x, y, 0, y)
    hx1.SetStats(0)
    hy1.SetStats(0)
    hz1.SetStats(0)
@@ -2154,7 +2200,10 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    ROOT.gPad.SetTopMargin(tmargin)
    ROOT.gPad.SetBottomMargin(bmargin)
    ROOT.gPad.SetLeftMargin(lmargin)
-   ROOT.gPad.SetRightMargin(0)
+   if x==51:
+     ROOT.gPad.SetRightMargin(0)
+   else:
+     ROOT.gPad.SetRightMargin(rmargin)
    hx1.SetMinimum(Min)
    hx1.SetMaximum(Max)
    canvas.Update()
@@ -2172,7 +2221,10 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    ROOT.gPad.SetTopMargin(tmargin)
    ROOT.gPad.SetBottomMargin(bmargin)
    ROOT.gPad.SetLeftMargin(lmargin)
-   ROOT.gPad.SetRightMargin(0)
+   if x==51:
+     ROOT.gPad.SetRightMargin(0)
+   else:
+     ROOT.gPad.SetRightMargin(rmargin)
    hy1.SetMinimum(Min)
    hy1.SetMaximum(Max)
 
@@ -2210,7 +2262,11 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    ROOT.gPad.SetTopMargin(tmargin)
    ROOT.gPad.SetBottomMargin(bmargin)
    ROOT.gPad.SetLeftMargin(lmargin)
-   ROOT.gPad.SetRightMargin(0)
+   if x==51:
+     ROOT.gPad.SetRightMargin(0)
+   else:
+     ROOT.gPad.SetRightMargin(rmargin)
+
    hx2.SetMinimum(Min)
    hx2.SetMaximum(Max)
 
@@ -2228,7 +2284,11 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    ROOT.gPad.SetTopMargin(tmargin)
    ROOT.gPad.SetBottomMargin(bmargin)
    ROOT.gPad.SetLeftMargin(lmargin)
-   ROOT.gPad.SetRightMargin(0)
+   if x==51:
+     ROOT.gPad.SetRightMargin(0)
+   else:
+     ROOT.gPad.SetRightMargin(rmargin)
+
    hy2.SetMinimum(Min)
    hy2.SetMaximum(Max)
 
