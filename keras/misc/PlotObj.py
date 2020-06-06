@@ -28,9 +28,9 @@ import analysis.utils.GANutils as gan
 
 def main():
     result=[]
-    resultfile = 'result_2Dconv.txt'
+    resultfile = 'result_log_128n.txt'
     file = open(resultfile)
-    plotdir = 'obj_plots_2Dconv/'
+    plotdir = 'obj_plots_128n/'
     gan.safe_mkdir(plotdir)
     for line in file:
       fields = line.strip().split()
@@ -41,10 +41,10 @@ def main():
     epochs = np.arange(len(result))
     print(epochs)
     print('The result file {} is read.'.format(resultfile))
-    PlotResultsRoot(result, plotdir, epochs, ang=0)
+    PlotResultsRoot(result, plotdir, epochs, start=100, end=300, ang=0, leg=0)
 
 #Plots results in a root file
-def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfile='obj_result', ang=1):
+def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfile='obj_result', ang=1, leg=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     legend = ROOT.TLegend(.5, .6, .89, .89)
     legend.SetBorderSize(0)
@@ -91,28 +91,29 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
          if item[4]< mina:
            mina = item[4]
            mina_n = epoch[i]
-                               
-    gt  = ROOT.TGraph( num- start , epoch[start:], total[start:] )
+    
+    num = min(num, end)                           
+    gt  = ROOT.TGraph( num- start , epoch[start:num], total[start:num] )
     gt.SetLineColor(color1)
     mg.Add(gt)
     legend.AddEntry(gt, "Total error")# min = {:.4f} (epoch {})".format(mint, mint_n), "l")
-    ge = ROOT.TGraph( num- start , epoch[start:], energy_e[start:] )
+    ge = ROOT.TGraph( num- start , epoch[start:num], energy_e[start:num] )
     ge.SetLineColor(color2)
     legend.AddEntry(ge, "Energy error")# min = {:.4f} (epoch {})".format(mine, mine_n), "l")
     mg.Add(ge)
-    gm = ROOT.TGraph( num- start , epoch[start:], mmt_e[start:])
+    gm = ROOT.TGraph( num- start , epoch[start:num], mmt_e[start:num])
     gm.SetLineColor(color3)
     mg.Add(gm)
     legend.AddEntry(gm, "Moment error")#  = {:.4f} (epoch {})".format(minm, minm_n), "l")
     c1.Update()
-    gs = ROOT.TGraph( num- start , epoch[start:], sf_e[start:])
+    gs = ROOT.TGraph( num- start , epoch[start:num], sf_e[start:num])
     gs.SetLineColor(color4)
     mg.Add(gs)
     legend.AddEntry(gs, "Sampling Fraction error  ")#= {:.4f} (epoch {})".format(mins, mins_n), "l")
     c1.Update()
                     
     if ang:
-      ga = ROOT.TGraph( num- start , epoch[start:], ang_e[start:])
+      ga = ROOT.TGraph( num- start , epoch[start:num], ang_e[start:num])
       ga.SetLineColor(color5)
       mg.Add(ga)
       legend.AddEntry(ga, "Angle error  = {:4f} (epoch {})".format(mina, mina_n), "l")
@@ -120,10 +121,10 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
                     
     mg.SetTitle("Optimization function: Mean Relative Error on shower shapes, moment and sampling fraction;Epochs;Error")
     mg.Draw('ALP')
-    mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(total))
+    mg.GetYaxis().SetRangeUser(0, 1.1 * np.amax(total[start:end]))
     #mg.GetYaxis().SetLabelSize(0.33)
     c1.Update()
-    legend.Draw()
+    if leg:legend.Draw()
     c1.Update()
     c1.Print(os.path.join(resultdir, plotfile + '.pdf'))
     c1.Print(os.path.join(resultdir, plotfile + '.C'))
@@ -152,7 +153,7 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
         legend.AddEntry(ge.GetFunction(fit), 'Energy fit', "l")
         legend.AddEntry(gm.GetFunction(fit), 'Moment fit', "l")  
         legend.AddEntry(gs.GetFunction(fit), 'S. Fr. fit', "l")
-      legend.Draw()
+      if leg: legend.Draw()
       c1.Update()
       c1.Print(os.path.join(resultdir, plotfile + '_{}.pdf'.format(fit)))
       c1.Print(os.path.join(resultdir, plotfile + '_{}.C'.format(fit)))
