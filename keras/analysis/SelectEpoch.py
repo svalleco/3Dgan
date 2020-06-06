@@ -38,7 +38,7 @@ def main():
    datapath =params.datapath
    particle= params.particle
    angtype= params.angtype
-   plotdir= params.plotdir
+   outdir= params.outdir
    sortdir= params.sortdir
    nbEvents= params.nbEvents
    binevents= params.binevents
@@ -53,7 +53,7 @@ def main():
    leg= params.leg
    statbox= params.statbox
    mono= params.mono
-   weightdir= params.weightsdir
+   gweightdir= params.gweightsdir
    xscale= params.xscale 
    yscale= params.yscale
    xpower = params.xpower
@@ -98,14 +98,14 @@ def main():
     
    if tlab:
      datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
-   else:
-     genpath =  weightdir +'/*generator*.hdf5'# path to weights
+   
+   genpath =  gweightdir +'/*generator*.hdf5'# path to weights
    sorted_path = 'Anglesorted'  # where sorted data is to be placed
    g= generator(latent_size=latent)
    
    gen_weights=[]
       
-   gan.safe_mkdir(plotdir)
+   gan.safe_mkdir(outdir)
 
    for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
@@ -118,13 +118,18 @@ def main():
       epoch.append(num)
 
    print("{} weights are found".format(len(gen_weights)))
-   result = GetResults(opt, plotdir, gen_weights, g, datapath, sorted_path, particle
+   result, error_bar = GetResults(opt, outdir, gen_weights, g, datapath, sorted_path, particle
             , scale=xscale, power=xpower, thresh=thresh, ang=ang, concat=concat, latent=latent
             , energies=energies, nbEvents=nbEvents, eventsperfile=events_per_file, dscale=dscale
              )
    for i, op in enumerate(opt):
       r= result[i::len(opt)]
-      PlotResultsRoot(r, op, plotdir, epoch, fits, sl, ang=ang)
+      if op=='mre':
+         print('error bars')
+         error_bar = error_bar[i::len(opt)]
+         PlotResultsErrors(r, error_bar, op, outdir, epoch, fits, sl, ang=ang)
+      else:
+         PlotResultsRoot(r, op, outdir, epoch, fits, sl, ang=ang)
 
 def get_parser():
     # defaults apply at caltech
@@ -133,7 +138,7 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='full', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle used.')
-    parser.add_argument('--plotdir', action='store', type=str, default='results/best_epoch_wt_aux/', help='Directory to store the analysis plots.')
+    parser.add_argument('--outdir', action='store', type=str, default='results/best_epoch_wt_aux/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--nbEvents', action='store', type=int, default=50000, help='Max limit for events used for Testing')
     parser.add_argument('--eventsperfile', action='store', type=int, default=5000, help='Number of events in a file')
@@ -150,7 +155,7 @@ def get_parser():
     parser.add_argument('--leg', action='store_true', default=False, help='add legends')
     parser.add_argument('--statbox', action='store_true', default=False, help='add statboxes')
     parser.add_argument('--mono', action='store_true', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--weightsdir', action='store', type=str, default='../weights/3dgan_weights_wt_aux/', help='paths to Generator weights.')
+    parser.add_argument('--gweightsdir', action='store', type=str, default='../weights/3dgan_weights_wt_aux/', help='paths to Generator weights.')
     parser.add_argument('--xscale', action='store', type=int, help='Multiplication factors for cell energies')
     parser.add_argument('--yscale', action='store', help='Division Factor for Primary Energy.')
     parser.add_argument('--xpower', action='store', help='Power of cell energies')
@@ -171,6 +176,55 @@ def taking_power(n, xscale=1, power=1):
 
 def inv_power(n, xscale=1, power=1.):
     return np.power(n, 1./power)/xscale
+
+def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, ang=1):
+    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
+    #c1.SetGrid ()
+    legend = ROOT.TLegend(.4, .7, .89, .89)
+    legend.SetTextSize(0.028)
+    legend.SetBorderSize(0)
+    mg=ROOT.TMultiGraph()
+    colors = [2, 8, 4, 6, 7]
+    num = len(result)
+    sf_e  = np.zeros((num))
+    er = np.zeros((num))
+    epoch = np.zeros((num))
+      
+    mins =1000
+    mins_n =0
+    j=0
+    for i, item in enumerate(result):
+      if item!=0:
+        epoch[j] = epochs[i]       
+        sf_e[j]=item
+        er[j] = error_bar[i]
+        j+=1
+    if  num<sl: sl=num
+    for i in range(num):
+      if epoch[i] > epoch[num-1]-sl:
+        if sf_e[i] <= mins:
+         mins = sf_e[i]
+         mins_n = epoch[i]
+    er_x = 0.5 * np.zeros((num))                                         
+    gs = ROOT.TGraphErrors(j, epoch[:j], sf_e[:j], er_x[:j], er[:j])
+    gs.SetLineColor(colors[0])
+    #gs.SetMarkerColor(colors[0])
+    #gs.SetMarkerStyle(21)
+    #mg.Add(gs)
+    legend.AddEntry(gs, "min for epoch {}= {:.4f}".format(mins_n, mins), "l")
+    c1.Update()
+    if opt=='chi2' or opt=='ks':
+       title = "-log[{}] for sampling fraction (selecting from last {} epochs);Epochs;{}"
+    else:
+       title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"                    
+    gs.SetTitle(title.format(opt, sl, opt))
+    gs.Draw()
+    gs.GetYaxis().SetRangeUser(0, 0.2)
+    c1.Update()
+    legend.Draw()
+    c1.Update()
+    c1.Print(os.path.join(resultdir, "{}_result.pdf".format(opt)))
+
 
 #Plots results in a root file
 def PlotResultsRoot(result, opt, resultdir, epochs, fits, sl=10, ang=1):
@@ -213,7 +267,7 @@ def PlotResultsRoot(result, opt, resultdir, epochs, fits, sl=10, ang=1):
        title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"                    
     mg.SetTitle(title.format(opt, sl, opt))
     mg.Draw('ALP')
-    mg.GetYaxis().SetRangeUser(0, 1.4 * np.amax(result))
+    mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(sf_e))
     c1.Update()
     legend.Draw()
     c1.Update()
@@ -244,22 +298,21 @@ def GetResults(opt, resultdir, gen_weights, g, datapath, sorted_path, particle="
     resultfile = os.path.join(resultdir,  'result_log.txt')
     file = open(resultfile,'w')
     n = len(opt)
-    result = analyse(g, False,True, gen_weights, datapath, sorted_path, opt, scale, power, particle, 
+    result, error_bar = analyse(g, False,True, gen_weights, datapath, sorted_path, opt, scale, power, particle, 
                      thresh=thresh, ang=ang, concat=concat, latent=latent, energies=energies,
                      nbEvents= nbEvents, eventsperfile=eventsperfile, dscale=dscale)
     for i, r in enumerate(result):
        if i !=0 and i % n==0:
          file.write('\n')
        file.write(str(r)+'\t')
-           
     #print all results together at end                                                                               
     for i in range(len(gen_weights)):                                                                                            
        print ('The results for ......',gen_weights[i])
        reslog = " The result = "
-       print (reslog, result[n*i:n*i + n])
+       print (reslog, '{} +/- {}'.format(result[n*i:n*i + n], error_bar[n*i:n*i + n]))
     file.close
     print ('The results are saved to {}.txt'.format(resultfile))
-    return result
+    return result, error_bar
 
 def GetAngleData_reduced(datafile, thresh=1e-6):
     #get data for training
@@ -306,6 +359,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    data_time = time.time() - start
    print ("The events were loaded in {} seconds".format(data_time))
    result = []
+   error_bar = []
    for energy in energies:
      var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
      var["events_act" + str(energy)]=  np.squeeze(var["events_act" + str(energy)])/dscale
@@ -337,7 +391,8 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
      print ("{} events were generated in {} seconds".format(total, gen_time))
      for opt in optimizer:
        if opt == 'mre':
-         res = mre(var, energies[1:], ang=ang)
+         res, d = mre(var, energies[1:], ang=ang)
+         error_bar.append(d)
        elif opt == 'chi2':
          res = stat_test(var, [energies[0]], ang=ang, test=opt, p=[])
        elif opt == 'ks':
@@ -345,20 +400,28 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
        elif opt == 'wass':
          if 0 in energies:
            res = wass( var["sf_act0"],  var["sf_act0"])
-       print('{} error = {}'.format(opt, res))  
+       print('{} error = {}'.format(opt, res))
+         
        result.append(res)
-   return result                                        
+   return result, error_bar                                        
  
 def mre(var, energies, ang=1):
    metrics = 0
+   d = 0
+
    for energy in energies:
      #Relative error on mean moment value for each moment and each axis
      mean_sf_g4 = np.mean(var["sf_act"+ str(energy)])
      mean_sf_gan = np.mean(var["sf_gan"+ str(energy)])
+     N = var["sf_act"+ str(energy)].shape[0]
      sf_error = np.divide(np.absolute(mean_sf_g4 - mean_sf_gan), mean_sf_g4)
+     #er = np.square((np.sqrt(N)/N) * sf_error)
+     er = (np.square(np.std(var["sf_gan"+ str(energy)]))/N) + (np.square(np.std(var["sf_act"+ str(energy)])/mean_sf_gan)/N)
      metrics +=sf_error
+     d += er
+   d = np.sqrt(d/len(energies))
    metrics = metrics/len(energies)
-   return metrics
+   return metrics, d
 
 def stat_test(var, energies, ang, bins=[10, 5], p=[100, 300], r = [0.018, 0.022], test='chi2', d=2):
     error=0
