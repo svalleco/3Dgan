@@ -11,13 +11,9 @@
 keras/weights/*
 keras/analysis/results/*
 keras/results/*
-keras/archives/*
 keras/logs/*
 */log/*
 /analysis/results/*
 /results/*
 /logs/*
-keras/paramScan/*
-keras/misc/*
-keras/archives/*
 keras/misc/results/*
