@@ -53,7 +53,7 @@ def write_log(callback, common_tag, tags, logs, batch_no):
 def main():
 
     #Architectures to import
-    from EcalEnergyGan import generator, discriminator
+    from EcalEnergyGan_old import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
@@ -87,8 +87,8 @@ def main():
     print(weightdir)
     # Building discriminator and generator
     K.set_image_data_format(dformat) #setting data format)
-    d=discriminator(dformat=dformat)
-    g=generator(latent_size=latent_size, dformat=dformat)
+    d=discriminator(keras_dformat=dformat)
+    g=generator(latent_size=latent_size, keras_dformat=dformat)
     Gan3DTrain(d, g, datapath, nEvents, weightdir, pklfile, resultfile, mod=fitmod, nb_epochs=nb_epochs, batch_size=batch_size, latent_size =latent_size 
                , loss_weights=lossweights, xscale = xscale, thresh=thresh, analysis=analysis, energies=energies, tf_flags=tf_flags, dformat=dformat)
 

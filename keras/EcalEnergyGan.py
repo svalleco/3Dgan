@@ -81,7 +81,7 @@ def generator(latent_size=200, return_intermediate=False, dformat='channels_last
          ZeroPadding3D((1,0,3)),
          Conv3D(6, (3, 3, 8), kernel_initializer='he_uniform'),
          LeakyReLU(),
-         Conv3D(1, (2, 2, 2), kernel_initializer='glorot_normal'),
+         Conv3D(1, (2, 2, 2), kernel_initializer='glorot_normal', use_bias=False),
          Activation('relu')
       
      ])
