@@ -88,7 +88,7 @@ def main():
      elif datapath=='full':
        datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
        events_per_file = 10000
-       energies =[0, 100, 200, 300, 400]
+       energies =[0, 50, 100, 150, 200, 250, 300, 350, 400, 450]
        dscale = 50.
    else: 
      datapath = "/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5"
@@ -125,8 +125,7 @@ def main():
    for i, op in enumerate(opt):
       r= result[i::len(opt)]
       if op=='mre':
-         print('error bars')
-         error_bar = error_bar[i::len(opt)]
+         #error_bar = error_bar[i::len(opt)]
          PlotResultsErrors(r, error_bar, op, outdir, epoch, fits, sl, ang=ang)
       else:
          PlotResultsRoot(r, op, outdir, epoch, fits, sl, ang=ang)
@@ -138,9 +137,9 @@ def get_parser():
     parser.add_argument('--datapath', action='store', type=str, default='full', help='HDF5 files to train from.')
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle.')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle used.')
-    parser.add_argument('--outdir', action='store', type=str, default='results/best_epoch_wt_aux/', help='Directory to store the analysis plots.')
+    parser.add_argument('--outdir', action='store', type=str, default='results/best_epoch_gan_training/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
-    parser.add_argument('--nbEvents', action='store', type=int, default=50000, help='Max limit for events used for Testing')
+    parser.add_argument('--nbEvents', action='store', type=int, default=10000, help='Max limit for events used for Testing')
     parser.add_argument('--eventsperfile', action='store', type=int, default=5000, help='Number of events in a file')
     parser.add_argument('--binevents', action='store', type=int, default=10000, help='Number of events in each bin')
     parser.add_argument('--start', action='store', type=int, default=0, help='plot beginning from epoch')
@@ -155,7 +154,7 @@ def get_parser():
     parser.add_argument('--leg', action='store_true', default=False, help='add legends')
     parser.add_argument('--statbox', action='store_true', default=False, help='add statboxes')
     parser.add_argument('--mono', action='store_true', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--gweightsdir', action='store', type=str, default='../weights/3dgan_weights_wt_aux/', help='paths to Generator weights.')
+    parser.add_argument('--gweightsdir', action='store', type=str, default='../weights/3dgan_weights_gan_training_epsilon_2_500GeV//', help='paths to Generator weights.')
     parser.add_argument('--xscale', action='store', type=int, help='Multiplication factors for cell energies')
     parser.add_argument('--yscale', action='store', help='Division Factor for Primary Energy.')
     parser.add_argument('--xpower', action='store', help='Power of cell energies')
@@ -208,9 +207,6 @@ def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, an
     er_x = 0.5 * np.zeros((num))                                         
     gs = ROOT.TGraphErrors(j, epoch[:j], sf_e[:j], er_x[:j], er[:j])
     gs.SetLineColor(colors[0])
-    #gs.SetMarkerColor(colors[0])
-    #gs.SetMarkerStyle(21)
-    #mg.Add(gs)
     legend.AddEntry(gs, "min for epoch {}= {:.4f}".format(mins_n, mins), "l")
     c1.Update()
     if opt=='chi2' or opt=='ks':
@@ -308,8 +304,10 @@ def GetResults(opt, resultdir, gen_weights, g, datapath, sorted_path, particle="
     #print all results together at end                                                                               
     for i in range(len(gen_weights)):                                                                                            
        print ('The results for ......',gen_weights[i])
-       reslog = " The result = "
-       print (reslog, '{} +/- {}'.format(result[n*i:n*i + n], error_bar[n*i:n*i + n]))
+       reslog = " The result = {}".format(result[n*i:n*i + n])
+       if 'mre' in opt:
+          reslog = reslog +' mre error {}'.format(error_bar[i])
+       print (reslog)
     file.close
     print ('The results are saved to {}.txt'.format(resultfile))
     return result, error_bar
@@ -394,9 +392,9 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
          res, d = mre(var, energies[1:], ang=ang)
          error_bar.append(d)
        elif opt == 'chi2':
-         res = stat_test(var, [energies[0]], ang=ang, test=opt, p=[])
+         res = stat_test(var, [energies[0]], ang=ang, test=opt, p=[100, 400])
        elif opt == 'ks':
-         res = stat_test(var, [energies[0]], ang=ang, test=opt, p=[])
+         res = stat_test(var, [energies[0]], ang=ang, test=opt, p=[100, 400])
        elif opt == 'wass':
          if 0 in energies:
            res = wass( var["sf_act0"],  var["sf_act0"])
@@ -416,15 +414,16 @@ def mre(var, energies, ang=1):
      N = var["sf_act"+ str(energy)].shape[0]
      sf_error = np.divide(np.absolute(mean_sf_g4 - mean_sf_gan), mean_sf_g4)
      #er = np.square((np.sqrt(N)/N) * sf_error)
-     er = (np.square(np.std(var["sf_gan"+ str(energy)]))/N) + (np.square(np.std(var["sf_act"+ str(energy)])/mean_sf_gan)/N)
+     er = (np.square(np.std(var["sf_gan"+ str(energy)])/mean_sf_g4)/N) + (np.square(np.std(var["sf_act"+ str(energy)])/mean_sf_gan)/N)
      metrics +=sf_error
      d += er
    d = np.sqrt(d/len(energies))
    metrics = metrics/len(energies)
    return metrics, d
 
-def stat_test(var, energies, ang, bins=[10, 5], p=[100, 300], r = [0.018, 0.022], test='chi2', d=2):
+def stat_test(var, energies, ang, bins=[10, 5], p=[100, 300], r = [0.018, 0.022], test='chi2', d=0):
     error=0
+    bsize=5
     for energy in energies:
       if len(p)!=2:
         pmin = np.amin(var["energy"+ str(energy)])
@@ -432,9 +431,15 @@ def stat_test(var, energies, ang, bins=[10, 5], p=[100, 300], r = [0.018, 0.022]
       else:
         pmin = p[0]
         pmax = p[1]
-      if d==2:
-        #r[0] = min(np.amin(var["sf_act"+ str(energy)]), np.amin(var["sf_act"+ str(energy)]))
-        #r[1] = max(np.amax(var["sf_act"+ str(energy)]), np.amax(var["sf_act"+ str(energy)]))
+      b2 = int((pmax-pmin)/bsize)
+      if d==0:
+        g4hist = ROOT.TProfile('g4hist', 'g4hist', b2, pmin, pmax)
+        ganhist = ROOT.TProfile('ganhist', 'ganhist', b2, pmin, pmax)
+        g4hist.Sumw2()
+        ganhist.Sumw2()
+        my.fill_profile(g4hist, var["energy"+ str(energy)], var["sf_act"+ str(energy)])
+        my.fill_profile(ganhist, var["energy"+ str(energy)], var["sf_gan"+ str(energy)])
+      elif d==2:
         g4hist = ROOT.TH2F('g4hist', 'g4hist', bins[0], pmin, pmax, bins[1], r[0], r[1])
         ganhist = ROOT.TH2F('ganhist', 'ganhist', bins[0], pmin, pmax, bins[1], r[0], r[1])
         g4hist.Sumw2()
@@ -453,10 +458,16 @@ def stat_test(var, energies, ang, bins=[10, 5], p=[100, 300], r = [0.018, 0.022]
         my.fill_hist(ganhist, var["sf_gan"+ str(energy)])
       
       if test == 'ks':
-        serror=g4hist.KolmogorovTest(ganhist, 'UU')
+        if d==0:
+          serror=g4hist.KolmogorovTest(ganhist, 'WW')
+        else:
+          serror=g4hist.KolmogorovTest(ganhist)
         print(test, serror)
       if test == 'chi2':
-        serror = g4hist.Chi2Test(ganhist, 'UU')
+        if d==0:
+          serror = g4hist.Chi2Test(ganhist, 'WW')
+        else:
+          serror = g4hist.Chi2Test(ganhist)
         print(test, serror)
       if serror> 0:
         serror = -1 * np.log10(serror)
