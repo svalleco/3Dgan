@@ -31,6 +31,7 @@ def main():
    add_weight = params.add_weight # weight for additional loss
    leg = params.leg # legend
    ang = params.ang # angle
+   test = params.test # if test losses
    #Loss names 
    ploss= 'Mean percentage error'
    aloss= 'Mean absolute error'
@@ -68,7 +69,7 @@ def main():
         lossnames.append('bin')
 
    safe_mkdir(outdir)
-   plot_loss(historyfile, ylim, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order, leg=leg, ang=ang)
+   plot_loss(historyfile, ylim, outdir, start_epoch, weights, losstypes, lossnames, num_ang_losses, order=fit_order, leg=leg, ang=ang, test=test)
    print('Loss Plots are saved in {}'.format(outdir))
    
 def get_parser():
@@ -92,18 +93,21 @@ def get_parser():
     parser.add_argument('--ang_weight', type=float, help='weight of angle loss')
     parser.add_argument('--add_weight', type=float, help='weight of bin count loss')
     parser.add_argument('--leg', type=int, default=1, help='draw legend') 
-    parser.add_argument('--ang', type=int, default=1, help='if variable angle')   
+    parser.add_argument('--ang', type=int, default=1, help='if variable angle')
+    parser.add_argument('--test', type=int, default=1, help='if test losses available')   
     return parser
 
-def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3, leg=True, ang=1):
+def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames, num_ang_losses, fig=1, order=3, leg=True, ang=1, test=1):
                              
    with open(lossfile, 'rb') as f:
     			x = pickle.load(f)
 
-   gen_test = np.asarray(x['test']['generator'])
    gen_train = np.asarray(x['train']['generator'])
-   disc_test = np.asarray(x['test']['discriminator'])
    disc_train = np.asarray(x['train']['discriminator'])
+   if test:
+      gen_test = np.asarray(x['test']['generator'])
+      disc_test = np.asarray(x['test']['discriminator'])
+   
    color= ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
            '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
                          '#bcbd22', '#17becf']
@@ -111,34 +115,39 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
 
    #Plots for Testing and Training Losses
    plt.figure(fig)
-   plt.subplot(221)
+   if test:
+     plots = 221
+   else:
+     plots = 121
+   plt.subplot(plots)
    plt.title('Discriminator loss')
    for i in loop:
       plt.plot(weights[i] * disc_train[:,i], label='{} (train)'.format(lossnames[i]))
    if leg: plt.legend(fontsize='x-small')                                                                   
    plt.ylim(0, ymax[6])                                                                                                                           
-
-   plt.subplot(222)
+   plots+=1
+   plt.subplot(plots)
    plt.title('Generator loss')
    for i in loop:
       plt.plot(weights[i] * gen_train[:,i], label='{} (train)'.format(lossnames[i]))
    if leg: plt.legend(fontsize='x-small')                                                                   
-   plt.ylim(0, ymax[0])                                                                                              
-
-   plt.subplot(223)
-   #plt.title('Testing loss for Discriminator')
-   for i in loop:
-      plt.plot(weights[i] * disc_test[:,i], label='{} (test)'.format(lossnames[i]))
-   if leg: plt.legend(fontsize='x-small')
-   plt.ylim(0, ymax[6])  
-    
-   plt.subplot(224)
-  # plt.title('\nTesting loss for Generator')
-   for i in loop:
-      plt.plot(weights[i] * gen_test[:,i], label='{} (test)'.format(lossnames[i]))
-   if leg: plt.legend(fontsize='x-small')
-   plt.ylim(0, ymax[0])  
-   plt.savefig(os.path.join(lossdir,'losses.pdf')) 
+   plt.ylim(0, ymax[0])
+   plots+=1                                                                                              
+   if test:
+     plt.subplot(plots)
+   
+     for i in loop:
+        plt.plot(weights[i] * disc_test[:,i], label='{} (test)'.format(lossnames[i]))
+     if leg: plt.legend(fontsize='x-small')
+     plt.ylim(0, ymax[6])  
+     plots+=1
+     plt.subplot(plots)
+  
+     for i in loop:
+       plt.plot(weights[i] * gen_test[:,i], label='{} (test)'.format(lossnames[i]))
+     if leg: plt.legend(fontsize='x-small')
+     plt.ylim(0, ymax[0])  
+     plt.savefig(os.path.join(lossdir,'losses.pdf')) 
    
    #Training losses
    fig = fig + 1
@@ -181,16 +190,17 @@ def plot_loss(lossfile, ymax, lossdir, start_epoch, weights, losstype, lossnames
    plt.savefig(os.path.join(lossdir, 'BCE_train_gen_losses.pdf'))
 
    #testing losses for Real/fake
-   fig = fig + 1
-   plt.figure(fig)
-   plt.title('{} Testing losses for GAN'.format(losstype[1]))
-   plt.plot(gen_test[:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
-   plt.plot(disc_test[:,1], label='Disc {} ({})'.format(lossnames[1], losstype[1]))
-   if leg: plt.legend()
-   plt.xlabel('Epochs')  
-   plt.ylabel('Loss')                            
-   plt.ylim(0, ymax[2])  
-   plt.savefig(os.path.join(lossdir, 'BCE_test_losses.pdf'))
+   if test:
+     fig = fig + 1
+     plt.figure(fig)
+     plt.title('{} Testing losses for GAN'.format(losstype[1]))
+     plt.plot(gen_test[:,1], label='Gen {} ({})'.format(lossnames[1], losstype[1]))
+     plt.plot(disc_test[:,1], label='Disc {} ({})'.format(lossnames[1], losstype[1]))
+     if leg: plt.legend()
+     plt.xlabel('Epochs')  
+     plt.ylabel('Loss')                            
+     plt.ylim(0, ymax[2])  
+     plt.savefig(os.path.join(lossdir, 'BCE_test_losses.pdf'))
 
    #Training losses for auxlilliary losses
    fig = fig + 1
