@@ -105,7 +105,7 @@ def main():
         K.set_image_data_format('channels_last')
 
  
-    config = tf.compat.v1.ConfigProto(log_device_placement=True)
+    config = tf.ConfigProto(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
     os.environ['KMP_BLOCKTIME'] = str(1)
@@ -114,9 +114,9 @@ def main():
     # os.environ['KMP_AFFINITY'] = 'balanced'
     # os.environ['OMP_NUM_THREADS'] = str(params.intraop)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
-    K.set_session(tf.compat.v1.Session(config=config))
-    run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
-    run_metadata = tf.compat.v1.RunMetadata()
+    K.set_session(tf.Session(config=config))
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
 
 
     if tlab:
