@@ -8,9 +8,9 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import keras
-from keras.callbacks import CallbackList
-kv2 = keras.__version__.startswith('2')
+#import keras
+#from keras.callbacks import CallbackList
+#kv2 = keras.__version__.startswith('2')
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
@@ -34,18 +34,18 @@ except:
     pass
 
 #from memory_profiler import profile # used for memory profiling
-import keras.backend as K
+import tensorflow as tf
+from tensorflow.keras import backend as K
 import analysis.utils.GANutils as gan
 
-from keras.layers import Input
-from keras.models import Model
-from keras.optimizers import Adadelta, Adam, RMSprop
-from keras.utils.generic_utils import Progbar
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adadelta, Adam, RMSprop
+from tensorflow.keras.utils import Progbar
 import horovod.keras as hvd
 # printing versions of software used
 #print('keras version:', keras.__version__)
 #print('python version:', sys.version)
-import tensorflow as tf
 #print('tensorflow version', tf.__version__)
 #print('numpy version', np.version.version)
 def genbatches(a,n):
@@ -67,7 +67,7 @@ def randomize(a, b, c, d):
 
 def main():
     #Architectures to import
-    from AngleArch3dGAN import generator, discriminator
+    from AngleArch3dGAN_tf2 import generator, discriminator
 
     #Values to be set by user
     parser = get_parser()
@@ -97,11 +97,13 @@ def main():
 
     if d_format == 'channels_first':
         print('Setting th channel ordering (NCHW)')
-        K.set_image_dim_ordering('th')
+        #K.set_image_dim_ordering('th')
+        #K.set_data_format('th')
         K.set_image_data_format('channels_first')
     else:
         print('Setting tf channel ordering (NHWC)')
-        K.set_image_dim_ordering('tf')
+        #K.set_image_dim_ordering('tf')
+        #K.set_data_format('tf')
         K.set_image_data_format('channels_last')
 
  
@@ -129,7 +131,7 @@ def main():
     #initialize Horovod
     hvd.init()
  
-    opt = getattr(keras.optimizers, params.optimizer)
+    opt = getattr(tf.keras.optimizers, params.optimizer)
     opt = opt(params.learningRate * hvd.size())
     opt = hvd.DistributedOptimizer(opt)
 
@@ -139,9 +141,9 @@ def main():
     gan.safe_mkdir(weightdir)
     d=discriminator(xpower)
     g=generator(latent_size)
-    Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
-                    latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
-                    yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
+    Gan3DTrainAngle(discriminator=d, generator=g, opt=opt, datapath=datapath, nEvents=nEvents, WeightsDir=weightdir, pklfile=pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
+                    latent_size=latent_size, loss_weights=loss_weights, xscale=xscale, xpower=xpower, angscale=ascale, angtype=angtype, 
+                    yscale=yscale, thresh=thresh, analyse=analyse, resultfile=resultfile,
                     energies=energies, warmup_epochs=warmup_epochs)
 
 def get_parser():
@@ -181,6 +183,7 @@ if K.image_data_format() !='channels_last':
    daxis = (2,3,4)
 else:
    daxis = (1,2,3)
+
 def hist_count(x, p=1):
     bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
     bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)

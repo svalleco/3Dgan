@@ -54,7 +54,7 @@ for i, gweight in enumerate(gweights):
   generator_in = np.multiply(np.reshape(Y, (-1, 1)), noise)
   start = time.time()
   generated_images = gm.predict(generator_in, verbose=False, batch_size=100)
-  print "Time {}s".format(time.time() - start)
+  print("Time {}s".format(time.time() - start))
   GData = np.sum(generated_images, axis=(1, 2, 3))/scales[i]
   for j in range(num_events):
     Gprof[i].Fill(Y[j] * 100, GData[j]/(Y[j]* 100))
@@ -67,4 +67,4 @@ for i, gweight in enumerate(gweights):
   c.Update()
 
 c.Print(filename)
-print ' The plot is saved in.....{}'.format(filename)
+print (' The plot is saved in.....{}'.format(filename))
