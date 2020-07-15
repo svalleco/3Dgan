@@ -5,8 +5,8 @@ from h5py import File as HDF5File
 import numpy as np
 
 import tensorflow as tf
-from tensorflow import py_func, float32, Tensor
-
+from tensorflow import py_function, float32, Tensor
+print('tensorflow version', tf.__version__)
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
                           Dropout, BatchNormalization, Activation, Embedding)

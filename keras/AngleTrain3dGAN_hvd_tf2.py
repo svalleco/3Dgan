@@ -8,9 +8,6 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-#import keras
-#from keras.callbacks import CallbackList
-#kv2 = keras.__version__.startswith('2')
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
@@ -34,25 +31,31 @@ except:
     pass
 
 #from memory_profiler import profile # used for memory profiling
+
 import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import callbacks
+from tensorflow.keras.callbacks import *
 from tensorflow.keras import backend as K
 import analysis.utils.GANutils as gan
-
 from tensorflow.keras.layers import Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adadelta, Adam, RMSprop
 from tensorflow.keras.utils import Progbar
-import horovod.keras as hvd
+import horovod.tensorflow.keras as hvd
+
 # printing versions of software used
-#print('keras version:', keras.__version__)
+#print('keras version:', tf.keras.__version__)
 #print('python version:', sys.version)
 #print('tensorflow version', tf.__version__)
 #print('numpy version', np.version.version)
+
+kv2 = keras.__version__.startswith('2')   # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
+
 def genbatches(a,n):
     for i in range(0, len(a), n):
         # Create an index range for l of n items:
         yield a[i:i+n]
-
 
 def randomize(a, b, c, d):
     assert a.shape[0] == b.shape[0]
@@ -97,14 +100,10 @@ def main():
 
     if d_format == 'channels_first':
         print('Setting th channel ordering (NCHW)')
-        #K.set_image_dim_ordering('th')
-        #K.set_data_format('th')
-        K.set_image_data_format('channels_first')
+        K.set_image_data_format('channels_first')   #in tf1: set_image_dim_ordering('th')
     else:
         print('Setting tf channel ordering (NHWC)')
-        #K.set_image_dim_ordering('tf')
-        #K.set_data_format('tf')
-        K.set_image_data_format('channels_last')
+        K.set_image_data_format('channels_last')    #in tf1: set_image_dim_ordering('tf')
 
  
     config = tf.compat.v1.ConfigProto(log_device_placement=True)
@@ -116,7 +115,7 @@ def main():
     # os.environ['KMP_AFFINITY'] = 'balanced'
     # os.environ['OMP_NUM_THREADS'] = str(params.intraop)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
-    K.set_session(tf.compat.v1.Session(config=config))
+    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
     run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
     run_metadata = tf.compat.v1.RunMetadata()
 
@@ -248,8 +247,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     discriminator.trainable = False
     fake, aux, ang, ecal, add_loss= discriminator(fake_image)
     combined = Model(
-        input=[latent],
-        output=[fake, aux, ang, ecal, add_loss],
+        inputs=[latent],
+        outputs=[fake, aux, ang, ecal, add_loss],
         name='combined_model'
     )
     combined.compile(
@@ -260,31 +259,31 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
     if kv2: 
         discriminator.trainable = True #workaround for keras 2 bug
-    gcb = CallbackList( \
+    gcb = Callback( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
         hvd.callbacks.MetricAverageCallback(), \
         # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+        tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
-    dcb = CallbackList( \
+    dcb = Callback( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
         hvd.callbacks.MetricAverageCallback(), \
         # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+        tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
-    ccb = CallbackList( \
+    ccb = Callback( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
         hvd.callbacks.MetricAverageCallback(), \
         # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+        tf.keras.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
     gcb.set_model( generator )
@@ -340,6 +339,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
        print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
        print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
+
+
        if analyse:
           var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
        train_history = defaultdict(list)
