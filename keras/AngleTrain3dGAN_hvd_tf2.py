@@ -36,6 +36,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import callbacks
 from tensorflow.keras.callbacks import *
+#from tensorflow.keras.callbacks import CallbackList
 from tensorflow.keras import backend as K
 import analysis.utils.GANutils as gan
 from tensorflow.keras.layers import Input
@@ -259,7 +260,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
     if kv2: 
         discriminator.trainable = True #workaround for keras 2 bug
-    gcb = Callback( \
+    gcb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
         hvd.callbacks.MetricAverageCallback(), \
@@ -268,7 +269,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
-    dcb = Callback( \
+    dcb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
         hvd.callbacks.MetricAverageCallback(), \
@@ -277,13 +278,13 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
-    ccb = Callback( \
+    ccb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
         hvd.callbacks.MetricAverageCallback(), \
         # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
         hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        tf.keras.ReduceLROnPlateau(patience=10, verbose=1) \
+        tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
         ])
 
     gcb.set_model( generator )
