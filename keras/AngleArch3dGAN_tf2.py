@@ -4,17 +4,18 @@ import h5py
 from h5py import File as HDF5File
 import numpy as np
 
-import keras.backend as K
-from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
+import tensorflow as tf
+from tensorflow import py_function, float32, Tensor
+print('tensorflow version', tf.__version__)
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
                           Dropout, BatchNormalization, Activation, Embedding)
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
+from tensorflow.keras.layers import LeakyReLU
+from tensorflow.keras.layers import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)
 
-from keras.models import Model, Sequential
+from tensorflow.keras.models import Model, Sequential
 import math
-from tensorflow import py_func, float32, Tensor
-import tensorflow as tf
 
 if K.image_data_format() =='channels_last':
     daxis=(1,2,3)
@@ -29,14 +30,14 @@ def ecal_sum(image, power):
    
 # counting entries for different energy bins
 def count(image, power):
-    bin1 = K.sum(K.tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.03**power, image > 0.02**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.02**power, image > 0.0125**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0125**power, image > 0.008**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.008**power, image > 0.003**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.003**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin1 = K.sum(tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin2 = K.sum(tf.where(tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin3 = K.sum(tf.where(tf.logical_and(image < 0.03**power, image > 0.02**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin4 = K.sum(tf.where(tf.logical_and(image < 0.02**power, image > 0.0125**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin5 = K.sum(tf.where(tf.logical_and(image < 0.0125**power, image > 0.008**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin6 = K.sum(tf.where(tf.logical_and(image < 0.008**power, image > 0.003**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin7 = K.sum(tf.where(tf.logical_and(image < 0.003**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin8 = K.sum(tf.where(tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
     bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
     return bins
 
@@ -53,16 +54,16 @@ def ecal_angle(image, power):
     z_shape= K.int_shape(image)[3]
     sumtot = K.sum(image, axis=(1,2,3))# sum of events
     # get 1. where event sum is 0 and 0 elsewhere
-    amask = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
+    amask = tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
     masked_events = K.sum(amask) # counting zero sum events
     
     # ref denotes barycenter as that is our reference point
     x_ref = K.sum(K.sum(image, axis=(2,3)) * (K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32') + 0.5) , axis=1)# sum for x position * x index
     y_ref = K.sum(K.sum(image, axis=(1,3)) * (K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32') + 0.5), axis=1)
     z_ref = K.sum(K.sum(image, axis=(1,2)) * (K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32') + 0.5), axis=1)
-    x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) , x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
-    y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref) , y_ref/sumtot)
-    z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref), z_ref/sumtot)
+    x_ref = tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) , x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
+    y_ref = tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref) , y_ref/sumtot)
+    z_ref = tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref), z_ref/sumtot)
     #reshape    
     x_ref = K.expand_dims(x_ref, 1)
     y_ref = K.expand_dims(y_ref, 1)
@@ -71,7 +72,7 @@ def ecal_angle(image, power):
     sumz = K.sum(image, axis =(1,2)) # sum for x,y planes going along z
 
     # Get 0 where sum along z is 0 and 1 elsewhere
-    zmask = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz) , K.ones_like(sumz))
+    zmask = tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz) , K.ones_like(sumz))
         
     x = K.expand_dims(K.arange(x_shape), 0) # x indexes
     x = K.cast(K.expand_dims(x, 2), dtype='float32') + 0.5
@@ -81,16 +82,16 @@ def ecal_angle(image, power):
     #barycenter for each z position
     x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
     y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
-    x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
-    y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
+    x_mid = tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
+    y_mid = tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
 
     #Angle Calculations
     z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5)  * K.ones_like(z_ref) # Make an array of z indexes for all events
     zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis with stability check
-    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
-    m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
+    m = tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
+    m = tf.where(tf.less(z, z_ref),  -1 * m, m)# sign inversion
     ang = (math.pi/2.0) - tf.atan(m)# angle correction
-    zmask = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
+    zmask = tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
     ang = ang * zmask # place zero where zsum is zero
     
     ang = ang * z  # weighted by position
@@ -100,7 +101,7 @@ def ecal_angle(image, power):
     #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
 
     ang = K.sum(ang, axis=1)/K.sum(sumz_tot, axis=1) # sum ( measured * weights)/sum(weights)
-    ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
+    ang = tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
     
     ang = K.expand_dims(ang, 1)
     return ang
@@ -115,23 +116,23 @@ def discriminator(power=1.0):
 
     image = Input(shape=dshape) 
 
-    x = Conv3D(16, 5, 6, 6, border_mode='same')(image)
+    x = Conv3D(16, (5, 6, 6), padding='same')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
 
-    x = Conv3D(8, 5, 6, 6, border_mode='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
     x = Dropout(0.2)(x)
@@ -148,8 +149,8 @@ def discriminator(power=1.0):
     ang = Lambda(ecal_angle, arguments={'power':power})(image)
     ecal = Lambda(ecal_sum, arguments={'power':power})(image)
     add_loss = Lambda(count, arguments={'power':power})(image)
-    Model(input=[image], output=[fake, aux, ang, ecal, add_loss]).summary()
-    return Model(input=[image], output=[fake, aux, ang, ecal, add_loss])
+    Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary()
+    return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss])
 
 # Generator
 def generator(latent_size=200, return_intermediate=False):
@@ -201,8 +202,8 @@ def generator(latent_size=200, return_intermediate=False):
     latent = Input(shape=(latent_size, ))   
     fake_image = loc(latent)
     loc.summary()
-    Model(input=[latent], output=[fake_image]).summary()
-    return Model(input=[latent], output=[fake_image])
+    Model(inputs=[latent], outputs=[fake_image]).summary()
+    return Model(inputs=[latent], outputs=[fake_image])
 
 # useful at design time
 def main():
