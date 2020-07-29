@@ -36,7 +36,6 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import callbacks
 from tensorflow.keras.callbacks import *
-#from tensorflow.keras.callbacks import CallbackList
 from tensorflow.keras import backend as K
 import analysis.utils.GANutils as gan
 from tensorflow.keras.layers import Input
@@ -201,21 +200,45 @@ def hist_count(x, p=1):
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
+    #print('Data is successfully loaded into the f variable')
     ang = np.array(f.get(angtype))
+    #print('ang is successfully set as an array with fs angtype: ')
+    #print(ang)
     X=np.array(f.get('ECAL'))* xscale
+    #print('X is set as an array with fs Ecal * xscale: ')
+    #print(X)
     Y=np.array(f.get('energy'))/yscale
+    #print('Y is set as an array with fs energy * yscale: ') 
+    #print(Y)
     X[X < thresh] = 0
+    #print('when X values are less than the threshold, they are reset to 0.')
     X = X.astype(np.float32)
+    #print('X type set as float32')
+    #print(X)
     Y = Y.astype(np.float32)
+    #print('Y type set as float32')
+    #print(Y)
     ang = ang.astype(np.float32)
+    #print('angtype set as float32')
+    #print(ang)
     X = np.expand_dims(X, axis=-1)
+    #print('expanded X dims (-1)')
     if K.image_data_format() !='channels_last':
+       #print('currently channels first')
        X =np.moveaxis(X, -1, 1)
        ecal = np.sum(X, axis=(2, 3, 4))
+       #print('reformated to channels last and summed')
     else:
+       #print('already channels last, summed')
        ecal = np.sum(X, axis=(1, 2, 3))
-    if xpower !=1.:
-        X = np.power(X, xpower)
+    if xpower !=1.: 
+       X = np.power(X, xpower)
+       #print('set xpower to 1')
+    #print('printing x, y, ang, and ecal: ')
+    #print(X)
+    #print(Y)
+    #print(ang)
+    #print(ecal)
     return X, Y, ang, ecal
 
 def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
@@ -260,61 +283,88 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
     if kv2: 
         discriminator.trainable = True #workaround for keras 2 bug
-    gcb = CallbackList( \
-        callbacks=[ \
-        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
-        hvd.callbacks.MetricAverageCallback(), \
-        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
-        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
-        ])
 
-    dcb = CallbackList( \
-        callbacks=[ \
-        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
-        hvd.callbacks.MetricAverageCallback(), \
-        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
-        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
-        ])
+    #commented out the callback list functions as it is in the nightly version for keras 2 (currently unsupported) and not called.
+    #gcb = tf.keras.callbacks.Callback( \
+    #    callbacks=[ \
+    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+    #    hvd.callbacks.MetricAverageCallback(), \
+    #    # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+    #    hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+    #    tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+    #    ])
 
-    ccb = CallbackList( \
-        callbacks=[ \
-        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
-        hvd.callbacks.MetricAverageCallback(), \
-        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
-        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
-        ])
+    #dcb = tf.keras.callbacks.Callback( \
+    #    callbacks=[ \
+    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+    #    hvd.callbacks.MetricAverageCallback(), \
+    #    # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+    #    hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+    #    tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+    #    ])
 
-    gcb.set_model( generator )
-    dcb.set_model( discriminator )
-    ccb.set_model( combined )
+    #ccb = tf.keras.callbacks.Callback( \
+    #    callbacks=[ \
+    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+    #    hvd.callbacks.MetricAverageCallback(), \
+    #    # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+    #    hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+    #    tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+    #    ])
 
-    gcb.on_train_begin()
-    dcb.on_train_begin()
-    ccb.on_train_begin()
+    #gcb.set_model( generator )
+    #dcb.set_model( discriminator )
+    #ccb.set_model( combined )
+
+    #gcb.on_train_begin()
+    #dcb.on_train_begin()
+    #ccb.on_train_begin()
 
     # Getting Data
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
     if hvd.rank()==0:
+        print('hvd.rank was equal to 0. now printing the training files and testing files: ')
+        print('Training files: ')
         print(Trainfiles)
+        print('Testing files: ')
         print(Testfiles)
     nb_Test = int(nEvents * f[1]) # The number of test files calculated from fraction of nEvents
     nb_Train = int(nEvents * f[0]) # The number of train files calculated from fraction of nEvents
+
+    #Bug check for reading the test file in
+    if len(Testfiles) == 0:
+       print('Error reading the Testfiles. The enumerated list will show up as empty. Check the GANutils.py file in 3Dgan/keras/analysis/utils.')
+    print('printing test file: ')
+    print(Testfiles)
+   
     #Read test data into a single array
     for index, dtest in enumerate(Testfiles):
+       print('entered the enumerate for loop!!!!!!!!!!!!!!!!!!!!!!!!!')
        if index == 0:
+           print('------------------------------debugging in enumerate within Gan3Dtrainangle()')
+           print('index is 0')
            X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-       else:
+           print('X_test is: ')
+           #print(X_test)
+           print('Y_test is: ')
+           print(Y_test)
+           print('ang_test is: ')
+           print(ang_test)
+           print('ecal_test is: ')
+           print(ecal_test)
+       # nbTest = The number of test files calculated from fraction of nEvents
+       else: 
+           print('is x_test shape equal to nb_test?')
+           print(X_test.shape[0] == nb_Test)
            if X_test.shape[0] < nb_Test:
+              print('x_test shape is less than nb_test')
               X_temp, Y_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
               X_test = np.concatenate((X_test, X_temp))
               Y_test = np.concatenate((Y_test, Y_temp))
               ang_test = np.concatenate((ang_test, ang_temp))
               ecal_test = np.concatenate((ecal_test, ecal_temp))
     if X_test.shape[0] > nb_Test:
-        X_test, Y_test, ang_test, ecal_test = X_test[:numTest], Y_test[:numTest], ang_test[:numTest], ecal_test[:numTest]
+        X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test] #changed numTest to nb_Test on this line
     else:
         nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
     for index, dtrain in enumerate(Trainfiles):
@@ -335,8 +385,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
 
     if hvd.rank()==0:
        print('Test Data loaded of shapes:')
-       print(X_test.shape)
-       print(Y_test.shape)
+       print('X_test length: '+str(X_test.shape))
+       print('Y_test length: '+str(Y_test.shape))
        print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
        print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
