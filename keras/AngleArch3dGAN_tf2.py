@@ -6,20 +6,19 @@ import numpy as np
 
 import tensorflow as tf
 from tensorflow import py_function, float32, Tensor
-print('tensorflow version', tf.__version__)
+#print('tensorflow version', tf.__version__)
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
                           Dropout, BatchNormalization, Activation, Embedding)
 from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)
-
 from tensorflow.keras.models import Model, Sequential
 import math
 
 if K.image_data_format() =='channels_last':
     daxis=(1,2,3)
-else:
+else:                       #channels_first
     daxis=(2,3,4)
 
 # Summming cell energies
@@ -45,7 +44,7 @@ def count(image, power):
 def ecal_angle(image, power):
     if K.image_data_format() =='channels_last':
        image = K.squeeze(image, axis=4)
-    else: 
+    else:                      # channels first
        image = K.squeeze(image, axis=1)
     image = K.pow(image, 1./power)
     # size of ecal
@@ -64,6 +63,7 @@ def ecal_angle(image, power):
     x_ref = tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) , x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
     y_ref = tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref) , y_ref/sumtot)
     z_ref = tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref), z_ref/sumtot)
+    
     #reshape    
     x_ref = K.expand_dims(x_ref, 1)
     y_ref = K.expand_dims(y_ref, 1)
@@ -106,85 +106,105 @@ def ecal_angle(image, power):
     ang = K.expand_dims(ang, 1)
     return ang
 
-# Discriminator
+# Discriminator - 4 layers, lambda functions, uses LeakyReLu (sparsity), outputs sigmoid neuron and linear neuron.
 def discriminator(power=1.0):
+    
+    # Make sure the dimension ordering is correct 
     if K.image_data_format() =='channels_last':
-        dshape=(51, 51, 25,1)
-    else:
+        dshape=(51, 51, 25, 1)
+    else:                      #channels first
         dshape=(1, 51, 51, 25)
         daxis=(2,3,4)
 
     image = Input(shape=dshape) 
 
+    # layer 1 = takes in the image
     x = Conv3D(16, (5, 6, 6), padding='same')(image)
-    x = LeakyReLU()(x)
-    x = Dropout(0.2)(x)
+    x = LeakyReLU()(x)     # D uses LeakyReLU, G uses ReLu for sparsity
+    x = Dropout(0.2)(x)     # dropout regularization
 
+    # layer 2
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.2)(x)     # dropout regularization
 
+    # layer 3
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.2)(x)     # dropout regularization
 
+    # layer 4
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.2)(x)     # dropout regularization
 
+    # one average pooling layer (additional pooling layers resulted in loss in performance)
     x = AveragePooling3D((2, 2, 2))(x)
     h = Flatten()(x)
 
     dnn = Model(image, h)
     dnn.summary()
 
+    # Output
     dnn_out = dnn(image)
+    # A sigmoid neuron predicts the typical GAN real/fake probability 
     fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
+    # A linear neuron implements a regression on the primary particle energy following the auxiliary GAN schema
     aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
+    
+    # Lambda Functions: calculate and constrain (total deposited energy, binned pixel intensity distribution, and incident angle) 
+    # according to loss function terms
     ang = Lambda(ecal_angle, arguments={'power':power})(image)
     ecal = Lambda(ecal_sum, arguments={'power':power})(image)
     add_loss = Lambda(count, arguments={'power':power})(image)
     Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary()
     return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss])
 
-# Generator
+# Generator - 7 layers (stronger G = better results), uses ReLu (sparsity), clustered up-sampling operations to help with convergence at the lower distribution tails.
 def generator(latent_size=200, return_intermediate=False):
     if K.image_data_format() =='channels_last':
         dim = (9,9,8,8)
         baxis=-1 # axis for BatchNormalization
-    else:
+    else:                       #channels_first
         dim = (8, 9, 9,8) 
         baxis=1 # axis for BatchNormalization
+    
+    # Clustered up-sampling operations to help with convergence at the lower distribution tails
     loc = Sequential([
         Dense(5184, input_shape=(latent_size,)),
         Reshape(dim),
-        UpSampling3D(size=(6, 6, 6)),
+        UpSampling3D(size=(6, 6, 6)),       
         
+        # layer 1
         Conv3D(8, (6, 6, 8), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
         
+        # layer 2
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
-        ####################################### added layers 
+        ####################################### added layers (stronger G = better results)
         
+        # layer 3
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
 
+        # layer 4
         ZeroPadding3D((2, 2, 1)),
         Conv3D(6, (4, 4, 6), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         BatchNormalization(axis=baxis, epsilon=1e-6),
 
+        # layer 5
         ZeroPadding3D((1, 1, 0)),
         Conv3D(6, (3, 3, 5), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
@@ -192,10 +212,12 @@ def generator(latent_size=200, return_intermediate=False):
         
         #####################################  
         
+        # layer 6
         ZeroPadding3D((1, 1,0)),
         Conv3D(6, (3, 3, 3), padding='valid', kernel_initializer='he_uniform'),
         Activation('relu'),
         
+        # layer 7
         Conv3D(1, (2, 2, 2),  padding='valid', kernel_initializer='glorot_normal'),
         Activation('relu')
     ])
@@ -207,8 +229,8 @@ def generator(latent_size=200, return_intermediate=False):
 
 # useful at design time
 def main():
-    g= generator()
-    d=discriminator()
+    g = generator()
+    d = discriminator()
 
 if __name__ == "__main__":
     main()

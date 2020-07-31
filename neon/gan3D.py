@@ -29,6 +29,7 @@ init = Gaussian()
 
 # discriminiator using convolution layers
 lrelu = Rectlin(slope=0.1)  # leaky relu for discriminator
+
 # sigmoid = Logistic() # sigmoid activation function
 conv1 = dict(init=init, batch_norm=False, activation=lrelu) # what's about BatchNorm Layer and batch_norm parameter?
 conv2 = dict(init=init, batch_norm=True, activation=lrelu, padding=2)
