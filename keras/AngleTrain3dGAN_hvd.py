@@ -10,7 +10,7 @@ except ImportError:
     import pickle
 import keras
 from keras.callbacks import CallbackList
-kv2 = keras.__version__.startswith('2')
+kv2 = keras.__version__.startswith('2')     # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
@@ -36,24 +36,26 @@ except:
 #from memory_profiler import profile # used for memory profiling
 import keras.backend as K
 import analysis.utils.GANutils as gan
-
 from keras.layers import Input
 from keras.models import Model
 from keras.optimizers import Adadelta, Adam, RMSprop
 from keras.utils.generic_utils import Progbar
 import horovod.keras as hvd
+
 # printing versions of software used
 #print('keras version:', keras.__version__)
 #print('python version:', sys.version)
 import tensorflow as tf
 #print('tensorflow version', tf.__version__)
 #print('numpy version', np.version.version)
+
+# Creates a list of lists, used in Gan3DTrainAngle()
 def genbatches(a,n):
     for i in range(0, len(a), n):
         # Create an index range for l of n items:
         yield a[i:i+n]
 
-
+# Shuffles four arrays, used in Gan3DTrainAngle(X_train, Y_train, ecal_train, ang_train)
 def randomize(a, b, c, d):
     assert a.shape[0] == b.shape[0]
     # Generate the permutation index array.
@@ -65,6 +67,7 @@ def randomize(a, b, c, d):
     shuffled_d = d[permutation]
     return shuffled_a, shuffled_b, shuffled_c, shuffled_d
 
+# Main - import architecture, parser values, set channels format, configure the session, initialize & optimize horovod, build discriminator & generator, call Gan3DTrainAngle()
 def main():
     #Architectures to import
     from AngleArch3dGAN import generator, discriminator
@@ -92,7 +95,8 @@ def main():
     thresh = params.thresh # threshold for data
     angtype = params.angtype
     warmup_epochs = params.warmupepochs
-
+   
+    # channels format: want channels_first for cpu
     d_format = params.channel_format
 
     if d_format == 'channels_first':
@@ -104,7 +108,7 @@ def main():
         K.set_image_dim_ordering('tf')
         K.set_image_data_format('channels_last')
 
- 
+    # configure the session
     config = tf.ConfigProto(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
@@ -118,7 +122,7 @@ def main():
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     run_metadata = tf.RunMetadata()
 
-
+    # Gul rukh's default data paths
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
       weightdir = '/gkhattak/weights/3dgan_weights'
@@ -126,15 +130,18 @@ def main():
       resultfile = '/gkhattak/results/3dgan_analysis.pkl'
 
     print(params)
+    
     #initialize Horovod
     hvd.init()
  
+    # get attribute and optimize using horovod
     opt = getattr(keras.optimizers, params.optimizer)
     opt = opt(params.learningRate * hvd.size())
     opt = hvd.DistributedOptimizer(opt)
 
     global_batch_size = batch_size * hvd.size()
     print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
+    
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
     d=discriminator(xpower)
@@ -144,6 +151,8 @@ def main():
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
                     energies=energies, warmup_epochs=warmup_epochs)
 
+# parser method: nbepochs, batchsize, latentsize, datapath, nbEvents, verbose, weightsdir, pklfile, xscale, xpower, yscale, ascale, resultfile, 
+#                analyse, energies, lossweights, thresh, angtype, learningRate, optimizer, intraop, interop, warmupepochs, channel_format, analysis
 def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -174,13 +183,17 @@ def get_parser():
     parser.add_argument('--analysis', action='store', type=bool, default=False, help='Calculate optimisation function')
     return parser
 
+# x map function
 def mapping(x):
     return x
-    
+
+# set channel format - want channels_first for cpu    
 if K.image_data_format() !='channels_last':
    daxis = (2,3,4)
 else:
    daxis = (1,2,3)
+   
+# histogram count - sums 8 bins btwn [0.05, 0.03, 0.02, 0.0125, 0.008, 0.003, 0]**p
 def hist_count(x, p=1):
     bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
     bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
@@ -194,33 +207,41 @@ def hist_count(x, p=1):
     bins[np.where(bins==0)]=1
     return bins
 
-#get data for training
+# get data for training - returns X, Y, ang, ecal
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
-    f=h5py.File(datafile,'r')
-    ang = np.array(f.get(angtype))
-    X=np.array(f.get('ECAL'))* xscale
-    Y=np.array(f.get('energy'))/yscale
-    X[X < thresh] = 0
+    f = h5py.File(datafile,'r')            # load data into f variable
+    ang = np.array(f.get(angtype))         # ang is an array of angle data from f
+    X = np.array(f.get('ECAL'))* xscale    # x is an array of scaled ecal data from f
+    Y = np.array(f.get('energy'))/yscale   # y is an array of scaled energy data from f
+    X[X < thresh] = 0            # when X values are less than the threshold, they are reset to 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
     ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
+    
+    # check data format and sum along axis
     if K.image_data_format() !='channels_last':
-       X =np.moveaxis(X, -1, 1)
+       X = np.moveaxis(X, -1, 1)
        ecal = np.sum(X, axis=(2, 3, 4))
     else:
        ecal = np.sum(X, axis=(1, 2, 3))
+     
+    # X ** xpower
     if xpower !=1.:
         X = np.power(X, xpower)
+        
     return X, Y, ang, ecal
 
+# Training Function - build & compile discriminator, build & compile generator, run the generator and discriminator, unused callback list functions, read TrainFiles & TestFiles,
+#                     run through epochs, train the generator & discriminator, collect discriminator losses, collect generator losses, test, save weights every epoch
 def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
     start_init = time.time()
     verbose = False    
     particle='Ele'
     f = [0.9, 0.1]
     loss_ftn = hist_count
+    
     if hvd.rank()==0:
         print('[INFO] Building discriminator')
     #discriminator.summary()
@@ -240,9 +261,11 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
  
     # build combined Model
-    latent = Input(shape=(latent_size, ), name='combined_z')   
-    fake_image = generator( latent)
-    discriminator.trainable = False
+    # generator: latent vector --> fake image
+    latent = Input(shape=(latent_size, ), name='combined_z')   # random latent vector = generator input
+    fake_image = generator( latent)     # fake image = generator output
+     # discriminator: fake image --> fake, aux, ang, ecal, add_loss
+     discriminator.trainable = False
     fake, aux, ang, ecal, add_loss= discriminator(fake_image)
     combined = Model(
         input=[latent],
@@ -257,6 +280,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
     if kv2: 
         discriminator.trainable = True #workaround for keras 2 bug
+        
     gcb = CallbackList( \
         callbacks=[ \
         hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
@@ -299,7 +323,12 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         print(Testfiles)
     nb_Test = int(nEvents * f[1]) # The number of test files calculated from fraction of nEvents
     nb_Train = int(nEvents * f[0]) # The number of train files calculated from fraction of nEvents
-    #Read test data into a single array
+    
+    # Bug check for reading the test file in
+    if len(Testfiles) == 0:
+       print('Error reading the Testfiles. The enumerated list will show up as empty. Check the GANutils.py file in 3Dgan/keras/analysis/utils.')
+       
+    # Read test data into a single array
     for index, dtest in enumerate(Testfiles):
        if index == 0:
            X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
@@ -314,6 +343,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
     else:
         nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
+    
+    # Read train data into a single array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
             X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
@@ -324,19 +355,20 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             ang_train = np.concatenate((ang_train, ang_temp))
             ecal_train = np.concatenate((ecal_train, ecal_temp))
 
-    nb_train = X_train.shape[0]# Total events in training files
+    nb_train = X_train.shape[0]    # Total events in training files
     total_batches = nb_train / global_batch_size
+    
     if hvd.rank()==0:
         print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
-
-    if hvd.rank()==0:
+    if hvd.rank()==0:           # will throw an error if the number of epochs is not large enough
        print('Test Data loaded of shapes:')
        print(X_test.shape)
        print(Y_test.shape)
        print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
        print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
+       
        if analyse:
           var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
        train_history = defaultdict(list)
@@ -344,6 +376,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
        analysis_history = defaultdict(list)
        init_time = time.time()- start_init
        print('Initialization time is {} seconds'.format(init_time))
+    
+    # run through epochs
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         if hvd.rank()==0:
@@ -356,11 +390,13 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         epoch_gen_loss = []
         epoch_disc_loss = []
         
-        image_batches = genbatches(X_train, batch_size)
-        energy_batches = genbatches(Y_train, batch_size)
-        ecal_batches = genbatches(ecal_train, batch_size)
-        ang_batches = genbatches(ang_train, batch_size)
-        for index in range(int(total_batches)):
+        image_batches = genbatches(X_train, batch_size)    # creates len(X_train) index ranges for len(batch_size) # of items
+        energy_batches = genbatches(Y_train, batch_size)   # creates len(Y_train) index ranges for len(batch_size) # of items
+        ecal_batches = genbatches(ecal_train, batch_size)  # creates len(ecal_train) index ranges for len(batch_size) # of items
+        ang_batches = genbatches(ang_train, batch_size)    # creates len(ang_train) index ranges for len(batch_size) # of items
+        
+         # go through batches: train the generator and discriminator
+         for index in range(int(total_batches)):
             start = time.time()         
             image_batch = next(image_batches) 
             energy_batch = next(energy_batches)
@@ -371,10 +407,11 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
   
+            # collect the loss of the discriminator with real and fake images
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
-            #if ecal sum has 100% loss then end the training
+            # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0 and index >10:
                 if hvd.rank()==0:
                     print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
@@ -387,6 +424,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
             trick = np.ones(batch_size)
+            
+            # collect generator losses in array
             gen_losses = []
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size-1))
@@ -430,7 +469,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             print(ROW_FMT.format('discriminator (train)',
                              *train_history['discriminator'][-1]))
 
-        # save weights every epoch
+            # save weights every epoch
             generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
             discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),

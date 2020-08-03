@@ -47,11 +47,13 @@ def ecal_angle(image, power):
     else:                      # channels first
        image = K.squeeze(image, axis=1)
     image = K.pow(image, 1./power)
+    
     # size of ecal
     x_shape= K.int_shape(image)[1]
     y_shape= K.int_shape(image)[2]
     z_shape= K.int_shape(image)[3]
     sumtot = K.sum(image, axis=(1,2,3))# sum of events
+    
     # get 1. where event sum is 0 and 0 elsewhere
     amask = tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
     masked_events = K.sum(amask) # counting zero sum events
@@ -79,13 +81,13 @@ def ecal_angle(image, power):
     y = K.expand_dims(K.arange(y_shape), 0)# y indexes
     y = K.cast(K.expand_dims(y, 2), dtype='float32') + 0.5
   
-    #barycenter for each z position
+    # barycenter for each z position
     x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
     y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
     x_mid = tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
     y_mid = tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
 
-    #Angle Calculations
+    # Angle Calculations
     z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5)  * K.ones_like(z_ref) # Make an array of z indexes for all events
     zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis with stability check
     m = tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
@@ -106,7 +108,7 @@ def ecal_angle(image, power):
     ang = K.expand_dims(ang, 1)
     return ang
 
-# Discriminator - 4 layers, lambda functions, uses LeakyReLu (sparsity), outputs sigmoid neuron and linear neuron.
+# Discriminator - 4 layers, lambda functions, uses LeakyReLu (sparsity & convergence), outputs sigmoid neuron and linear neuron
 def discriminator(power=1.0):
     
     # Make sure the dimension ordering is correct 

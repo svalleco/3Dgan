@@ -70,6 +70,7 @@ def randomize(a, b, c, d):
     shuffled_d = d[permutation]
     return shuffled_a, shuffled_b, shuffled_c, shuffled_d
 
+# Main - import architecture, parser values, set channels format, configure the session, initialize & optimize horovod, build discriminator & generator, call Gan3DTrainAngle()
 def main():
     # Architectures to import
     from AngleArch3dGAN_tf2 import generator, discriminator
@@ -98,6 +99,7 @@ def main():
     angtype = params.angtype
     warmup_epochs = params.warmupepochs
 
+    # channels format: want channels_first for cpu
     d_format = params.channel_format
 
     if d_format == 'channels_first':
@@ -186,7 +188,7 @@ def get_parser():
 def mapping(x):
     return x
     
-# set channel format
+# set channel format - want channels_first for cpu
 if K.image_data_format() !='channels_last':
    daxis = (2,3,4)  # channels_first
 else:
@@ -209,11 +211,11 @@ def hist_count(x, p=1):
 # get data for training - returns X, Y, ang, ecal
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
-    f=h5py.File(datafile,'r')   # load data into f variable
-    ang = np.array(f.get(angtype))  # ang is an array of angle data from f
-    X=np.array(f.get('ECAL'))* xscale   # x is an array of scaled ecal data from f
-    Y=np.array(f.get('energy'))/yscale  # y is an array of scaled energy data from f
-    X[X < thresh] = 0   # when X values are less than the threshold, they are reset to 0
+    f = h5py.File(datafile,'r')           # load data into f variable
+    ang = np.array(f.get(angtype))        # ang is an array of angle data from f
+    X = np.array(f.get('ECAL'))* xscale   # x is an array of scaled ecal data from f
+    Y = np.array(f.get('energy'))/yscale  # y is an array of scaled energy data from f
+    X[X < thresh] = 0            # when X values are less than the threshold, they are reset to 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
     ang = ang.astype(np.float32)
@@ -261,10 +263,10 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
  
     # build combined Model -- run the generator and discriminator!
-    # generator - latent vector --> fake image
+    # generator: latent vector --> fake image
     latent = Input(shape=(latent_size, ), name='combined_z')   # random latent vector = generator input
     fake_image = generator( latent)     # fake image = generator output
-    # discriminator - fake image --> fake, aux, ang, ecal, add_loss
+    # discriminator: fake image --> fake, aux, ang, ecal, add_loss
     discriminator.trainable = False
     fake, aux, ang, ecal, add_loss= discriminator(fake_image)
     combined = Model(
@@ -328,7 +330,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     nb_Test = int(nEvents * f[1]) # The number of test files calculated from fraction of nEvents
     nb_Train = int(nEvents * f[0]) # The number of train files calculated from fraction of nEvents
 
-    #Bug check for reading the test file in
+    # Bug check for reading the test file in
     if len(Testfiles) == 0:
        print('Error reading the Testfiles. The enumerated list will show up as empty. Check the GANutils.py file in 3Dgan/keras/analysis/utils.')
    
@@ -361,11 +363,15 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
 
     nb_train = X_train.shape[0] # Total events in training files
     total_batches = nb_train / global_batch_size
+    
     if hvd.rank()==0:
         print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
-
     if hvd.rank()==0:           # will throw an error if the number of epochs is not large enough
+       print('Test Data loaded of shapes:')
+       print(X_test.shape)
+       print(Y_test.shape)
+       print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
        print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
 
@@ -412,7 +418,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
-            #if ecal sum has 100% loss then end the training
+            # if ecal sum has 100% loss then end the training
             if fake_batch_loss[4] == 100.0 and index >10:
                 if hvd.rank()==0:
                     print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
@@ -470,7 +476,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             print(ROW_FMT.format('discriminator (train)',
                              *train_history['discriminator'][-1]))
 
-        # save weights every epoch
+            # save weights every epoch
             generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
             discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
