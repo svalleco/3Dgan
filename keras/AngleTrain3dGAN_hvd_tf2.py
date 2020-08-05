@@ -410,7 +410,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             ecal_batch = next(ecal_batches)
             ang_batch = next(ang_batches)
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
-            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2))    
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
             
@@ -419,7 +419,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
             # if ecal sum has 100% loss then end the training
-            if fake_batch_loss[4] == 100.0 and index >10:
+            if fake_batch_loss[4] == 100.0 and index > 10:
                 if hvd.rank()==0:
                     print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
                     generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
@@ -435,7 +435,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             # collect generator losses in array
             gen_losses = []
             for _ in range(2):
-                noise = np.random.normal(0, 1, (batch_size, latent_size-1))
+                noise = np.random.normal(0, 1, (batch_size, latent_size-2))  
                 generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
