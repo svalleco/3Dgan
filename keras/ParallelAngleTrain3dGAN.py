@@ -47,7 +47,7 @@ config = tf.compat.v1.ConfigProto(log_device_placement=True)
 
 def main():
     #Architectures to import
-    from AngleArch3dGAN import generator, discriminator
+    from AngleArch3dGAN import generator, discriminator #if there is any parallel changes to the architecture this needs to change
     
     #Values to be set by user
     parser = get_parser()
@@ -106,13 +106,17 @@ def main():
     prev_gweights = outpath + 'weights/' + params.prev_gweights
     prev_dweights = outpath + 'weights/' + params.prev_dweights
 
-    print(params)
-    
+    #setting up parallel strategy
+    # strategy = tf.distribute.MirroredStrategy() #initialize parallel strategy
+    # print ('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+    # global_batch_size = batch_size * strategy.num_replicas_in_sync
+
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
+    #with strategy.scope():
     d=discriminator(xpower, dformat=dformat)
     g=generator(latent_size, dformat=dformat)
-    
+
     # GAN training 
     Gan3DTrainAngle(d, g, datapath, nEvents, weightdir, pklfile, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, loss_weights=loss_weights, lr=lr, xscale = xscale, xpower=xpower, angscale=ascale,
@@ -191,8 +195,11 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     return X, Y, ang, ecal
 
 def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
+
+    #with strategy.scope():
     loss_ftn = hist_count # function used for additional loss
     
     # apply settings according to data format
@@ -264,145 +271,30 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
-        # read first file
-        X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
-        nb_file=1
-        epoch_gen_loss = []
-        epoch_disc_loss = []
-        index = 0
-        file_index=0
-        
-        # repeat till training data is available (unavailable?)
-        while nb_file < len(Trainfiles) and index < nb_train_batches:
-            if verbose:
-                progress_bar.update(index)
-            else:
-                if index % 100 == 0:
-                    print('processed {} batches'.format(index + 1))
-            loaded_data = X_train.shape[0]
-            used_data = file_index * batch_size
-            # Check if loaded data is less than bacth size
-            if (loaded_data - used_data) < (batch_size + 1 ):
-                # remove the batches used
-                X_left = X_train[(file_index * batch_size):]
-                Y_left = Y_train[(file_index * batch_size):]
-                ang_left = ang_train[(file_index * batch_size):]
-                ecal_left = ecal_train[(file_index * batch_size):]
-                # read in next file                                                
-                X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
-                nb_file+=1
-                # concatenate to left over data
-                X_train = np.concatenate((X_left, X_train))
-                Y_train = np.concatenate((Y_left, Y_train))
-                ang_train = np.concatenate((ang_left, ang_train))
-                ecal_train = np.concatenate((ecal_left, ecal_train))
-                nb_batches = int(X_train.shape[0] / batch_size)
-                
-                print("{} batches loaded..........".format(nb_batches))
-                file_index = 0
-            # Get a single batch    
-            image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
-            energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
-            ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
-            file_index +=1
-            # Generate Fake events with same energy and angle as data batch
-            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
-            generated_images = generator.predict(generator_ip, verbose=0)
-            # Train discriminator first on real batch and then the fake batch
-            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
-            #if ecal sum has 100% loss(generating empty events) then end the training 
-            if fake_batch_loss[3] == 100.0 and index >10:
-                print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
-                generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
-                discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
-                print ('real_batch_loss', real_batch_loss)
-                print ('fake_batch_loss', fake_batch_loss)
-                sys.exit()
-            # append mean of discriminator loss for real and fake events 
-            epoch_disc_loss.append([
-                (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
-            ])
-            
-            trick = np.ones(batch_size).astype(np.float32)
-            gen_losses = []
-            # Train generator twice using combined model
-            for _ in range(2):
-                noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-                generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
-                gen_losses.append(combined.train_on_batch(
-                    [generator_ip],
-                    [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
-            generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
-            epoch_gen_loss.append(generator_loss)
-            index +=1
+        #Training
+        #add Trainfiles, nb_train_batches, progress_bar, daxis, daxis2, loss_ftn, combined
+        # X_train, epoch_disc_loss, epoch_gen_loss = Train_steps(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, \
+        #     Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, \
+        #     nb_epochs, batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
+        #     angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
+        #     warm, prev_gweights, prev_dweights)
+        
+        X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+        print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
 
         # Testing
         # Test process will also be accomplished in batches to reduce memory consumption
-        print ('Total batches were {}'.format(index))
-        print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         print('\nTesting for epoch {}:'.format(epoch))
         test_start = time.time()
+        #add Testfiles, nb_test_batches, daxis, daxis2, X_train(??), loss_ftn, combined
+        disc_test_loss, gen_test_loss = Test_steps(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, \
+            Testfiles, nb_test_batches, daxis, daxis2, X_train, loss_ftn, combined, \
+            nb_epochs, batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
+            angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
+            warm, prev_gweights, prev_dweights)
 
-        #read first test file
-        X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
-        disc_test_loss=[]
-        gen_test_loss =[]
-        nb_file=1
-        index=0
-        file_index=0
-        # repeat till data is available
-        while nb_file < len(Testfiles) and index < nb_test_batches:
-           loaded_data = X_test.shape[0]
-           used_data = file_index * batch_size
-           # if loaded test data has less a single batch
-           if (loaded_data - used_data) < (batch_size + 1 ):
-               # remove data already used
-               X_left = X_test[(file_index * batch_size):]
-               Y_left = Y_test[(file_index * batch_size):]
-               ang_left = ang_test[(file_index * batch_size):]
-               ecal_left = ecal_test[(file_index * batch_size):]
-               # read in new file
-               X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
-               nb_file+=1
-               # concatenate with left over data
-               X_test = np.concatenate((X_left, X_test))
-               Y_test = np.concatenate((Y_left, Y_test))
-               ang_test = np.concatenate((ang_left, ang_test))
-               ecal_test = np.concatenate((ecal_left, ecal_test))
-               nb_batches = int(X_train.shape[0] / batch_size)
 
-               print("{} test batches loaded..........".format(nb_batches))
-               file_index = 0
-           # Get one batch
-           image_batch = X_test[(file_index * batch_size):(file_index  + 1) * batch_size]
-           energy_batch = Y_test[(file_index * batch_size):(file_index + 1) * batch_size]
-           ecal_batch = ecal_test[(file_index *  batch_size):(file_index + 1) * batch_size]
-           ang_batch = ang_test[(file_index * batch_size):(file_index + 1) * batch_size]
-           add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
-           file_index +=1
-           # Generate fake events                                                            
-           noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-           generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
-           generated_images = generator.predict(generator_ip, verbose=False)
-           # concatenate to fake and real batches
-           X = np.concatenate((image_batch, generated_images))
-           y = np.array([1] * batch_size + [0] * batch_size).astype(np.float32)
-           ang = np.concatenate((ang_batch, ang_batch))
-           ecal = np.concatenate((ecal_batch, ecal_batch))
-           aux_y = np.concatenate((energy_batch, energy_batch), axis=0)
-           add_loss= np.concatenate((add_loss_batch, add_loss_batch), axis=0)
-           index +=1
-           # evaluate discriminator loss           
-           disc_test_loss.append(discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size))
-           # evaluate generator loss
-           gen_test_loss.append(combined.evaluate(generator_ip,
-                    [np.ones(batch_size), energy_batch, ang_batch, ecal_batch, add_loss_batch]
-                    , verbose=False, batch_size=batch_size))
         # make loss dict 
         print('Total Test batches were {}'.format(index))
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
@@ -419,22 +311,24 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         print('-' * 65)
         ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
         print(ROW_FMT.format('generator (train)',
-                             *train_history['generator'][-1]))
+                                *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',
-                             *test_history['generator'][-1]))
+                                *test_history['generator'][-1]))
         print(ROW_FMT.format('discriminator (train)',
-                             *train_history['discriminator'][-1]))
+                                *train_history['discriminator'][-1]))
         print(ROW_FMT.format('discriminator (test)',
-                             *test_history['discriminator'][-1]))
+                                *test_history['discriminator'][-1]))
 
         # save weights every epoch                                                                                                                                                                                                                                                    
         generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
-                               overwrite=True)
+                                overwrite=True)
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
-                                   overwrite=True)
+                                    overwrite=True)
 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
+
+        
         # save loss dict to pkl file
         pickle.dump({'train': train_history, 'test': test_history}, open(pklfile, 'wb'))
         
@@ -467,6 +361,152 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             print('Result = ', result)
             # write analysis history to a pickel file
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
+
+def Train_steps(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    # read first file
+    print(Trainfiles)
+    X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+    nb_file=1
+    epoch_gen_loss = []
+    epoch_disc_loss = []
+    index = 0
+    file_index=0
+    
+    
+    # repeat till training data is available (unavailable?)
+    while nb_file < len(Trainfiles) and index < nb_train_batches:
+        if verbose:
+            progress_bar.update(index)
+        else:
+            if index % 100 == 0:
+                print('processed {} batches'.format(index + 1))
+        loaded_data = X_train.shape[0]
+        used_data = file_index * batch_size
+        # Check if loaded data is less than bacth size
+        if (loaded_data - used_data) < (batch_size + 1 ):
+            # remove the batches used
+            X_left = X_train[(file_index * batch_size):]
+            Y_left = Y_train[(file_index * batch_size):]
+            ang_left = ang_train[(file_index * batch_size):]
+            ecal_left = ecal_train[(file_index * batch_size):]
+            # read in next file                                                
+            X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+            nb_file+=1
+            # concatenate to left over data
+            X_train = np.concatenate((X_left, X_train))
+            Y_train = np.concatenate((Y_left, Y_train))
+            ang_train = np.concatenate((ang_left, ang_train))
+            ecal_train = np.concatenate((ecal_left, ecal_train))
+            nb_batches = int(X_train.shape[0] / batch_size)
+            
+            print("{} batches loaded..........".format(nb_batches))
+            file_index = 0
+        # Get a single batch    
+        image_batch = X_train[(file_index * batch_size):(file_index  + 1) * batch_size]
+        energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
+        ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
+        ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
+        add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+        file_index +=1
+        # Generate Fake events with same energy and angle as data batch
+        noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+        generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
+        generated_images = generator.predict(generator_ip, verbose=0)
+        # Train discriminator first on real batch and then the fake batch
+        real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+        fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+
+        #if ecal sum has 100% loss(generating empty events) then end the training 
+        if fake_batch_loss[3] == 100.0 and index >10:
+            print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
+            generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
+            discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
+            print ('real_batch_loss', real_batch_loss)
+            print ('fake_batch_loss', fake_batch_loss)
+            sys.exit()
+        # append mean of discriminator loss for real and fake events 
+        epoch_disc_loss.append([
+            (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
+        ])
+        
+        trick = np.ones(batch_size).astype(np.float32)
+        gen_losses = []
+        # Train generator twice using combined model
+        for _ in range(2):
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
+            gen_losses.append(combined.train_on_batch(
+                [generator_ip],
+                [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
+        generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
+        epoch_gen_loss.append(generator_loss)
+        index +=1
+
+    print ('Total batches were {}'.format(index))
+
+    return X_train, epoch_disc_loss, epoch_gen_loss
+
+def Test_steps(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, Testfiles, nb_test_batches, daxis, daxis2, X_train, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    #read first test file
+    X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+    disc_test_loss=[]
+    gen_test_loss =[]
+    nb_file=1
+    index=0
+    file_index=0
+    # repeat till data is available
+    while nb_file < len(Testfiles) and index < nb_test_batches:
+        loaded_data = X_test.shape[0]
+        used_data = file_index * batch_size
+        # if loaded test data has less a single batch
+        if (loaded_data - used_data) < (batch_size + 1 ):
+            # remove data already used
+            X_left = X_test[(file_index * batch_size):]
+            Y_left = Y_test[(file_index * batch_size):]
+            ang_left = ang_test[(file_index * batch_size):]
+            ecal_left = ecal_test[(file_index * batch_size):]
+            # read in new file
+            X_test, Y_test, ang_test, ecal_test = GetDataAngle(Testfiles[nb_file], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+            nb_file+=1
+            # concatenate with left over data
+            X_test = np.concatenate((X_left, X_test))
+            Y_test = np.concatenate((Y_left, Y_test))
+            ang_test = np.concatenate((ang_left, ang_test))
+            ecal_test = np.concatenate((ecal_left, ecal_test))
+            nb_batches = int(X_train.shape[0] / batch_size)
+
+            print("{} test batches loaded..........".format(nb_batches))
+            file_index = 0
+        # Get one batch
+        image_batch = X_test[(file_index * batch_size):(file_index  + 1) * batch_size]
+        energy_batch = Y_test[(file_index * batch_size):(file_index + 1) * batch_size]
+        ecal_batch = ecal_test[(file_index *  batch_size):(file_index + 1) * batch_size]
+        ang_batch = ang_test[(file_index * batch_size):(file_index + 1) * batch_size]
+        add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+        file_index +=1
+        # Generate fake events                                                            
+        noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+        generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
+        generated_images = generator.predict(generator_ip, verbose=False)
+        # concatenate to fake and real batches
+        X = np.concatenate((image_batch, generated_images))
+        y = np.array([1] * batch_size + [0] * batch_size).astype(np.float32)
+        ang = np.concatenate((ang_batch, ang_batch))
+        ecal = np.concatenate((ecal_batch, ecal_batch))
+        aux_y = np.concatenate((energy_batch, energy_batch), axis=0)
+        add_loss= np.concatenate((add_loss_batch, add_loss_batch), axis=0)
+        index +=1
+        # evaluate discriminator loss           
+        disc_test_loss.append(discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size))
+        # evaluate generator loss
+        gen_test_loss.append(combined.evaluate(generator_ip,
+                [np.ones(batch_size), energy_batch, ang_batch, ecal_batch, add_loss_batch]
+                , verbose=False, batch_size=batch_size))
+
+    return disc_test_loss, gen_test_loss
+    
+    
+
 
 if __name__ == '__main__':
     main()

@@ -72,10 +72,12 @@ def main():
      if data=='reduced':
        datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                                        
      elif data=='full':
-       datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate                                
+       datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate  
+     else:
+       datapath = data                              
      datafiles = GetDataFiles(datapath, particle, 1)
      data = datafiles[0]
-     X, Y, angle = GetAngleData(data, angtype='theta', num_events=numevents)
+     X, Y, angle = GetAngleData(data, angtype='theta') # what is it used to???????? #, num_events=numevents)
    else:
      from EcalEnergyGan import generator
      dscale = 1.
