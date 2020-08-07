@@ -361,15 +361,16 @@ def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2
                     srt["energy" + str(energy)] = srt["energy" + str(energy)][:num_events2]
     return srt
 
+
 # get variable angle data
-def GetAngleData(datafile, thresh=0, angtype='eta', offset=0.0):
+def GetAngleData(datafile, thresh=0, angtype='eta', offset=0.0, num_events=10000):
     #get data for training                                                                                        
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
-    X=np.array(f.get('ECAL'))
-    Y=np.array(f.get('energy'))
+    X=np.array(f.get('ECAL')[:num_events])
+    Y=np.array(f.get('energy')[:num_events])
     if angtype in f:
-      ang = np.array(f.get(angtype))
+      ang = np.array(f.get(angtype)[:num_events])
     else:
       if angtype=='mtheta':
         ang = measPython(X)
@@ -386,7 +387,7 @@ def GetAngleData(datafile, thresh=0, angtype='eta', offset=0.0):
     return X, Y, ang 
 
 # Get sorted data for variable angle
-def get_sorted_angle(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance1=5, tolerance2=0.5, Data=GetAngleData, angtype='theta', thresh=0.0, offset=0.0):
+def get_sorted_angle(datafiles, energies, flag=False, num_events1=5000, num_events2=2000, tolerance1=5, tolerance2=0.5, Data=GetAngleData, angtype='theta', thresh=0.0, offset=0.0):
     srt = {}
     for index, datafile in enumerate(datafiles):
        data = Data(datafile, thresh = thresh, angtype=angtype, offset= offset)
