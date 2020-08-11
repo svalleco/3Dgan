@@ -8,9 +8,6 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import keras
-from keras.callbacks import CallbackList
-kv2 = keras.__version__.startswith('2')
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
@@ -34,26 +31,34 @@ except:
     pass
 
 #from memory_profiler import profile # used for memory profiling
-import keras.backend as K
-import analysis.utils.GANutils as gan
 
-from keras.layers import Input
-from keras.models import Model
-from keras.optimizers import Adadelta, Adam, RMSprop
-from keras.utils.generic_utils import Progbar
-import horovod.keras as hvd
-# printing versions of software used
-#print('keras version:', keras.__version__)
-#print('python version:', sys.version)
 import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import callbacks
+from tensorflow.keras.callbacks import *
+from tensorflow.keras import backend as K
+import analysis.utils.GANutils as gan
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adadelta, Adam, RMSprop
+from tensorflow.keras.utils import Progbar
+import horovod.tensorflow.keras as hvd
+
+# printing versions of software used
+#print('keras version:', tf.keras.__version__)
+#print('python version:', sys.version)
 #print('tensorflow version', tf.__version__)
 #print('numpy version', np.version.version)
+
+kv2 = keras.__version__.startswith('2')   # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
+
+# Creates a list of lists, used in Gan3DTrainAngle()
 def genbatches(a,n):
     for i in range(0, len(a), n):
         # Create an index range for l of n items:
         yield a[i:i+n]
 
-
+# Shuffles four arrays, used in Gan3DTrainAngle(X_train, Y_train, ecal_train, ang_train)
 def randomize(a, b, c, d):
     assert a.shape[0] == b.shape[0]
     # Generate the permutation index array.
@@ -65,11 +70,12 @@ def randomize(a, b, c, d):
     shuffled_d = d[permutation]
     return shuffled_a, shuffled_b, shuffled_c, shuffled_d
 
+# Main - import architecture, parser values, set channels format, configure the session, initialize & optimize horovod, build discriminator & generator, call Gan3DTrainAngle()
 def main():
-    #Architectures to import
-    from AngleArch3dGAN import generator, discriminator
+    # Architectures to import
+    from AngleArch3dGAN_tf2 import generator, discriminator
 
-    #Values to be set by user
+    # Values to be set by user
     parser = get_parser()
     params = parser.parse_args()
     nb_epochs = params.nbepochs #Total Epochs
@@ -93,18 +99,17 @@ def main():
     angtype = params.angtype
     warmup_epochs = params.warmupepochs
 
+    # channels format: want channels_first for cpu
     d_format = params.channel_format
 
     if d_format == 'channels_first':
         print('Setting th channel ordering (NCHW)')
-        K.set_image_dim_ordering('th')
-        K.set_image_data_format('channels_first')
+        K.set_image_data_format('channels_first')   #in tf1: set_image_dim_ordering('th')
     else:
         print('Setting tf channel ordering (NHWC)')
-        K.set_image_dim_ordering('tf')
-        K.set_image_data_format('channels_last')
+        K.set_image_data_format('channels_last')    #in tf1: set_image_dim_ordering('tf')
 
- 
+    # configure the session
     config = tf.compat.v1.ConfigProto(log_device_placement=True)
     config.intra_op_parallelism_threads = params.intraop
     config.inter_op_parallelism_threads = params.interop
@@ -114,11 +119,11 @@ def main():
     # os.environ['KMP_AFFINITY'] = 'balanced'
     # os.environ['OMP_NUM_THREADS'] = str(params.intraop)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
-    K.set_session(tf.compat.v1.Session(config=config))
+    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
     run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
     run_metadata = tf.compat.v1.RunMetadata()
 
-
+    # Gul rukh's default data paths
     if tlab:
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
       weightdir = '/gkhattak/weights/3dgan_weights'
@@ -126,24 +131,29 @@ def main():
       resultfile = '/gkhattak/results/3dgan_analysis.pkl'
 
     print(params)
+    
     #initialize Horovod
     hvd.init()
  
-    opt = getattr(keras.optimizers, params.optimizer)
+    # get attribute and optimize using horovod
+    opt = getattr(tf.keras.optimizers, params.optimizer)
     opt = opt(params.learningRate * hvd.size())
     opt = hvd.DistributedOptimizer(opt)
 
     global_batch_size = batch_size * hvd.size()
     print("Global batch size is: {0} / batch size is: {1}".format(global_batch_size, batch_size))
+    
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
     d=discriminator(xpower)
     g=generator(latent_size)
-    Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
-                    latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
-                    yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
+    Gan3DTrainAngle(discriminator=d, generator=g, opt=opt, datapath=datapath, nEvents=nEvents, WeightsDir=weightdir, pklfile=pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
+                    latent_size=latent_size, loss_weights=loss_weights, xscale=xscale, xpower=xpower, angscale=ascale, angtype=angtype, 
+                    yscale=yscale, thresh=thresh, analyse=analyse, resultfile=resultfile,
                     energies=energies, warmup_epochs=warmup_epochs)
 
+# parser method: nbepochs, batchsize, latentsize, datapath, nbEvents, verbose, weightsdir, pklfile, xscale, xpower, yscale, ascale, resultfile, 
+#                analyse, energies, lossweights, thresh, angtype, learningRate, optimizer, intraop, interop, warmupepochs, channel_format, analysis
 def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -174,13 +184,17 @@ def get_parser():
     parser.add_argument('--analysis', action='store', type=bool, default=False, help='Calculate optimisation function')
     return parser
 
+# x map function
 def mapping(x):
     return x
     
+# set channel format - want channels_first for cpu
 if K.image_data_format() !='channels_last':
-   daxis = (2,3,4)
+   daxis = (2,3,4)  # channels_first
 else:
-   daxis = (1,2,3)
+   daxis = (1,2,3)  # channels_last
+
+# histogram count - sums 8 bins btwn [0.05, 0.03, 0.02, 0.0125, 0.008, 0.003, 0]**p
 def hist_count(x, p=1):
     bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
     bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
@@ -194,36 +208,45 @@ def hist_count(x, p=1):
     bins[np.where(bins==0)]=1
     return bins
 
-#get data for training
+# get data for training - returns X, Y, ang, ecal
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
-    f=h5py.File(datafile,'r')
-    ang = np.array(f.get(angtype))
-    X=np.array(f.get('ECAL'))* xscale
-    Y=np.array(f.get('energy'))/yscale
-    X[X < thresh] = 0
+    f = h5py.File(datafile,'r')           # load data into f variable
+    ang = np.array(f.get(angtype))        # ang is an array of angle data from f
+    X = np.array(f.get('ECAL'))* xscale   # x is an array of scaled ecal data from f
+    Y = np.array(f.get('energy'))/yscale  # y is an array of scaled energy data from f
+    X[X < thresh] = 0            # when X values are less than the threshold, they are reset to 0
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
     ang = ang.astype(np.float32)
     X = np.expand_dims(X, axis=-1)
+    
+    # check data format and sum along axis
     if K.image_data_format() !='channels_last':
        X =np.moveaxis(X, -1, 1)
        ecal = np.sum(X, axis=(2, 3, 4))
-    else:
+    else:               # channels_last
        ecal = np.sum(X, axis=(1, 2, 3))
-    if xpower !=1.:
-        X = np.power(X, xpower)
+    
+    # X ** xpower
+    if xpower !=1.: 
+       X = np.power(X, xpower)  # isn't it faster to do X=X**xpower ?
+       
     return X, Y, ang, ecal
 
+# Training Function - build & compile discriminator, build & compile generator, run the generator and discriminator, unused callback list functions, read TrainFiles & TestFiles,
+#                     run through epochs, train the generator & discriminator, collect discriminator losses, collect generator losses, test, save weights every epoch
 def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
     start_init = time.time()
     verbose = False    
     particle='Ele'
     f = [0.9, 0.1]
     loss_ftn = hist_count
+    
     if hvd.rank()==0:
         print('[INFO] Building discriminator')
     #discriminator.summary()
+    # compile the discriminator with the loss functions
     discriminator.compile(
         optimizer=opt,
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
@@ -239,14 +262,16 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         loss='binary_crossentropy'
     )
  
-    # build combined Model
-    latent = Input(shape=(latent_size, ), name='combined_z')   
-    fake_image = generator( latent)
+    # build combined Model -- run the generator and discriminator!
+    # generator: latent vector --> fake image
+    latent = Input(shape=(latent_size, ), name='combined_z')   # random latent vector = generator input
+    fake_image = generator( latent)     # fake image = generator output
+    # discriminator: fake image --> fake, aux, ang, ecal, add_loss
     discriminator.trainable = False
     fake, aux, ang, ecal, add_loss= discriminator(fake_image)
     combined = Model(
-        input=[latent],
-        output=[fake, aux, ang, ecal, add_loss],
+        inputs=[latent],
+        outputs=[fake, aux, ang, ecal, add_loss],
         name='combined_model'
     )
     combined.compile(
@@ -257,53 +282,63 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     )
     if kv2: 
         discriminator.trainable = True #workaround for keras 2 bug
-    gcb = CallbackList( \
-        callbacks=[ \
-        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
-        hvd.callbacks.MetricAverageCallback(), \
-        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
-        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
-        ])
 
-    dcb = CallbackList( \
-        callbacks=[ \
-        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
-        hvd.callbacks.MetricAverageCallback(), \
-        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
-        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
-        ])
+    #commented out the callback list functions as it is in the nightly version for keras 2 (currently unsupported) and not called.
+    #gcb = tf.keras.callbacks.Callback( \
+    #    callbacks=[ \
+    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+    #    hvd.callbacks.MetricAverageCallback(), \
+    #    # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+    #    hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+    #    tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+    #    ])
 
-    ccb = CallbackList( \
-        callbacks=[ \
-        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
-        hvd.callbacks.MetricAverageCallback(), \
-        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
-        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
-        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
-        ])
+    #dcb = tf.keras.callbacks.Callback( \
+    #    callbacks=[ \
+    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+    #    hvd.callbacks.MetricAverageCallback(), \
+    #    # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+    #    hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+    #    tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+    #    ])
 
-    gcb.set_model( generator )
-    dcb.set_model( discriminator )
-    ccb.set_model( combined )
+    #ccb = tf.keras.callbacks.Callback( \
+    #    callbacks=[ \
+    #    hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+    #    hvd.callbacks.MetricAverageCallback(), \
+    #    # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+    #    hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+    #    tf.keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+    #    ])
 
-    gcb.on_train_begin()
-    dcb.on_train_begin()
-    ccb.on_train_begin()
+    #gcb.set_model( generator )
+    #dcb.set_model( discriminator )
+    #ccb.set_model( combined )
+
+    #gcb.on_train_begin()
+    #dcb.on_train_begin()
+    #ccb.on_train_begin()
 
     # Getting Data
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
-    if hvd.rank()==0:
-        print(Trainfiles)
-        print(Testfiles)
+    #if hvd.rank()==0:
+        #print('hvd.rank was equal to 0. now printing the training files and testing files: ')
+        #print('Training files: ')
+        #print(Trainfiles)
+        #print('Testing files: ')
+        #print(Testfiles)
     nb_Test = int(nEvents * f[1]) # The number of test files calculated from fraction of nEvents
     nb_Train = int(nEvents * f[0]) # The number of train files calculated from fraction of nEvents
-    #Read test data into a single array
+
+    # Bug check for reading the test file in
+    if len(Testfiles) == 0:
+       print('Error reading the Testfiles. The enumerated list will show up as empty. Check the GANutils.py file in 3Dgan/keras/analysis/utils.')
+   
+    # Read test data into a single array, make sure it is the same length as nb_Test (The number of test files calculated from fraction of nEvents)
     for index, dtest in enumerate(Testfiles):
        if index == 0:
            X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-       else:
+       else: 
            if X_test.shape[0] < nb_Test:
               X_temp, Y_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
               X_test = np.concatenate((X_test, X_temp))
@@ -311,9 +346,11 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
               ang_test = np.concatenate((ang_test, ang_temp))
               ecal_test = np.concatenate((ecal_test, ecal_temp))
     if X_test.shape[0] > nb_Test:
-        X_test, Y_test, ang_test, ecal_test = X_test[:numTest], Y_test[:numTest], ang_test[:numTest], ecal_test[:numTest]
+        X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test] #changed numTest to nb_Test on this line
     else:
-        nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
+        nb_Test = X_test.shape[0] # the nb_test may be different if total events are less than nEvents
+   
+    # Read train data into a single array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)    
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
             X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
@@ -324,19 +361,21 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             ang_train = np.concatenate((ang_train, ang_temp))
             ecal_train = np.concatenate((ecal_train, ecal_temp))
 
-    nb_train = X_train.shape[0]# Total events in training files
+    nb_train = X_train.shape[0] # Total events in training files
     total_batches = nb_train / global_batch_size
+    
     if hvd.rank()==0:
         print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
 
-
-    if hvd.rank()==0:
+    if hvd.rank()==0:           # will throw an error if the number of epochs is not large enough
        print('Test Data loaded of shapes:')
        print(X_test.shape)
        print(Y_test.shape)
        print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
        print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
+
+
        if analyse:
           var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
        train_history = defaultdict(list)
@@ -344,6 +383,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
        analysis_history = defaultdict(list)
        init_time = time.time()- start_init
        print('Initialization time is {} seconds'.format(init_time))
+    
+    # run through epochs
     for epoch in range(nb_epochs):
         epoch_start = time.time()
         if hvd.rank()==0:
@@ -356,10 +397,12 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         epoch_gen_loss = []
         epoch_disc_loss = []
         
-        image_batches = genbatches(X_train, batch_size)
-        energy_batches = genbatches(Y_train, batch_size)
-        ecal_batches = genbatches(ecal_train, batch_size)
-        ang_batches = genbatches(ang_train, batch_size)
+        image_batches = genbatches(X_train, batch_size)    # creates len(X_train) index ranges for len(batch_size) # of items
+        energy_batches = genbatches(Y_train, batch_size)   # creates len(Y_train) index ranges for len(batch_size) # of items
+        ecal_batches = genbatches(ecal_train, batch_size)  # creates len(ecal_train) index ranges for len(batch_size) # of items
+        ang_batches = genbatches(ang_train, batch_size)    # creates len(ang_train) index ranges for len(batch_size) # of items
+        
+        # go through batches: train the generator and discriminator
         for index in range(int(total_batches)):
             start = time.time()         
             image_batch = next(image_batches) 
@@ -367,15 +410,16 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             ecal_batch = next(ecal_batches)
             ang_batch = next(ang_batches)
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
-            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2))    
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
-  
+            
+            # collect the loss of the discriminator with real and fake images
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
-            #if ecal sum has 100% loss then end the training
-            if fake_batch_loss[4] == 100.0 and index >10:
+            # if ecal sum has 100% loss then end the training
+            if fake_batch_loss[4] == 100.0 and index > 10:
                 if hvd.rank()==0:
                     print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
                     generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
@@ -387,9 +431,11 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
                 (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
             ])
             trick = np.ones(batch_size)
+            
+            # collect generator losses in array
             gen_losses = []
             for _ in range(2):
-                noise = np.random.normal(0, 1, (batch_size, latent_size-1))
+                noise = np.random.normal(0, 1, (batch_size, latent_size-2))  
                 generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
@@ -430,7 +476,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             print(ROW_FMT.format('discriminator (train)',
                              *train_history['discriminator'][-1]))
 
-        # save weights every epoch
+            # save weights every epoch
             generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
                                overwrite=True)
             discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
