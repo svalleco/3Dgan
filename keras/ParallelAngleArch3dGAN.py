@@ -1,13 +1,14 @@
 import numpy as np
-import keras.backend as K
-from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
-                          Dropout, BatchNormalization, Activation, Embedding)
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
-                                        AveragePooling3D)
-from keras.models import Model, Sequential
-import math
 import tensorflow as tf
+import tensorflow.keras.backend as K
+from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
+                          Dropout, BatchNormalization, Activation, Embedding)
+from tensorflow.keras.layers import LeakyReLU
+from tensorflow.keras.layers import (UpSampling3D, Conv3D, ZeroPadding3D,
+                                        AveragePooling3D)
+from tensorflow.keras.models import Model, Sequential
+import math
+
 
 # calculate sum of intensities
 def ecal_sum(image, daxis):
