@@ -70,31 +70,17 @@ def run(args,config):
     global_step = 0
 
     
+    # -------------
+    # Phasing Loop
+    #-------------
 
     for phase in range(1, num_phases + 1):
         
         tf.reset_default_graph()
-
-        npy_data = dataset()
+        npy_data = dataset() 
 
         
 
-    gen_loss, disc_loss, gp_loss, gen_sample = forward_simultaneous(
-            generator,
-            discriminator,
-            real_image_input,
-            args.latent_dim,
-            alpha,
-            phase,
-            num_phases,
-            base_dim,
-            base_shape,
-            args.activation,
-            args.leakiness,
-            args.network_size,
-            args.loss_fn,
-            args.gp_weight
-            )
 
 
 
