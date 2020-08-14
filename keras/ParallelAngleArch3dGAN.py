@@ -140,8 +140,8 @@ def discriminator(power=1.0, dformat='channels_last'):
     ang = Lambda(ecal_angle, arguments={'daxis':daxis})(inv_image) # angle calculation
     ecal = Lambda(ecal_sum, arguments={'daxis':daxis2})(inv_image) # sum of energies
     add_loss = Lambda(count, arguments={'daxis':daxis2})(inv_image) # loss for bin counts
-    Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary()
-    return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss])
+    Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary() #removed add_loss
+    return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]) #removed add_loss
 
 
 def generator(latent_size=256, return_intermediate=False, dformat='channels_last'):
