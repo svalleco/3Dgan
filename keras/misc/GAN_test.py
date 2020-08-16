@@ -8,16 +8,16 @@ from matplotlib import rcParams
 plt.rcParams.update({'lines.markeredgewidth': 1})
 import ROOT
 import sys
-sys.path.insert(0,'../keras/analysis')
+sys.path.insert(0,'../analysis')
 import utils.ROOTutils as r
 import utils.GANutils as gan
 
 def main():
-    validation_files =["validation_GANtrain_G4test.h5", "validation_GANtrain_GANtest.h5", "validation_G4train_G4test.h5", "validation_G4train_GANtest_hcal.h5"]
+    validation_files =["GANtrain_G4test.h5", "GANtrain_GANtest.h5", "G4train_G4test.h5", "G4train_GANtest.h5"]
     data = []
     for f in validation_files:
       data.append(h5py.File(f, 'r'))    
-    save_path = 'results/triforce_validation_net_out_wthcal/'
+    save_path = 'results/triforce_validation_thesis/'
     gan.safe_mkdir(save_path)
     ###################################################
     Ele_ID = 11
@@ -136,7 +136,7 @@ def PLotClassBarPython(class_list, error_list, labels, particle, title, out_file
     plt.figure()
     width = 0.4
     x_val = np.arange(len(class_list) + 2)
-    color = ['b', 'r', 'g']
+    color = ['r', 'b', 'g']
     for i, class_pred in enumerate(class_list):
        plt.bar(i+1, [class_pred], width, yerr = error_list[i], align='center', alpha=0.5, color=color[i], capsize=4)
     
