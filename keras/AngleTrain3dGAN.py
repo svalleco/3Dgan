@@ -87,7 +87,7 @@ def main():
     if datapath=='path1':
        datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                                         
     elif datapath=='path2':
-       datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate                              
+       datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate                              
        events_per_file = 10000
        energies = [0, 50, 100, 200, 250, 300, 400, 500]
     elif datapath=='path3':
@@ -122,7 +122,7 @@ def main():
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
-    parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
+    parser.add_argument('--nbepochs', action='store', type=int, default=120, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
     parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
@@ -145,25 +145,25 @@ def get_parser():
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle')
     parser.add_argument('--lr', action='store', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
-    parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
-    parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--name', action='store', type=str, default='gan_training', help='Unique identifier can be set for each training')
+    parser.add_argument('--prev_gweights', type=str, default='surfsara_128n/params_generator_epoch_193.hdf5', help='Initial generator weights for warm start')
+    parser.add_argument('--prev_dweights', type=str, default='surfsara_128n/params_discriminator_epoch_193.hdf5', help='Initial discriminator weights for warm start')
+    parser.add_argument('--name', action='store', type=str, default='_bin_test', help='Unique identifier can be set for each training')
     return parser
 
 # A histogram fucntion that counts cells in different bins
 def hist_count(x, p=1.0, daxis=(1, 2, 3)):
     limits=np.array([0.05, 0.03, 0.02, 0.0125, 0.008, 0.003]) # bin boundaries used
     limits= np.power(limits, p)
-    bin1 = np.sum(np.where(x>(limits[0]) , 1, 0), axis=daxis)
-    bin2 = np.sum(np.where((x<(limits[0])) & (x>(limits[1])), 1, 0), axis=daxis)
-    bin3 = np.sum(np.where((x<(limits[1])) & (x>(limits[2])), 1, 0), axis=daxis)
-    bin4 = np.sum(np.where((x<(limits[2])) & (x>(limits[3])), 1, 0), axis=daxis)
-    bin5 = np.sum(np.where((x<(limits[3])) & (x>(limits[4])), 1, 0), axis=daxis)
-    bin6 = np.sum(np.where((x<(limits[4])) & (x>(limits[5])), 1, 0), axis=daxis)
-    bin7 = np.sum(np.where((x<(limits[5])) & (x>0.), 1, 0), axis=daxis)
-    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
+    bin1 = np.sum(np.where(x>(limits[0]) , 1., 0.), axis=daxis)
+    bin2 = np.sum(np.where((x<(limits[0])) & (x>(limits[1])), 1., 0.), axis=daxis)
+    bin3 = np.sum(np.where((x<(limits[1])) & (x>(limits[2])), 1., 0.), axis=daxis)
+    bin4 = np.sum(np.where((x<(limits[2])) & (x>(limits[3])), 1., 0.), axis=daxis)
+    bin5 = np.sum(np.where((x<(limits[3])) & (x>(limits[4])), 1., 0.), axis=daxis)
+    bin6 = np.sum(np.where((x<(limits[4])) & (x>(limits[5])), 1., 0.), axis=daxis)
+    bin7 = np.sum(np.where((x<(limits[5])) & (x>0.), 1., 0.), axis=daxis)
+    bin8 = np.sum(np.where(x==0, 1., 0.), axis=daxis)
     bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
-    bins[np.where(bins==0)]=1 # so that an empty bin will be assigned a count of 1 to avoid unstability
+    bins[np.where(bins==0)]=1. # so that an empty bin will be assigned a count of 1 to avoid unstability
     return bins
 
 #get data for training
@@ -336,6 +336,18 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
+            for l in combined.layers[2].layers:
+               print(l.name)
+            #grad = get_layer_output_grad(combined, combined.input, combined.output, layer=3)
+            #weights = combined.layers[2].layers[-1].get_weights()
+            #print(weights)
+            for o, out in enumerate(combined.output):
+              out = combined.output[o]
+              print('out {} = {}'.format(o, out))
+              weights = combined.layers[1].trainable_weights
+              grad = K.gradients(out, weights)
+              print('grad', grad)
+            
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
             epoch_gen_loss.append(generator_loss)
             index +=1
