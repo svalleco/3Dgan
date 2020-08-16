@@ -8,7 +8,7 @@ import tensorflow as tf
 #import tensorflow.python.ops.image_ops_impl as image 
 import time
 import sys
-sys.path.insert(0,'../keras')
+sys.path.insert(0,'../')
 import analysis.utils.GANutils as gan
 import analysis.utils.ROOTutils as roo
 from skimage import measure
@@ -24,22 +24,23 @@ def main():
   power=0.85    #power for cell energies used in training
   thresh =0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
-  labels =["G4", "GAN"] # labels
-  plotsdir = 'results/IQA_surfsara_L2' # dir for results
+  labels =["MC", "GAN"] # labels
+  plotsdir = 'results/IQA_gan_training_2_500GeV/'#results
   gan.safe_mkdir(plotsdir) 
-  #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
-  datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
+  datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+  #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
 
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  #energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
-  energies = [0, 110, 150, 190]
+  energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
+  #energies = [0, 110, 150, 190]
   angles=[62, 90, 118]
-  L=1e-8
+  L=1e-4
   concat=2
-  stest = True
+  stest = 0
+  stat = 0
   dscale =50.0
   g = generator(latent)       # build generator
-  gen_weight1= "../keras/weights/surfsara_weights/params_generator_epoch_099.hdf5" # weights for generator
+  gen_weight1= "../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
   sorted_data = gan.get_sorted_angle(data_files[-3:], energies, thresh=thresh) # load data in a dict
   
@@ -83,7 +84,7 @@ def main():
        psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], generated_images, data_range=L)
        print('PSNR={}'.format(psnr))
        #make plot
-       Draw1d(mscn_g4, mscn_gan, filename, labels, [ssim_mean, psnr], stest=stest)
+       Draw1d(mscn_g4, mscn_gan, filename, labels, [], stest=stest, stat=stat)
 
        if get_shuffled:
           # repeat for shuffled data
@@ -98,7 +99,7 @@ def main():
           print('SSIM Data shuffled mean ={} std={}'.format(ssim_mean, ssim_std))
           psnr = measure.compare_psnr(sorted_data["events_act" + str(energy)+ "ang_" + str(a)], shuffled_data, data_range=L)
           print('PSNR Data shuffled ={}'.format(psnr))
-          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ssim_mean, psnr], stest=stest)
+          Draw1d(mscn_g4, mscn_2, filename, ['G4', 'G4 shuffled'], [ssim_mean, psnr], stest=stest, stat=stat)
 
           # repeat for shuffled GAN
           filename = path.join(plotsdir, "IQA_GAN_shuffled{}GeV_{}degree.pdf".format(energy, a))
@@ -112,7 +113,7 @@ def main():
           print('SSIM GAN shuffled mean={} std={}'.format(ssim_mean, ssim_std))
           psnr = measure.compare_psnr(generated_images, shuffled_gan, data_range=L)
           print('PSNR GAN shuffled ={}'.format(psnr))
-          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ssim_mean, psnr], stest=stest)
+          Draw1d(mscn_gan, mscn_2, filename, ['GAN', 'GAN shuffled'], [ssim_mean, psnr], stest=stest, stat=stat)
                               
 
 # MSCN original
@@ -182,17 +183,18 @@ def SSIM(images1, images2, multichannel=True, data_range=1, gaussian_weights=Tru
   return np.mean(ssim_val), np.std(ssim_val)
 
 # Plot for MSCN
-def Draw1d(array1, array2, filename, labels, metrics=[], stest=True):
+def Draw1d(array1, array2, filename, labels, metrics=[], stest=True, stat=0):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
-  c.SetGrid()
+  #c.SetGrid()
   min1=np.amin(array1)
   min2=np.amin(array2)
   max1=np.amax(array1)
   max2=np.amax(array2)
   mean1=np.mean(array1)
   mean2=np.mean(array2)
-  ROOT.gStyle.SetOptStat(111111)
-  leg=ROOT.TLegend(.1, .1, .4, .3)
+  ROOT.gStyle.SetOptStat(1111)
+  leg=ROOT.TLegend(.11, .11, .4, .3)
+  leg.SetBorderSize(0)
   hist1 = ROOT.TH1D(labels[0], "MSCN Co efficients for Ecal and Ep;MSCN Co efficient;normalized count", 100, -7., 5.)
   hist2 = ROOT.TH1D(labels[1], "MSCN Co efficients for Ecal and Ep;MSCN Co efficient;normalized count", 100, -7., 5.)
   roo.fill_hist(hist1, array1)
@@ -208,13 +210,16 @@ def Draw1d(array1, array2, filename, labels, metrics=[], stest=True):
     leg.AddEntry(hist2, "K test ={:.4f}".format(ks), "l")
   hist1.Sumw2()
   hist2.Sumw2()
+  if stat==0:
+    hist1.SetStats(0)
+    hist2.SetStats(0)
   hist1.GetYaxis().CenterTitle()
   hist1.Draw()
   hist1.Draw('hist')
   hist2.Draw('sames')
   hist2.Draw('hist sames')
   c.Update()
-  roo.stat_pos(hist2)
+  if stat: roo.stat_pos(hist2)
   hist1.SetLineColor(2)
   hist2.SetLineColor(4)
   leg.Draw()
