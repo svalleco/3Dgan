@@ -1197,12 +1197,12 @@ def plot_energy_hist_root(array1x, array1y, array1z, array2x, array2y, array2z, 
 def plot_moment(array1, array2, out_file, dim, energy, m, labels, p =[2, 500], stest=False, ifpdf=True, grid=True, leg=True, statbox=True, mono=False, ang=1):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make                                                                 
    array1= array1[:, m]
-   
-   if dim=='x' or dim=='y':
-      bins = 51 if ang else 25
-      maxbin = 51 if ang else 25
-      minbin= 0
-   elif m==0:
+   if m==0:
+     if dim=='x' or dim=='y':
+       bins = 51 if ang else 25
+       maxbin = 51 if ang else 25
+       minbin= 0
+     else:
       bins = 25
       maxbin = 25
       minbin= 0
@@ -2146,13 +2146,15 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
    lmargin = 0.15
    rmargin = 0.17
    if theta:
-     ang1 = MeasPython(np.moveaxis(aevent, 3, 0))
-     ang2 = MeasPython(np.moveaxis(aevent, 3, 0), mod=2)
+     #ang1 = MeasPython(np.moveaxis(aevent, 3, 0))
+     ang1 = MeasPython(np.moveaxis(aevent, 3, 0), mod=2)
+     ang2 = MeasPython(np.moveaxis(gevent, 3, 0), mod=2)
      if unit == 'degrees':
         ang1= np.degrees(ang1)
         ang2= np.degrees(ang2)
         theta = np.degrees(theta)
-     title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV #theta ={:.2f} #circ".format(energy, theta))
+     
+     title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV #theta={:.2f} #circ  meas#theta G4={:.2f} #circ meas#theta GAN={:.2f} #circ ".format(energy, theta, ang1[0], ang2[0]))
    else:
      title = ROOT.TPaveLabel(0.1,0.95,0.9,0.99,"Ep = {:.2f} GeV".format(energy))
    title.SetFillStyle(0)
