@@ -8,7 +8,7 @@ import tensorflow as tf
 #import tensorflow.python.ops.image_ops_impl as image 
 import time
 import sys
-sys.path.insert(0,'../keras')
+sys.path.insert(0,'../')
 import analysis.utils.GANutils as gan
 import analysis.utils.ROOTutils as roo
 from skimage import measure
@@ -21,11 +21,11 @@ except:
   pass
 
 def main():
-  #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
-  datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
-  data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  energies = [0, 110, 150, 190] 
-  #energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
+  datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
+  #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"
+  particle = 'Ele'
+  data_files = gan.GetDataFiles(datapath, [particle]) # get list of files
+  energies =[0, 50, 100, 200, 300, 400, 500]# energy bins
   angles=[62, 90, 118]
 
   latent = 256  #latent space
@@ -37,14 +37,13 @@ def main():
   stest = True
   get_shuffled= True # whether to make plots for shuffled
   
-  labels =["G4", "GAN"] # labels
-  plotsdir = 'results/SSIMi_ep127_gan_training/' # dir for results
+  plotsdir = 'results/SSIM_gan_training_epsilon_2_500GeV_ep21_thesis/' # dir for results
   gan.safe_mkdir(plotsdir) 
-  L=[1, 1e-2, 1e-4, 1e-6, 1e-8]
+  L=[1, 1e-2, 1e-4, 1e-6]
 
   g = generator(latent)       # build generator
-  gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_127.hdf5" # weights for generator
-  g.load_weights(gen_weight1) # load weights
+  gen_weight= "../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
+  g.load_weights(gen_weight) # load weights
   sorted_data = gan.get_sorted_angle(data_files[-20:], energies, thresh=thresh) # load data in a dict
   
   ssim_dict={}
@@ -93,8 +92,8 @@ def main():
           ssim_dict['L{}'.format(str(i))]['energy' + str(energy)]['angle' + str(a)]['GANXGAN']=ssim_gan
           print('GAN X GAN: SSIM GAN  mean={} std={}'.format(np.mean(ssim_gan), np.std(ssim_gan)))
      for a in angles:
-          DrawMulti(ssim_dict['L{}'.format(str(i))], energies[1:], a, l, path.join(plotsdir, "L{}_degree{}.pdf".format(i, a)), labels)
-          DrawScatter(ssim_dict['L{}'.format(str(i))]['energy0'], sorted_data["energy0" + "ang_" + str(a)], a, l, path.join(plotsdir, "L{}_degree{}_scatter.pdf".format(i, a)), labels)
+          DrawMulti(ssim_dict['L{}'.format(str(i))], energies[1:], a, l, path.join(plotsdir, "L{}_degree{}.pdf".format(i, a)))
+          DrawScatter(ssim_dict['L{}'.format(str(i))]['energy0'], sorted_data["energy0" + "ang_" + str(a)], a, l, path.join(plotsdir, "L{}_degree{}_scatter.pdf".format(i, a)))
                                         
 
 def SSIM(images1, images2, multichannel=True, data_range=1, gaussian_weights=True, use_sample_covariance=False, shuffle=True):
@@ -106,12 +105,12 @@ def SSIM(images1, images2, multichannel=True, data_range=1, gaussian_weights=Tru
   return np.array(ssim_val)
 
 # Plot for MSCN
-def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
+def DrawMulti(dict_L, energies, angle, L, filename, grid=0):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
   if grid: c.SetGrid()
   color = 2
-  legend = ROOT.TLegend(.7, .7, .9, .9)
-  
+  legend = ROOT.TLegend(.65, .65, .89, .89)
+  legend.SetBorderSize(0)
   mg=ROOT.TMultiGraph()
   g_g4xgan = ROOT.TGraphErrors(len(energies))
 
@@ -124,7 +123,7 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   g_g4xgan.SetMarkerStyle(21)
   
   mg.Add(g_g4xgan)
-  legend.AddEntry(g_g4xgan, "G4 x GAN", "l")
+  legend.AddEntry(g_g4xgan, "MC vs. GAN", "l")
 
   color+=2
   g_g4xg4 = ROOT.TGraphErrors(len(energies))
@@ -135,7 +134,7 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   g_g4xg4.SetMarkerColor(color)
   g_g4xg4.SetMarkerStyle(21)
   mg.Add(g_g4xg4)
-  legend.AddEntry(g_g4xg4, "G4 x G4", "l")
+  legend.AddEntry(g_g4xg4, "MC vs. MC", "l")
 
   color+=2
   g_ganxgan = ROOT.TGraphErrors(len(energies))
@@ -146,9 +145,9 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   g_ganxgan.SetMarkerColor(color)
   g_ganxgan.SetMarkerStyle(21)
   mg.Add(g_ganxgan)
-  legend.AddEntry(g_ganxgan, "GAN x GAN", "l")
+  legend.AddEntry(g_ganxgan, "GAN vs. GAN", "l")
 
-  mg.SetTitle("SSIM: L={} Angle={} #circ;Ep [GeV];ssim".format(L, angle))
+  mg.SetTitle("SSIM: L = {}   #theta = {}#circ;Ep [GeV];SSIM".format(L, angle))
   if L == 1:
     mg.GetYaxis().SetRangeUser(0.9,  1.1)
   elif L==0.01:
@@ -166,12 +165,12 @@ def DrawMulti(dict_L, energies, angle, L, filename, labels, grid=0):
   print (' The plot is saved in.....{}'.format(filename))
 
 # Plot for MSCN                                                                                                                                                                                                                                                                           
-def DrawScatter(dict_E, energy, angle, L, filename, labels, grid=0):
+def DrawScatter(dict_E, energy, angle, L, filename, labels="", grid=0):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
   if grid: c.SetGrid()
   color = 2
-  legend = ROOT.TLegend(.7, .7, .9, .9)
-
+  legend = ROOT.TLegend(.7, .7, .89, .89)
+  legend.SetBorderSize(0)
   mg=ROOT.TMultiGraph()
   g_g4xgan = ROOT.TGraph(energy.shape[0])
 
