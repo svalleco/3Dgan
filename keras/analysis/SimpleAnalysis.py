@@ -27,7 +27,7 @@ def get_parser():
    parser.add_argument('--xscales',  type=float, nargs='+', help="scaling factor for cell energies")
    parser.add_argument('--data', default='full', help='Data to check the output obtained')
    parser.add_argument('--outdir', default= 'results/short_analysis/', help='Complete PATH to save the output plot')
-   parser.add_argument('--numevents', action='store', type=int, default=5000, help='Max limit for events used for validation')
+   parser.add_argument('--numevents', action='store', type=int, default=10000, help='Max limit for events used for validation')
    parser.add_argument('--latent', action='store', type=int, help='size of latent space to sample')
    parser.add_argument('--dformat', action='store', type=str, default='channels_last', help='keras image format')
    parser.add_argument('--error', type=int, default=0, help='add relative errors to plots')
@@ -131,7 +131,7 @@ def plotSF(Data, gan_images, Y, labels, out_file, error=0, stest=0, ifC=0, grid=
    Eprof.SetTitle("Sampling Fraction (cell energy sum / primary particle energy)")
    Eprof.GetXaxis().SetTitle("Primary particle energy [GeV]")
    Eprof.GetYaxis().SetTitle("Sampling Fraction")
-   Eprof.GetYaxis().SetRangeUser(0, 0.03)
+   Eprof.GetYaxis().SetRangeUser(0.01, 0.03)
    Eprof.SetLineColor(color)
    Eprof.Draw()
    if stest:
@@ -156,7 +156,7 @@ def plotSF(Data, gan_images, Y, labels, out_file, error=0, stest=0, ifC=0, grid=
          glabel = glabel + ' MRE={:.4f}'.format(np.mean(sf_error))
       legend.AddEntry(Gprof[i], glabel, "l")
       if stest:
-         ks = Eprof.KolmogorovTest(Gprof[i], 'UU')
+         ks = Eprof.KolmogorovTest(Gprof[i], 'WW')
          legend.AddEntry(Gprof[i], 'k={:e}'.format(ks), "l")
       if leg: legend.Draw()
       c.Update()
@@ -290,7 +290,7 @@ def plotshapes(X, generated_images, x, y, z, energy, out_file, labels, log=0, p=
           glabel = glabel + ' MRE {:.4f}'.format(np.mean(errorz))
        elif not stest:
           leg.AddEntry(h, glabel,"l")     
-   leg.Draw()
+   if leg: leg.Draw()
    canvas.Update()
    canvas.Print(out_file + '.pdf')
    if ifC:
