@@ -16,7 +16,7 @@ import ROOT
 import argparse
 from scipy import stats
 from scipy.stats import wasserstein_distance as wass
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
+if 'cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
     tlab = True
 else:
     tlab= False
@@ -61,7 +61,7 @@ def main():
    dformat = params.dformat
    fits = params.fits if isinstance(params.fits, list) else [params.fits]
    opt = params.opt if isinstance(params.opt, list) else [params.opt]
-   if ang:
+   if ang==1:
      from AngleArch3dGAN import generator # architecture
      if not xscale:
        xscale=1.
@@ -69,9 +69,16 @@ def main():
        xpower = 0.85
      if not latent:
        latent = 256
-
+   if ang==2:
+     from AngleArch3dGAN_2 import generator # architecture
+     if not xscale:
+       xscale=1.
+     if not xpower:
+       xpower = 0.85
+     if not latent:
+       latent = 256
    else:
-     from EcalEnergyGan import generator
+     from EcalEnergyGan2 import generator
      if not xscale:
        xscale=100.
      if not xpower:
@@ -126,7 +133,7 @@ def main():
       r= result[i::len(opt)]
       if op=='mre':
          #error_bar = error_bar[i::len(opt)]
-         PlotResultsErrors(r, error_bar, op, outdir, epoch, fits, sl, ang=ang)
+         PlotResultsErrors(r, error_bar, op, outdir, epoch, fits, sl, ang=ang, particle=particle)
       else:
          PlotResultsRoot(r, op, outdir, epoch, fits, sl, ang=ang)
 
@@ -176,7 +183,7 @@ def taking_power(n, xscale=1, power=1):
 def inv_power(n, xscale=1, power=1.):
     return np.power(n, 1./power)/xscale
 
-def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, ang=1):
+def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, ang=1, particle='Ele'):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     #c1.SetGrid ()
     legend = ROOT.TLegend(.4, .7, .89, .89)
@@ -215,7 +222,10 @@ def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, an
        title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"                    
     gs.SetTitle(title.format(opt, sl, opt))
     gs.Draw()
-    gs.GetYaxis().SetRangeUser(0, 0.2)
+    if particle=='ChPi':
+      gs.GetYaxis().SetRangeUser(0, 0.5)
+    else:
+      gs.GetYaxis().SetRangeUser(0, 0.2)
     c1.Update()
     legend.Draw()
     c1.Update()
