@@ -107,7 +107,7 @@ def main():
                                                                             (var["angle"+ str(energy)+ "ang_" + str(index)]) * ascale], latent, concat=2)
           var["events_gan" + str(energy) + "ang_" + str(index)]= inv_power(var["events_gan" + str(energy) + "ang_" + str(index)], xpower=xpower)/dscale
           var["events_gan" + str(energy) + "ang_" + str(index)]= applythresh(var["events_gan" + str(energy) + "ang_" + str(index)], thresh)
-          for n in np.arange(num):
+          for n in np.arange(min(num, var["index" + str(energy)+ "ang_" + str(index)])):
             pl.PlotEvent2(var["events_act" + str(energy) + "ang_" + str(index)][n], var["events_gan" + str(energy) + "ang_" + str(index)][n],
                          var["energy" + str(energy) + "ang_" + str(index)][n],
                          var["angle" + str(energy) + "ang_" + str(index)][n],
@@ -128,7 +128,7 @@ def main():
                                                       [var["energy" + str(energy)]], latent=latent)
         var["events_gan" + str(energy)]= var["events_gan" + str(energy)]/(xscale* dscale)
         var["events_gan" + str(energy)]= applythresh(var["events_gan" + str(energy)], thresh)
-        for n in np.arange(num):
+        for n in np.arange(min(num, var["index" + str(energy)])):
             pl.PlotEvent2(var["events_act" + str(energy)][n], var["events_gan" + str(energy)][n],
                          yscale * var["energy" + str(energy)][n],
                          None,
