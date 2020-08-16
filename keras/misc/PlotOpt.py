@@ -23,14 +23,14 @@ try:
     import setGPU #if Caltech
 except:
     pass
-sys.path.insert(0,'../keras/')
+sys.path.insert(0,'../')
 import analysis.utils.GANutils as gan
 
 def main():
     result=[]
-    resultfile = 'result_log.txt'
+    resultfile = 'result_gan_training_wass.txt'
     file = open(resultfile)
-    plotdir = 'obj_13layers'
+    plotdir = 'results/obj_gan_training_wass/'
     gan.safe_mkdir(plotdir)
     for line in file:
       fields = line.strip().split()
@@ -44,10 +44,10 @@ def main():
     PlotResultsRoot(result, plotdir, epochs, ang=0)
 
 #Plots results in a root file
-def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfile='obj_result', ang=1):
+def PlotResultsRoot(result, resultdir, epochs, start=0, end=50, fits="", plotfile='obj_result', ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     legend = ROOT.TLegend(.5, .6, .9, .9)
-    
+    legend.SetBorderSize(0)
     legend.SetTextSize(0.028)
     mg=ROOT.TMultiGraph()
     color1 = 2
@@ -92,20 +92,20 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
            mina = item[4]
            mina_n = epoch[i]
                                
-    gt  = ROOT.TGraph( num- start , epoch[start:], total[start:] )
+    gt  = ROOT.TGraph( end- start , epoch[start:end], total[start:end] )
     gt.SetLineColor(color1)
     mg.Add(gt)
     legend.AddEntry(gt, "Total error min = {:.4f} (epoch {})".format(mint, mint_n), "l")
-    ge = ROOT.TGraph( num- start , epoch[start:], energy_e[start:] )
+    ge = ROOT.TGraph( end- start , epoch[start:end], energy_e[start:end] )
     ge.SetLineColor(color2)
     legend.AddEntry(ge, "Energy error min = {:.4f} (epoch {})".format(mine, mine_n), "l")
     mg.Add(ge)
-    gm = ROOT.TGraph( num- start , epoch[start:], mmt_e[start:])
+    gm = ROOT.TGraph( end- start , epoch[start:end], mmt_e[start:end])
     gm.SetLineColor(color3)
     mg.Add(gm)
     legend.AddEntry(gm, "Moment error  = {:.4f} (epoch {})".format(minm, minm_n), "l")
     c1.Update()
-    gs = ROOT.TGraph( num- start , epoch[start:], sf_e[start:])
+    gs = ROOT.TGraph( end- start , epoch[start:end], sf_e[start:end])
     gs.SetLineColor(color4)
     mg.Add(gs)
     legend.AddEntry(gs, "Sampling Fraction error  = {:.4f} (epoch {})".format(mins, mins_n), "l")
@@ -120,7 +120,7 @@ def PlotResultsRoot(result, resultdir, epochs, start=0, end=60, fits="", plotfil
                     
     mg.SetTitle("Optimization function: Mean Relative Error on shower shapes, moment and sampling fraction;Epochs;Error")
     mg.Draw('ALP')
-    mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(total))
+    mg.GetYaxis().SetRangeUser(0, 1.1* np.amax(total))
     c1.Update()
     #legend.Draw()
     c1.Update()
