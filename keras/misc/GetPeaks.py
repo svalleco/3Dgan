@@ -19,8 +19,8 @@ import tensorflow as tf
 #import tensorflow.python.ops.image_ops_impl as image 
 import time
 import sys
-sys.path.insert(0,'../keras')
-sys.path.insert(0,'../keras/analysis')
+sys.path.insert(0,'../')
+sys.path.insert(0,'../analysis')
 import utils.GANutils as gan
 import utils.ROOTutils as roo
 import ROOT.TSpectrum2 as sp2
@@ -38,24 +38,24 @@ def main():
   power=0.85    #power for cell energies used in training
   thresh =0.0   #threshold used
   get_shuffled= True # whether to make plots for shuffled
-  labels =["G4", "GAN"] # labels
-  plotsdir = 'results/peaks2_test_data' # dir for results
+  labels =["MC", "GAN"]# labels
+  particle = 'Ele'
+  plotsdir = 'results/peaks2_thesis/' # dir for results
   gan.safe_mkdir(plotsdir) 
-  #datapath = "/bigdata/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
+  #datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
   datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech 
-  data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
-  #energies =[110, 150, 190] 
-  energies = [400]
-  angles=[62, 118]
-  L=1e-6
+  data_files = gan.GetDataFiles(datapath, [particle]) # get list of files
+  energies =[50, 100, 200, 300, 400, 500] 
+  #energies = [400]
+  angles=[0]
   concat=2
   dscale =50.
   g = generator(latent)       # build generator
-  gen_weight1= "../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
+  gen_weight1= "../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
   sorted_data = gan.get_sorted_angle(data_files[-10:], energies, num_events1=10000, num_events2=5000, thresh=thresh) # load data in a dict
   sigma = 1
-  peak_threshold=0.3
+  peak_threshold=0.4
   # for each energy bin
   plist_g4=[]
   plist_gan=[]
@@ -79,11 +79,13 @@ def main():
                                        , latent, concat=concat)
        # post processing
        generated_images = np.power(generated_images, 1./power)
-       peaks_g4 = FindPeaks(sorted_data["events_act" + str(energy) + "ang_" + str(a)],  sigma, peak_threshold)
-       peaks_gan = FindPeaks(generated_images,  sigma, peak_threshold)
+       #peaks_g4 = FindPeaks(sorted_data["events_act" + str(energy) + "ang_" + str(a)],  sigma, peak_threshold)
+       #peaks_gan = FindPeaks(generated_images,  sigma, peak_threshold)
        generated_images = generated_images/dscale
        sorted_data["events_act" + str(energy) + "ang_" + str(a)] = sorted_data["events_act" + str(energy) + "ang_" + str(a)]/dscale
        #Draw1d(peaks_g4, peaks_gan, filename, labels)
+       peaks_g4 = FindPeaks(sorted_data["events_act" + str(energy) + "ang_" + str(a)],  sigma, peak_threshold)
+       peaks_gan = FindPeaks(generated_images,  sigma, peak_threshold)
        
        indexes_gan = np.where(peaks_gan > 1)
        events_gan = generated_images[indexes_gan]
@@ -127,7 +129,7 @@ def main():
          for i in np.arange(min(m, 10)):
             PlotEventPeaks(events_act[i], e2[i], ang2[i], path.join(ddir, 'Event{}.pdf'.format(i)), i, opt='colz', label='G4'.format(p2[i]), sigma=sigma, thresh=peak_threshold)
        
-  DrawGraph2(plist_g4, plist_gan, elist_g4, elist_gan, energies, angles, path.join(plotsdir, 'peak_percent.pdf'), labels=['G4', 'GAN']) 
+  DrawGraph(plist_g4, plist_gan, elist_g4, elist_gan, energies, angles, path.join(plotsdir, 'peak_percent.pdf'), labels=['MC', 'GAN']) 
                               
 def FindPeaks(events, sigma, thresh):
    n = events.shape[0]
@@ -166,7 +168,7 @@ def FindPeaks1D(events, sigma, thresh):
 # Plot for MSCN
 def Draw1d(array1, array2, filename, labels):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
-  c.SetGrid()
+  #c.SetGrid()
   min1=np.amin(array1)
   min2=np.amin(array2)
   max1=np.amax(array1)
@@ -188,7 +190,7 @@ def Draw1d(array1, array2, filename, labels):
   roo.normalize(hist2, 1)
   leg.AddEntry(hist1, "{} ({:.4f} %)".format(labels[0], fr_g4 * 100), "l")
   leg.AddEntry(hist2, "{} ({:.4f} %)".format(labels[1], fr_gan * 100), "l")
-  hist1.GetYaxis().SetRangeUser(0, 1.2)
+  #hist1.GetYaxis().SetRangeUser(0, 1.2)
   hist1.Draw()
   hist1.Draw('hist')
   hist2.Draw('sames')
@@ -206,7 +208,8 @@ def Draw1d(array1, array2, filename, labels):
 def DrawGraph(list1, list2, elist1, elist2,energies, angles, filename, labels):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
   ROOT.gStyle.SetOptStat(111111)
-  leg=ROOT.TLegend(.7, .6, .9, .9)
+  leg=ROOT.TLegend(.7, .6, .89, .89)
+  leg.SetBorderSize(0)
   mg=ROOT.TMultiGraph()
   n = len(energies)
   m = len(angles)
@@ -231,10 +234,10 @@ def DrawGraph(list1, list2, elist1, elist2,energies, angles, filename, labels):
     for j in np.arange(m):
       peaks_g4[j][i] = list1[(i*(m-1)) + j]
       peaks_gan[j][i] = list2[(i*(m-1)) + j]
-      ex_g4[j][i] = elist1[(i*(m-1)) + j]
-      ex_gan[j][i] = elist2[(i*(m-1)) + j]
-      ey_g4[j][i] = 0.5
-      ey_gan[j][i] = 0.5
+      ey_g4[j][i] = elist1[(i*(m-1)) + j]
+      ey_gan[j][i] = elist2[(i*(m-1)) + j]
+      ex_g4[j][i] = 0.5
+      ex_gan[j][i] = 0.5
 
   graphs_g4 =[]
   graphs_gan =[]
@@ -247,15 +250,15 @@ def DrawGraph(list1, list2, elist1, elist2,energies, angles, filename, labels):
     graphs_g4[i].SetMarkerStyle(21)
     leg.AddEntry(graphs_g4[i], "{} {} degree".format(labels[0], angles[i]), "l")
     graphs_gan.append(ROOT.TGraphErrors(n, e, peaks_gan[i], ex_gan[i], ey_gan[i]))
-    mg.Add(graphs_gan[i])
-    graphs_gan[i].SetLineColor(color)
-    graphs_gan[i].SetLineStyle(2)
-    graphs_gan[i].SetMarkerColor(color)
-    graphs_gan[i].SetMarkerStyle(21)
-    leg.AddEntry(graphs_gan[i], "{} {} degree".format(labels[1], angles[i]), "l")
+    #mg.Add(graphs_gan[i])
+    #graphs_gan[i].SetLineColor(color)
+    #graphs_gan[i].SetLineStyle(2)
+    #graphs_gan[i].SetMarkerColor(color)
+    #graphs_gan[i].SetMarkerStyle(21)
+    #leg.AddEntry(graphs_gan[i], "{} {} degree".format(labels[1], angles[i]), "l")
     color+=2        
-  mg.SetTitle("Percentage of events with multiple peaks;Ep;percentage [%]")
-  mg.GetYaxis().SetRangeUser(0.,10.)
+  mg.SetTitle("Percentage of events with multiple peaks;Ep [GeV];percentage [%]")
+  #mg.GetYaxis().SetRangeUser(0.,10.)
   mg.Draw('ALP')
   c.Update()
   leg.Draw()
@@ -268,7 +271,8 @@ def DrawGraph(list1, list2, elist1, elist2,energies, angles, filename, labels):
 def DrawGraph2(list1, list2, elist1, elist2,energies, angles, filename, labels):
   c=ROOT.TCanvas("c" ,"" ,200 ,10 ,700 ,500)
   ROOT.gStyle.SetOptStat(111111)
-  leg=ROOT.TLegend(.7, .6, .9, .9)
+  leg=ROOT.TLegend(.6, .5, .89, .89)
+  leg.SetBorderSize(0)
   mg=ROOT.TMultiGraph()
   n = len(energies)
   color=2
