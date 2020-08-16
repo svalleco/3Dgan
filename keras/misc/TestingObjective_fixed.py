@@ -29,8 +29,8 @@ import analysis.utils.GANutils as gan
 
 def main():
     # All of the following needs to be adjusted
-    from EcalEnergyGan import generator # architecture
-    weightdir = 'BCSweights_mp_200k_test/generator_params_generator*.hdf5'
+    from analysis.EcalEnergyGan2 import generator # architecture
+    weightdir = '3dgan_weightsfixed_angle/params_generator*.hdf5'
     if tlab:
       #datapath = '/eos/project/d/dshep/LCD/V1/*scan/*.h5'
       datapath = '/eos/user/g/gkhattak/FixedAngleData/*.h5'
@@ -41,7 +41,7 @@ def main():
       genpath = "../weights/" + weightdir # path to weights
     datapath = '/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5'
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/BSC_optimization_test_mp' # plot directory
+    plotsdir = 'results/optimization_fixed' # plot directory
     particle = "Ele"
     dformat= 'channels_last'
     K.set_image_data_format(dformat) # setting global format flag
@@ -261,7 +261,7 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
    Test = True
    m = 2
    var = {}
-   energies = [110, 150, 190]
+   energies = [50, 100, 200, 300, 400]
    sorted_path= sorted_path 
    #g =generator(latent)
    if read_data:
@@ -360,7 +360,9 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
         var["angle_error"+ str(energy)] = np.mean(np.absolute((var["mtheta_act" + str(energy)] - var[ "mtheta_gan" + str(energy)])/var["mtheta_act" + str(energy)]))
         metrica += var["angle_error"+ str(energy)]
      #sampling fraction relative error
-     sf_error = np.mean(np.absolute(np.divide(var["sf_act"+ str(energy)] - var["sf_gan"+ str(energy)], var["sf_act"+ str(energy)] )))
+     real_SF = np.mean(var["sf_act"+ str(energy)])
+     fake_SF = np.mean(var["sf_gan"+ str(energy)])
+     sf_error = np.absolute((real_SF - fake_SF)/ real_SF)
      metrics +=sf_error
    metricp = metricp/len(energies)
    metrice = metrice/len(energies)
