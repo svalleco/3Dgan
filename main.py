@@ -1,15 +1,16 @@
+# IMPORTS - I JUST IMPORTED EVERYTHING FOR ANGLEGAN AND PGAN JUST IN CASE :) I CAN CLEAN UP THE UNUSED ONES LATER
 import argparse
-import horovod as hvd
+import horovod as hvd #AngleGAN
+import horovod.tensorflow as hvd #pgan
+import time
 from dataset import NumpyPathDataset
 import os
-import time
 import tensorflow as tf
 import sys
 import importlib
 import numpy as np
 import random
-from metrics import (calculate_fid_given_batch_volumes, get_swd_for_volumes,
-                     get_normalized_root_mse, get_mean_squared_error, get_psnr, get_ssim)
+from metrics import (calculate_fid_given_batch_volumes, get_swd_for_volumes, get_normalized_root_mse, get_mean_squared_error, get_psnr, get_ssim)
 from utils import count_parameters, image_grid, parse_tuple, MPMap
 # from mpi4py import MPI
 from rectified_adam import RAdamOptimizer
@@ -17,9 +18,69 @@ from networks.loss import forward_simultaneous, forward_generator, forward_discr
 import psutil
 from networks.ops import num_filters
 from tensorflow.data.experimental import AUTOTUNE
+from __future__ import print_function
+from collections import defaultdict
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+import keras
+from keras.callbacks import CallbackList
+kv2 = keras.__version__.startswith('2')     # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
+import argparse
+import os
+os.environ['LD_LIBRARY_PATH'] = os.getcwd()
+from six.moves import range
+import sys
+#import glob
+import h5py 
+import math
+import keras.backend as K
+import analysis.utils.GANutils as gan
+from keras.layers import Input
+from keras.models import Model
+from keras.optimizers import Adadelta, Adam, RMSprop
+from keras.utils.generic_utils import Progbar
+import horovod.keras as hvd
 #import nvgpu
 
-# DO WE NEED TO ADDRESS THE CHANNELS_FIRST (CPU) VS CHANNELS_LAST FORMATTING?
+
+################################### EM TODO! ####################################
+    # IMPLEMENT SARAGAN/MAIN.PY/MAIN() INTO THIS RUN() FUNCTION!
+    # REMOVE KERAS?
+    # UNDERSTAND PGAN + REVIEW PGAN PAPER
+    # DATA PROCESSING FUNCTION + GETDATAANGLE
+    # INTEGRATE GAN3DTRAINANGLE() WITH PGAN BETTER
+    # CLEAN OUT IMPORTS & UNUSED CODE
+
+
+# Pasted from GetDataAngle() in AngleTrain
+# get data for training - returns X, Y, ang, ecal
+def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
+    print ('Loading Data from .....', datafile)
+    f = h5py.File(datafile,'r')            # load data into f variable
+    ang = np.array(f.get(angtype))         # ang is an array of angle data from f
+    X = np.array(f.get('ECAL'))* xscale    # x is an array of scaled ecal data from f
+    Y = np.array(f.get('energy'))/yscale   # y is an array of scaled energy data from f
+    X[X < thresh] = 0            # when X values are less than the threshold, they are reset to 0
+    X = X.astype(np.float32)
+    Y = Y.astype(np.float32)
+    ang = ang.astype(np.float32)
+    X = np.expand_dims(X, axis=-1)
+    
+    # check data format and sum along axis
+    if K.image_data_format() !='channels_last':
+       X = np.moveaxis(X, -1, 1)
+       ecal = np.sum(X, axis=(2, 3, 4))
+    else:
+       ecal = np.sum(X, axis=(1, 2, 3))
+     
+    # X ** xpower
+    if xpower !=1.:
+        X = np.power(X, xpower)
+        
+    return X, Y, ang, ecal
+
 
 # TODO! preprocess data (np.arrays), address resolution concerns
 def dataset():
@@ -29,19 +90,25 @@ def dataset():
     :returns: Return NumpyDataset
 
     """
+    
+    # EITHER PUT IN OR ~CALL GETDATAANGLE()~
+    
+    # Possible resizing methods:
+    #tf.image.resize(images, size, method=ResizeMethod.BILINEAR, preserve_aspect_ratio=False, antialias=False, name=None)
+    # try method = lanczos3 or lanczos5?
+    
+    #scipy.misc.imresize(arr, size, interp='bilinear', mode=None)
+    # try interp ='lanczos'
+    
+    # Code Adel put in (from pgan), NOT SURE HOW TO TIE IN
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
     return npy_data
 
+
 # returns optimizers (Adam=default)
 def optimizers():
-    """TODO: Docstring for optimizers.
-
-    :function: TODO
-    :returns: TODO
-
-    """
-    if args.optimizer == 'Adam':
+    if args.optimizer == 'Adam': # pgan default
         optimizer_gen = tf.train.AdamOptimizer(learning_rate=args.g_lr, beta1=args.beta1, beta2=args.beta2)
         optimizer_disc = tf.train.AdamOptimizer(learning_rate=args.d_lr, beta1=args.beta1, beta2=args.beta2)
     elif args.optimizer == 'RMSProp':
@@ -50,18 +117,37 @@ def optimizers():
     elif args.optimizer == 'GradientDescent':
         optimizer_gen = tf.train.GradientDescentOptimizer(learning_rate=1e-3)
         optimizer_disc = tf.train.GradientDescentOptimizer(learning_rate=1e-3)
-    elif args.optimizer == '':     #not sure what this means!
+    elif args.optimizer == 'RAdam':     
         optimizer_gen = RAdamOptimizer(learning_rate=args.g_lr, beta1=args.beta1, beta2=args.beta2)
         optimizer_disc = RAdamOptimizer(learning_rate=args.d_lr, beta1=args.beta1, beta2=args.beta2)
+    
+    # from lines 169-176 in saraGAN/main
+    if args.horovod:
+            if args.use_adasum:
+                optimizer_gen = hvd.DistributedOptimizer(optimizer_gen)#, op=hvd.Adasum)
+                optimizer_disc = hvd.DistributedOptimizer(optimizer_disc, op=hvd.Adasum)
+            else:
+                optimizer_gen = hvd.DistributedOptimizer(optimizer_gen)
+                optimizer_disc = hvd.DistributedOptimizer(optimizer_disc)
+   
+    # the following is pasted code from Angle Train, doesn't really fit as main.py uses optimizers() for gen and disc opts. 
+    # do we still need to call hvd.DistributedOptimizer on our opts though?
+    # get attribute and optimize using horovod
+    #opt = getattr(keras.optimizers, params.optimizer)
+    #opt = opt(params.learningRate * hvd.size())
+    #opt = hvd.DistributedOptimizer(opt)
+    
+    return optimizer_gen, optimizer_disc
 
 
+# parses and returns arguments/params, called in run()
 def get_args():
     global args
     
     parser = argparse.ArgumentParser(description='Arguments')
     
     parser.add_argument('--architecture', type=str, default='AngleArch3dGAN', choices=['AngleArch3dGAN', 'ProgressiveGAN'])
-    parser.add_argument('--optimizer', type=str, default='Adam', choices=['Adam', 'RMSProp', 'GradientDescent', ''])
+    parser.add_argument('--optimizer', type=str, default='Adam', choices=['Adam', 'RMSProp', 'GradientDescent', 'RAdam'])
 
     # AngleArch3dGAN Arguments (defaults = caltech values)
     parser.add_argument('--nbepochs', action='store', type=int, default=60, help='Number of epochs to train for.')
@@ -83,7 +169,6 @@ def get_args():
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
     parser.add_argument('--learningRate', '-lr', action='store', type=float, default=0.001, help='Learning Rate')
-    parser.add_argument('--optimizer', action='store', type=str, default='RMSprop', help='Keras Optimizer to use.')
     parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
     parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
@@ -135,17 +220,366 @@ def get_args():
     return args
 
 
-# calls: dataset(), optimizers(), builds generator and discriminator
-def run(config):
-    """TODO: Docstring for run.
+# DO WE NEED TO ADDRESS THE CHANNELS_FIRST (CPU) VS CHANNELS_LAST FORMATTING?
+# channels format: want channels_first for cpu
+def set_format(channel_format):
+    if channel_format == 'channels_first':
+        print('Setting th channel ordering (NCHW)')
+        K.set_image_dim_ordering('th')
+        K.set_image_data_format('channels_first')
+    else:
+        print('Setting tf channel ordering (NHWC)')
+        K.set_image_dim_ordering('tf')
+        K.set_image_data_format('channels_last')
+
+
+# Creates a list of lists, used in Gan3DTrainAngle()
+def genbatches(a,n):
+    for i in range(0, len(a), n):
+        # Create an index range for l of n items:
+        yield a[i:i+n]
+
+
+# Shuffles 4 arrays, used in Gan3DTrainAngle(X_train, Y_train, ecal_train, ang_train)
+def randomize(a, b, c, d):
+    assert a.shape[0] == b.shape[0]
+    # Generate the permutation index array.
+    permutation = np.random.permutation(a.shape[0])
+    # Shuffle the arrays by giving the permutation in the square brackets.
+    shuffled_a = a[permutation]
+    shuffled_b = b[permutation]
+    shuffled_c = c[permutation]
+    shuffled_d = d[permutation]
+    return shuffled_a, shuffled_b, shuffled_c, shuffled_d
+
+
+# histogram count - sums 8 bins btwn [0.05, 0.03, 0.02, 0.0125, 0.008, 0.003, 0]**p
+def hist_count(x, p=1):
+    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
+    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
+    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=daxis)
+    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=daxis)
+    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=daxis)
+    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=daxis)
+    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=daxis)
+    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
+    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
+    bins[np.where(bins==0)]=1
+    return bins
+
+
+# Pasted from Gan3DTrainAngle() in AngleTrain
+# Training Function - build & compile discriminator, build & compile generator, run the generator and discriminator, unused callback list functions, read TrainFiles & TestFiles,
+#                     run through epochs, train the generator & discriminator, collect discriminator losses, collect generator losses, test, save weights every epoch
+def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
+    start_init = time.time()
+    verbose = False    
+    particle='Ele'
+    f = [0.9, 0.1]
+    loss_ftn = hist_count
     
-    The main function, training done here 
+    if hvd.rank()==0:
+        print('[INFO] Building discriminator')
+    #discriminator.summary()
+    discriminator.compile(
+        optimizer=opt,
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=loss_weights
+    )
 
-    :a: TODO
-    :returns: TODO
+    # build the generator
+    if hvd.rank()==0:
+        print('[INFO] Building generator')
+    #generator.summary()
+    generator.compile(
+        optimizer=opt,
+        loss='binary_crossentropy'
+    )
+ 
+    # build combined Model
+    # generator: latent vector --> fake image
+    latent = Input(shape=(latent_size, ), name='combined_z')   # random latent vector = generator input
+    fake_image = generator( latent)     # fake image = generator output
+     # discriminator: fake image --> fake, aux, ang, ecal, add_loss
+     discriminator.trainable = False
+    fake, aux, ang, ecal, add_loss= discriminator(fake_image)
+    combined = Model(
+        input=[latent],
+        output=[fake, aux, ang, ecal, add_loss],
+        name='combined_model'
+    )
+    combined.compile(
+        #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
+        optimizer=opt,
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss_weights=loss_weights
+    )
+    if kv2: 
+        discriminator.trainable = True #workaround for keras 2 bug
+        
+    gcb = CallbackList( \
+        callbacks=[ \
+        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+        hvd.callbacks.MetricAverageCallback(), \
+        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+        ])
 
-    """
-    global local_rank
+    dcb = CallbackList( \
+        callbacks=[ \
+        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+        hvd.callbacks.MetricAverageCallback(), \
+        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+        ])
+
+    ccb = CallbackList( \
+        callbacks=[ \
+        hvd.callbacks.BroadcastGlobalVariablesCallback(0), \
+        hvd.callbacks.MetricAverageCallback(), \
+        # hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=warmup_epochs, verbose=1), \
+        hvd.callbacks.LearningRateScheduleCallback(start_epoch=warmup_epochs, end_epoch=nb_epochs, multiplier=1.), \
+        keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1) \
+        ])
+
+    gcb.set_model( generator )
+    dcb.set_model( discriminator )
+    ccb.set_model( combined )
+
+    gcb.on_train_begin()
+    dcb.on_train_begin()
+    ccb.on_train_begin()
+
+    # Getting Data
+    Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
+    if hvd.rank()==0:
+        print(Trainfiles)
+        print(Testfiles)
+    nb_Test = int(nEvents * f[1]) # The number of test files calculated from fraction of nEvents
+    nb_Train = int(nEvents * f[0]) # The number of train files calculated from fraction of nEvents
+    
+    # Bug check for reading the test file in
+    if len(Testfiles) == 0:
+       print('Error reading the Testfiles. The enumerated list will show up as empty. Check the GANutils.py file in 3Dgan/keras/analysis/utils.')
+       
+    # Read test data into a single array
+    for index, dtest in enumerate(Testfiles):
+       if index == 0:
+           X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+       else:
+           if X_test.shape[0] < nb_Test:
+              X_temp, Y_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+              X_test = np.concatenate((X_test, X_temp))
+              Y_test = np.concatenate((Y_test, Y_temp))
+              ang_test = np.concatenate((ang_test, ang_temp))
+              ecal_test = np.concatenate((ecal_test, ecal_temp))
+    if X_test.shape[0] > nb_Test:
+        X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
+    else:
+        nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
+    
+    # Read train data into a single array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
+    for index, dtrain in enumerate(Trainfiles):
+        if index == 0:
+            X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+        else:
+            X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+            X_train = np.concatenate((X_train, X_temp))
+            Y_train = np.concatenate((Y_train, Y_temp))
+            ang_train = np.concatenate((ang_train, ang_temp))
+            ecal_train = np.concatenate((ecal_train, ecal_temp))
+
+    nb_train = X_train.shape[0]    # Total events in training files
+    total_batches = nb_train / global_batch_size
+    
+    if hvd.rank()==0:
+        print('Total Training batches = {} with {} events'.format(total_batches, nb_train))
+
+    if hvd.rank()==0:           # will throw an error if the number of epochs is not large enough
+       print('Test Data loaded of shapes:')
+       print(X_test.shape)
+       print(Y_test.shape)
+       print('*************************************************************************************')
+       print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
+       print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
+       
+       if analyse:
+          var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
+       train_history = defaultdict(list)
+       test_history = defaultdict(list)
+       analysis_history = defaultdict(list)
+       init_time = time.time()- start_init
+       print('Initialization time is {} seconds'.format(init_time))
+    
+    # run through epochs
+    for epoch in range(nb_epochs):
+        epoch_start = time.time()
+        if hvd.rank()==0:
+            print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
+ 
+        epoch_gen_loss = []
+        epoch_disc_loss = []
+        randomize(X_train, Y_train, ecal_train, ang_train)
+
+        epoch_gen_loss = []
+        epoch_disc_loss = []
+        
+        image_batches = genbatches(X_train, batch_size)    # creates len(X_train) index ranges for len(batch_size) # of items
+        energy_batches = genbatches(Y_train, batch_size)   # creates len(Y_train) index ranges for len(batch_size) # of items
+        ecal_batches = genbatches(ecal_train, batch_size)  # creates len(ecal_train) index ranges for len(batch_size) # of items
+        ang_batches = genbatches(ang_train, batch_size)    # creates len(ang_train) index ranges for len(batch_size) # of items
+        
+         # go through batches: train the generator and discriminator
+         for index in range(int(total_batches)):
+            start = time.time()         
+            image_batch = next(image_batches) 
+            energy_batch = next(energy_batches)
+            ecal_batch = next(ecal_batches)
+            ang_batch = next(ang_batches)
+            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2))
+            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
+            generated_images = generator.predict(generator_ip, verbose=0)
+  
+            # collect the loss of the discriminator with real and fake images
+            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+
+            # if ecal sum has 100% loss then end the training
+            if fake_batch_loss[4] == 100.0 and index >10:
+                if hvd.rank()==0:
+                    print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
+                    generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
+                    discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
+                    print ('real_batch_loss', real_batch_loss)
+                    print ('fake_batch_loss', fake_batch_loss)
+                sys.exit()
+            epoch_disc_loss.append([
+                (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
+            ])
+            trick = np.ones(batch_size)
+            
+            # collect generator losses in array
+            gen_losses = []
+            for _ in range(2):
+                noise = np.random.normal(0, 1, (batch_size, latent_size-1))
+                generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
+                gen_losses.append(combined.train_on_batch(
+                    [generator_ip],
+                    [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
+            generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
+            epoch_gen_loss.append(generator_loss)
+            #print ('generator_loss', generator_loss)
+            index +=1
+
+            # Used at design time for debugging
+            #print('real_batch_loss', real_batch_loss)
+            #print ('fake_batch_loss', fake_batch_loss)
+            #disc_out = discriminator.predict(image_batch)
+            #print('disc_out')
+            #print(np.transpose(disc_out[4][:5].astype(int)))
+            #print('add_loss_batch')
+            #print(np.transpose(add_loss_batch[:5]))
+
+        # Testing  
+        train_history['generator'].append(generator_train_loss)
+        train_history['discriminator'].append(discriminator_train_loss)
+        if hvd.rank()==0:
+            if analyse:
+                result = gan.OptAnalysisShort(var, generated_images, energies)
+                print('Analysing............')
+                analysis_history['total'].append(result[0])
+                analysis_history['energy'].append(result[1])
+                analysis_history['moment'].append(result[2])
+                analysis_history['angle'].append(result[3])
+                print('Result = ', result)
+                pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
+
+            print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s} | {6:8s}'.format('component', *discriminator.metrics_names))
+            print('-' * 65)
+            ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
+            print(ROW_FMT.format('generator (train)',
+                             *train_history['generator'][-1]))
+            print(ROW_FMT.format('discriminator (train)',
+                             *train_history['discriminator'][-1]))
+
+            # save weights every epoch
+            generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
+                               overwrite=True)
+            discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
+                                   overwrite=True)
+        
+            epoch_time = time.time()-test_start
+            pickle.dump({'train': train_history}, open(pklfile, 'wb'))
+            
+            
+ # I made a configure function to try and organize the code, I think we could have it set up the config for run(config), but I don't really understand how to set this stuff up
+def configure():
+    ######## ANGLEGAN ###########
+    # configure the session
+    config = tf.ConfigProto(log_device_placement=True)
+    config.intra_op_parallelism_threads = params.intraop
+    config.inter_op_parallelism_threads = params.interop
+    os.environ['KMP_BLOCKTIME'] = str(1)
+    os.environ['KMP_SETTINGS'] = str(1)
+    os.environ['KMP_AFFINITY'] = 'granularity=fine,compact'
+    # os.environ['KMP_AFFINITY'] = 'balanced'
+    # os.environ['OMP_NUM_THREADS'] = str(params.intraop)
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(3)
+    K.set_session(tf.Session(config=config))
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
+    
+    ############ PGAN (main.py/from if __name__ == '__main__')##############
+    
+    if args.horovod:
+        hvd.init()
+        np.random.seed(args.seed + hvd.rank())
+        tf.random.set_random_seed(args.seed + hvd.rank())
+        random.seed(args.seed + hvd.rank())
+
+        print(f"Rank {hvd.rank()}:{hvd.local_rank()} reporting!")
+
+    else:
+        np.random.seed(args.seed)
+        tf.random.set_random_seed(args.seed)
+        random.seed(args.seed)
+    
+    if 'OMP_NUM_THREADS' not in os.environ:
+        print("Warning: OMP_NUM_THREADS not set. Setting it to 1.")
+        os.environ['OMP_NUM_THREADS'] = str(1)
+
+    gopts = tf.GraphOptions(place_pruned_graph=True)
+    config = tf.ConfigProto(graph_options=gopts, allow_soft_placement=True)
+    # config = tf.ConfigProto()
+    
+    if args.gpu:
+        config.gpu_options.allow_growth = True
+        # config.inter_op_parallelism_threads = 1
+        #config.gpu_options.per_process_gpu_memory_fraction = 0.96
+        if args.horovod:
+            config.gpu_options.visible_device_list = str(hvd.local_rank())
+
+    else:
+        config = tf.ConfigProto(graph_options=gopts,
+                                intra_op_parallelism_threads=int(os.environ['OMP_NUM_THREADS']),
+                                inter_op_parallelism_threads=args.num_inter_ops,
+                                allow_soft_placement=True,
+                                device_count={'CPU': int(os.environ['OMP_NUM_THREADS'])})
+
+       
+# I made a function to organize horovod setup, I don't really understand how it works though so we may need to add stuff
+def setup_horovod():
+    hvd.init()
+
+    
+# calls: dataset(), optimizers(), builds generator and discriminator
+# calls get_args(), sets the channels, initializes horovod (similar to main() in AngleTrain and saraGAN/main())
+def run(config):
+    # parse and return global arguments (params)
+    get_args()
     
     # Get the discriminator and generator from the architecture of choice
     if args.architecture == 'AngleArch3dGAN':
@@ -154,6 +588,38 @@ def run(config):
     elif args.architecture == 'ProgressiveGAN':
         discriminator = importlib.import_module(f'networks.{args.architecture}.discriminator').discriminator
         generator = importlib.import_module(f'networks.{args.architecture}.generator').generator
+      
+        
+    ########################## IMPLEMENT ANGLEGAN CODE ########################
+    
+    # sets channels format (want channels_first for cpu?)
+    channel_format = args.channel_format
+    set_format(channel_format)
+    
+    # configure the session
+    configure()
+    
+    # if we are running on horovod, call the function to set everything up
+    if args.horovod:
+        setup_horovod()
+        
+    global_batch_size = args.batch_size * hvd.size()
+    print("Global batch size is: {0} / batch size is: {1}".format(args.global_batch_size, args.batch_size))
+    
+    # Building AngleGAN discriminator and generator
+    gan.safe_mkdir(weightdir)
+    d=discriminator(xpower)
+    g=generator(latent_size)
+    Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
+                    latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
+                    yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
+                    energies=energies, warmup_epochs=warmup_epochs)
+    
+    
+    ######################### saraGAN/main.py code ####################### 
+   
+    # get the optimizers specified in the parameters
+    optimizer_gen, optimizer_disc = optimizers()
     
     # horovod settings
     if args.horovod:
@@ -200,14 +666,12 @@ def run(config):
         npy_data = dataset() 
         
         
-# calls get_args(), run(config), initializes horovod 
-def main():
-    get_args()
-    config = ''
-    if horovod:
-        hvd.init()
+# calls run()
+def main():   
+    # run the main code!
     run(config)
-        
+      config = configure()
+      run(config)  
 
 # calls main()
 if __name__ == "__main__":       
