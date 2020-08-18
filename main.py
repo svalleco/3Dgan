@@ -1,52 +1,46 @@
-# IMPORTS - I JUST IMPORTED EVERYTHING FOR ANGLEGAN AND PGAN JUST IN CASE :) I CAN CLEAN UP THE UNUSED ONES LATER
 import argparse
-import horovod as hvd #AngleGAN
-import horovod.tensorflow as hvd #pgan
 import time
-from dataset import NumpyPathDataset
 import os
-import tensorflow as tf
 import sys
-import importlib
 import numpy as np
 import random
-from metrics import (calculate_fid_given_batch_volumes, get_swd_for_volumes, get_normalized_root_mse, get_mean_squared_error, get_psnr, get_ssim)
-from utils import count_parameters, image_grid, parse_tuple, MPMap
-# from mpi4py import MPI
+import h5py 
+import math
+import importlib
+import analysis.utils.GANutils as gan
+import tensorflow as tf
+import horovod as hvd #AngleGAN
+import horovod.tensorflow as hvd #pgan
+import horovod.keras as hvd
+
 from rectified_adam import RAdamOptimizer
 from networks.loss import forward_simultaneous, forward_generator, forward_discriminator
-import psutil
 from networks.ops import num_filters
-from tensorflow.data.experimental import AUTOTUNE
-from __future__ import print_function
 from collections import defaultdict
+from six.moves import range
+from dataset import NumpyPathDataset
+from utils import count_parameters, image_grid, parse_tuple
+
+import keras
+import keras.backend as K
+from keras.layers import Input
+from keras.models import Model
+from keras.callbacks import CallbackList
+from keras.optimizers import Adadelta, Adam, RMSprop
+from keras.utils.generic_utils import Progbar
+kv2 = keras.__version__.startswith('2')     # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
+
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import keras
-from keras.callbacks import CallbackList
-kv2 = keras.__version__.startswith('2')     # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
-import argparse
-import os
+    
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
-from six.moves import range
-import sys
-#import glob
-import h5py 
-import math
-import keras.backend as K
-import analysis.utils.GANutils as gan
-from keras.layers import Input
-from keras.models import Model
-from keras.optimizers import Adadelta, Adam, RMSprop
-from keras.utils.generic_utils import Progbar
-import horovod.keras as hvd
 #import nvgpu
 
 
 ################################### EM TODO! ####################################
-    # IMPLEMENT SARAGAN/MAIN.PY/MAIN() INTO THIS RUN() FUNCTION!
+    # TIE TOGETHER PGAN AND ANGLEGAN!
     # REMOVE KERAS?
     # UNDERSTAND PGAN + REVIEW PGAN PAPER
     # DATA PROCESSING FUNCTION + GETDATAANGLE
@@ -100,13 +94,31 @@ def dataset():
     #scipy.misc.imresize(arr, size, interp='bilinear', mode=None)
     # try interp ='lanczos'
     
-    # Code Adel put in (from pgan), NOT SURE HOW TO TIE IN
+    # Code Adel put in (from pgan), NOT SURE HOW TO TIE IN (called in run)
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
     return npy_data
 
+    # Get DataLoader
+    batch_size = max(1, args.base_batch_size // (2 ** (phase - 1)))
+    
+    if phase >= args.starting_phase:
+        assert batch_size * global_size <= args.max_global_batch_size
+        if verbose:
+            print(f"Using local batch size of {args.batch_size} and global batch size of {args.batch_size * args.global_size}")
+                  
+    zdim_base = max(1, final_shape[1] // (2 ** (num_phases - 1)))
+    base_shape = (image_channels, zdim_base, 4, 4)
+    current_shape = [batch_size, image_channels, *[size * 2 ** (phase - 1) for size in base_shape[1:]]]
+    
+    real_image_input = tf.placeholder(shape=current_shape, dtype=tf.float32)
+    real_image_input = real_image_input + tf.random.normal(tf.shape(real_image_input)) * .01
+    real_label = None
 
-# returns optimizers (Adam=default)
+    if real_label is not None:
+        real_label = tf.one_hot(real_label, depth=args.num_labels)
+
+# returns optimizers (Adam=default) and gen/disc learning rates, called in run() during phase loop, replaces optimizers block of code in pgan main()
 def optimizers():
     if args.optimizer == 'Adam': # pgan default
         optimizer_gen = tf.train.AdamOptimizer(learning_rate=args.g_lr, beta1=args.beta1, beta2=args.beta2)
@@ -130,14 +142,304 @@ def optimizers():
                 optimizer_gen = hvd.DistributedOptimizer(optimizer_gen)
                 optimizer_disc = hvd.DistributedOptimizer(optimizer_disc)
    
-    # the following is pasted code from Angle Train, doesn't really fit as main.py uses optimizers() for gen and disc opts. 
-    # do we still need to call hvd.DistributedOptimizer on our opts though?
-    # get attribute and optimize using horovod
-    #opt = getattr(keras.optimizers, params.optimizer)
-    #opt = opt(params.learningRate * hvd.size())
-    #opt = hvd.DistributedOptimizer(opt)
+    g_lr = args.g_lr
+    d_lr = args.d_lr
+
+    if args.horovod:
+        if args.g_scaling == 'sqrt':
+            g_lr = g_lr * np.sqrt(hvd.size())
+        elif args.g_scaling == 'linear':
+            g_lr = g_lr * hvd.size()
+        elif args.g_scaling == 'none':
+            pass
+        else:
+            raise ValueError(args.g_scaling)
+
+        if args.d_scaling == 'sqrt':
+            d_lr = d_lr * np.sqrt(hvd.size())
+        elif args.d_scaling == 'linear':
+            d_lr = d_lr * hvd.size()
+        elif args.d_scaling == 'none':
+            pass
+        else:
+            raise ValueError(args.d_scaling)
+
+    g_lr = tf.Variable(g_lr, name='g_lr', dtype=tf.float32)
+    d_lr = tf.Variable(d_lr, name='d_lr', dtype=tf.float32)
     
-    return optimizer_gen, optimizer_disc
+    lr_step = tf.Variable(0, name='step', dtype=tf.float32)
+    update_step = lr_step.assign_add(1.0)
+
+    with tf.control_dependencies([update_step]):
+        update_g_lr = g_lr.assign(g_lr * args.g_annealing)
+        update_d_lr = d_lr.assign(d_lr * args.d_annealing)
+
+    return g_lr, d_lr, optimizer_gen, optimizer_disc
+
+
+def networks():
+    with tf.variable_scope('alpha'):
+            alpha = tf.Variable(1, name='alpha', dtype=tf.float32)
+            # Alpha init
+            init_alpha = alpha.assign(1)
+
+            # Specify alpha update op for mixing phase.
+            num_steps = args.mixing_nimg // (batch_size * global_size)
+            alpha_update = 1 / num_steps
+            # noinspection PyTypeChecker
+            update_alpha = alpha.assign(tf.maximum(alpha - alpha_update, 0))
+
+        if args.optim_strategy == 'simultaneous':
+            gen_loss, disc_loss, gp_loss, gen_sample = forward_simultaneous(
+                generator,
+                discriminator,
+                real_image_input,
+                args.latent_dim,
+                alpha,
+                phase,
+                num_phases,
+                base_dim,
+                base_shape,
+                args.activation,
+                args.leakiness,
+                args.network_size,
+                args.loss_fn,
+                args.gp_weight
+            )
+            gen_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+            disc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+
+            g_gradients, g_variables = zip(*optimizer_gen.compute_gradients(gen_loss,
+                                                                            var_list=gen_vars))
+            if args.g_clipping:
+                g_gradients, _ = tf.clip_by_global_norm(g_gradients, 1.0)
+
+
+            d_gradients, d_variables = zip(*optimizer_disc.compute_gradients(disc_loss,
+                                                                             var_list=disc_vars))
+            if args.d_clipping:
+                d_gradients, _ = tf.clip_by_global_norm(d_gradients, 1.0)
+
+
+            g_norms = tf.stack([tf.norm(grad) for grad in g_gradients if grad is not None])
+            max_g_norm = tf.reduce_max(g_norms)
+            d_norms = tf.stack([tf.norm(grad) for grad in d_gradients if grad is not None])
+            max_d_norm = tf.reduce_max(d_norms)
+
+
+        elif args.optim_strategy == 'alternate':
+
+            disc_loss, gp_loss = forward_discriminator(
+                generator,
+                discriminator,
+                real_image_input,
+                args.latent_dim,
+                alpha,
+                phase,
+                num_phases,
+                args.base_dim,
+                base_shape,
+                args.activation,
+                args.leakiness,
+                args.network_size,
+                args.loss_fn,
+                args.gp_weight,
+                conditioning=real_label
+            )
+
+            disc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
+            d_gradients = optimizer_disc.compute_gradients(disc_loss, var_list=disc_vars)
+            d_norms = tf.stack([tf.norm(grad) for grad, var in d_gradients if grad is not None])
+            max_d_norm = tf.reduce_max(d_norms)
+
+            train_disc = optimizer_disc.apply_gradients(d_gradients)
+
+            with tf.control_dependencies([train_disc]):
+                gen_sample, gen_loss = forward_generator(
+                    generator,
+                    discriminator,
+                    real_image_input,
+                    args.latent_dim,
+                    alpha,
+                    phase,
+                    num_phases,
+                    base_dim,
+                    base_shape,
+                    args.activation,
+                    args.leakiness,
+                    args.network_size,
+                    args.loss_fn,
+                    is_reuse=True
+                )
+
+                gen_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
+                g_gradients = optimizer_gen.compute_gradients(gen_loss, var_list=gen_vars)
+                g_norms = tf.stack([tf.norm(grad) for grad, var in g_gradients if grad is not None])
+                max_g_norm = tf.reduce_max(g_norms)
+                train_gen = optimizer_gen.apply_gradients(g_gradients)
+
+        else:
+            raise ValueError("Unknown optim strategy ", args.optim_strategy)
+
+        if verbose:
+            print(f"Generator parameters: {count_parameters('generator')}")
+            print(f"Discriminator parameters:: {count_parameters('discriminator')}")
+
+        # train_gen = optimizer_gen.minimize(gen_loss, var_list=gen_vars)
+        # train_disc = optimizer_disc.minimize(disc_loss, var_list=disc_vars)
+
+        ema = tf.train.ExponentialMovingAverage(decay=args.ema_beta)
+        ema_op = ema.apply(gen_vars)
+        # Transfer EMA values to original variables
+        ema_update_weights = tf.group(
+            [tf.assign(var, ema.average(var)) for var in gen_vars])
+
+        with tf.name_scope('summaries'):
+            # Summaries
+            tf.summary.scalar('d_loss', disc_loss)
+            tf.summary.scalar('g_loss', gen_loss)
+            tf.summary.scalar('gp', tf.reduce_mean(gp_loss))
+
+            for g in zip(g_gradients, g_variables):
+                tf.summary.histogram(f'grad_{g[1].name}', g[0])
+
+            for g in zip(d_gradients, d_variables):
+                tf.summary.histogram(f'grad_{g[1].name}', g[0])
+
+            # tf.summary.scalar('convergence', tf.reduce_mean(disc_real) - tf.reduce_mean(tf.reduce_mean(disc_fake_d)))
+
+            tf.summary.scalar('max_g_grad_norm', max_g_norm)
+            tf.summary.scalar('max_d_grad_norm', max_d_norm)
+
+            real_image_grid = tf.transpose(real_image_input[0], (1, 2, 3, 0))
+            shape = real_image_grid.get_shape().as_list()
+            grid_cols = int(2 ** np.floor(np.log(np.sqrt(shape[0])) / np.log(2)))
+            grid_rows = shape[0] // grid_cols
+            grid_shape = [grid_rows, grid_cols]
+            real_image_grid = image_grid(real_image_grid, grid_shape, image_shape=shape[1:3],
+                                         num_channels=shape[-1])
+
+            fake_image_grid = tf.transpose(gen_sample[0], (1, 2, 3, 0))
+            fake_image_grid = image_grid(fake_image_grid, grid_shape, image_shape=shape[1:3],
+                                         num_channels=shape[-1])
+
+            fake_image_grid = tf.clip_by_value(fake_image_grid, -1, 2)
+
+            tf.summary.image('real_image', real_image_grid)
+            tf.summary.image('fake_image', fake_image_grid)
+
+            tf.summary.scalar('fake_image_min', tf.math.reduce_min(gen_sample))
+            tf.summary.scalar('fake_image_max', tf.math.reduce_max(gen_sample))
+
+            tf.summary.scalar('real_image_min', tf.math.reduce_min(real_image_input[0]))
+            tf.summary.scalar('real_image_max', tf.math.reduce_max(real_image_input[0]))
+            tf.summary.scalar('alpha', alpha)
+
+            tf.summary.scalar('g_lr', g_lr)
+            tf.summary.scalar('d_lr', d_lr)
+
+            merged_summaries = tf.summary.merge_all()
+
+        # Other ops
+        init_op = tf.global_variables_initializer()
+        assign_starting_alpha = alpha.assign(args.starting_alpha)
+        assign_zero = alpha.assign(0)
+        broadcast = hvd.broadcast_global_variables(0)
+
+        with tf.Session(config=config) as sess:
+            sess.run(init_op)
+
+            trainable_variable_names = [v.name for v in tf.trainable_variables()]
+
+            if var_list is not None and phase > args.starting_phase:
+                print("Restoring variables from:", os.path.join(logdir, f'model_{phase - 1}'))
+                var_names = [v.name for v in var_list]
+                load_vars = [sess.graph.get_tensor_by_name(n) for n in var_names if n in trainable_variable_names]
+                saver = tf.train.Saver(load_vars)
+                saver.restore(sess, os.path.join(logdir, f'model_{phase - 1}'))
+            elif var_list is not None and args.continue_path and phase == args.starting_phase:
+                print("Restoring variables from:", args.continue_path)
+                var_names = [v.name for v in var_list]
+                load_vars = [sess.graph.get_tensor_by_name(n) for n in var_names if n in trainable_variable_names]
+                saver = tf.train.Saver(load_vars)
+                saver.restore(sess, os.path.join(args.continue_path))
+            else:
+                if verbose:
+                     print("Not restoring variables.")
+                     print("Variable List Length:", len(var_list))
+
+            var_list = gen_vars + disc_vars
+
+            if phase < args.starting_phase:
+                continue
+
+            if phase == args.starting_phase:
+                sess.run(assign_starting_alpha)
+            else:
+                sess.run(init_alpha)
+
+            if verbose:
+                print(f"Begin mixing epochs in phase {phase}")
+            if args.horovod:
+                sess.run(broadcast)
+
+            local_step = 0
+            # take_first_snapshot = True
+
+            while True:
+                start = time.time()
+                if local_step % 2048 == 0 and local_step > 1:
+                    if args.horovod:
+                        sess.run(broadcast)
+                    saver = tf.train.Saver(var_list)
+                    if verbose:
+                        saver.save(sess, os.path.join(logdir, f'model_{phase}_ckpt_{global_step}'))
+
+                batch_loc = np.random.randint(0, len(npy_data) - batch_size)
+                batch_paths = npy_data[batch_loc: batch_loc + batch_size]
+                batch = np.stack([np.load(path) for path in batch_paths])
+                batch = batch[:, np.newaxis, ...].astype(np.float32) / 1024 - 1
+
+                _, _, summary, d_loss, g_loss = sess.run(
+                     [train_gen, train_disc, merged_summaries,
+                      disc_loss, gen_loss], feed_dict={real_image_input: batch})
+                global_step += batch_size * global_size
+                local_step += 1
+
+                end = time.time()
+                img_s = global_size * batch_size / (end - start)
+                if verbose:
+
+                    if local_step % 32 == 0:
+                        writer.add_summary(summary, global_step)
+                        writer.add_summary(tf.Summary(value=[tf.Summary.Value(tag='img_s', simple_value=img_s)]),
+                                           global_step)
+
+                    print(f"Step {global_step:09} \t"
+                          f"img/s {img_s:.2f} \t "
+                          f"d_loss {d_loss:.4f} \t "
+                          f"g_loss {g_loss:.4f} \t "
+                          # f"memory {memory_percentage:.4f} % \t"
+                          f"alpha {alpha.eval():.2f}")
+
+
+                if global_step >= ((phase - args.starting_phase)
+                                   * (args.mixing_nimg + args.stabilizing_nimg)
+                                   + args.mixing_nimg):
+                    break
+
+                sess.run(update_alpha)
+                sess.run(ema_op)
+                sess.run(update_d_lr)
+                sess.run(update_g_lr)
+
+                assert alpha.eval() >= 0
+
+            if verbose:
+                print(f"Begin stabilizing epochs in phase {phase}")
+
+            sess.run(assign_zero)
+
 
 
 # parses and returns arguments/params, called in run()
@@ -599,7 +901,7 @@ def run(config):
     # configure the session
     configure()
     
-    # if we are running on horovod, call the function to set everything up
+    # if we are running on horovod, call the function to set stuff up
     if args.horovod:
         setup_horovod()
         
@@ -617,9 +919,6 @@ def run(config):
     
     
     ######################### saraGAN/main.py code ####################### 
-   
-    # get the optimizers specified in the parameters
-    optimizer_gen, optimizer_disc = optimizers()
     
     # horovod settings
     if args.horovod:
@@ -656,14 +955,23 @@ def run(config):
     global_step = 0
 
     
-    # -------------
+    # ------------------------------------------------------------------------
     # Phasing Loop
-    #-------------
+    #-------------------------------------------------------------------------
 
     for phase in range(1, num_phases + 1):
         
         tf.reset_default_graph()
+        
+        # call dataset() -- replaces dataset block of code in pgan main()
         npy_data = dataset() 
+        
+        # call optimizers() -- replaces block of code in pgan main()
+        # get the optimizers specified in the parameters
+        g_lr, d_lr, optimizer_gen, optimizer_disc = optimizers()
+        
+        # call networks() -- replaces networks block of code in pgan main()
+        networks()
         
         
 # calls run()
