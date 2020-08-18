@@ -24,10 +24,9 @@ from utils import count_parameters, image_grid, parse_tuple
 import keras
 import keras.backend as K
 from keras.layers import Input
-from keras.models import Model
+from keras.models  import Model
 from keras.callbacks import CallbackList
-from keras.optimizers import Adadelta, Adam, RMSprop
-from keras.utils.generic_utils import Progbar
+from keras.optimizers import Adam, RMSprop
 kv2 = keras.__version__.startswith('2')     # written in the tf1 file as a workaround for a keras 2 bug in Gan3DTrainingAngle()
 
 try:
@@ -45,11 +44,11 @@ os.environ['LD_LIBRARY_PATH'] = os.getcwd()
     # UNDERSTAND PGAN + REVIEW PGAN PAPER
     # DATA PROCESSING FUNCTION + GETDATAANGLE
     # INTEGRATE GAN3DTRAINANGLE() WITH PGAN BETTER
-    # CLEAN OUT IMPORTS & UNUSED CODE
+
 
 
 # Pasted from GetDataAngle() in AngleTrain
-# get data for training - returns X, Y, ang, ecal
+# get data for training - returns X, Y, ang, ecal; called in Gan3DTrainAngle
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
     f = h5py.File(datafile,'r')            # load data into f variable
@@ -57,10 +56,13 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     X = np.array(f.get('ECAL'))* xscale    # x is an array of scaled ecal data from f
     Y = np.array(f.get('energy'))/yscale   # y is an array of scaled energy data from f
     X[X < thresh] = 0            # when X values are less than the threshold, they are reset to 0
+    
+    # set X, Y, and ang o float 32 datatypes
     X = X.astype(np.float32)
     Y = Y.astype(np.float32)
     ang = ang.astype(np.float32)
-    X = np.expand_dims(X, axis=-1)
+    
+    X = np.expand_dims(X, axis=-1)         # insert a new axis at the beginning for X
     
     # check data format and sum along axis
     if K.image_data_format() !='channels_last':
@@ -69,7 +71,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     else:
        ecal = np.sum(X, axis=(1, 2, 3))
      
-    # X ** xpower
+    # X ^ xpower
     if xpower !=1.:
         X = np.power(X, xpower)
         
@@ -79,24 +81,53 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
 # TODO! preprocess data (np.arrays), address resolution concerns
 def dataset():
     """TODO: Docstring for dataset.
+    
 
     :function: TODO
     :returns: Return NumpyDataset
 
     """
+    ######################## Anglegan ################################
+    # Read test data into a single array
+    for index, dtest in enumerate(Testfiles):
+       if index == 0:
+           X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+       else:
+           if X_test.shape[0] < nb_Test:
+              X_temp, Y_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+              X_test = np.concatenate((X_test, X_temp))
+              Y_test = np.concatenate((Y_test, Y_temp))
+              ang_test = np.concatenate((ang_test, ang_temp))
+              ecal_test = np.concatenate((ecal_test, ecal_temp))
+    if X_test.shape[0] > nb_Test:
+        X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
+    else:
+        nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
     
-    # EITHER PUT IN OR ~CALL GETDATAANGLE()~
+    # Read train data into a single array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
+    for index, dtrain in enumerate(Trainfiles):
+        if index == 0:
+            X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+        else:
+            X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+            X_train = np.concatenate((X_train, X_temp))
+            Y_train = np.concatenate((Y_train, Y_temp))
+            ang_train = np.concatenate((ang_train, ang_temp))
+            ecal_train = np.concatenate((ecal_train, ecal_temp))
     
-    # Possible resizing methods:
+    ####################### Possible resizing methods: ########################
     #tf.image.resize(images, size, method=ResizeMethod.BILINEAR, preserve_aspect_ratio=False, antialias=False, name=None)
     # try method = lanczos3 or lanczos5?
     
     #scipy.misc.imresize(arr, size, interp='bilinear', mode=None)
     # try interp ='lanczos'
     
-    # Code Adel put in (from pgan), NOT SURE HOW TO TIE IN (called in run)
+    #generic padding function
+    
+    ####################### Pgan/main Dataset block of code ############################
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
+    
     return npy_data
 
     # Get DataLoader
@@ -117,6 +148,7 @@ def dataset():
 
     if real_label is not None:
         real_label = tf.one_hot(real_label, depth=args.num_labels)
+
 
 # returns optimizers (Adam=default) and gen/disc learning rates, called in run() during phase loop, replaces optimizers block of code in pgan main()
 def optimizers():
@@ -179,9 +211,9 @@ def optimizers():
 
 def networks():
     with tf.variable_scope('alpha'):
-            alpha = tf.Variable(1, name='alpha', dtype=tf.float32)
-            # Alpha init
-            init_alpha = alpha.assign(1)
+        alpha = tf.Variable(1, name='alpha', dtype=tf.float32)
+        # Alpha init
+        init_alpha = alpha.assign(1)
 
             # Specify alpha update op for mixing phase.
             num_steps = args.mixing_nimg // (batch_size * global_size)
@@ -470,7 +502,6 @@ def get_args():
     parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     parser.add_argument('--thresh', action='store', type=int, default=0, help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
-    parser.add_argument('--learningRate', '-lr', action='store', type=float, default=0.001, help='Learning Rate')
     parser.add_argument('--intraop', action='store', type=int, default=9, help='Sets onfig.intra_op_parallelism_threads and OMP_NUM_THREADS')
     parser.add_argument('--interop', action='store', type=int, default=1, help='Sets config.inter_op_parallelism_threads')
     parser.add_argument('--warmupepochs', action='store', type=int, default=5, help='No wawrmup epochs')
@@ -490,8 +521,8 @@ def get_args():
     parser.add_argument('--max_global_batch_size', type=int, default=256)
     parser.add_argument('--mixing_nimg', type=int, default=2 ** 19)
     parser.add_argument('--stabilizing_nimg', type=int, default=2 ** 19)
-    parser.add_argument('--g_lr', type=float, default=1e-3)
-    parser.add_argument('--d_lr', type=float, default=1e-3)
+    parser.add_argument('--g_lr', type=float, default=1e-3, help='Learning rate for the generator')
+    parser.add_argument('--d_lr', type=float, default=1e-3, help='Learning rate for the discriminator')
     parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan'])
     parser.add_argument('--gp_weight', type=float, default=1)
     parser.add_argument('--activation', type=str, default='leaky_relu')
@@ -552,6 +583,7 @@ def randomize(a, b, c, d):
     shuffled_b = b[permutation]
     shuffled_c = c[permutation]
     shuffled_d = d[permutation]
+    
     return shuffled_a, shuffled_b, shuffled_c, shuffled_d
 
 
@@ -654,7 +686,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     dcb.on_train_begin()
     ccb.on_train_begin()
 
-    # Getting Data
+    # Getting Data: gan/DivideFiles() splits ~10 files into train and test files using [0.9, 0.1] probability
     Trainfiles, Testfiles = gan.DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle])
     if hvd.rank()==0:
         print(Trainfiles)
@@ -912,6 +944,8 @@ def run(config):
     gan.safe_mkdir(weightdir)
     d=discriminator(xpower)
     g=generator(latent_size)
+    
+    # train the generator and discriminator with the Gan3DTrainANgle() function
     Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
                     latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
@@ -977,9 +1011,8 @@ def run(config):
 # calls run()
 def main():   
     # run the main code!
-    run(config)
-      config = configure()
-      run(config)  
+    config = configure()
+    run(config)  
 
 # calls main()
 if __name__ == "__main__":       
