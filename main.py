@@ -6,6 +6,7 @@ import numpy as np
 import random
 import h5py 
 import math
+import PIL
 import importlib
 import analysis.utils.GANutils as gan
 import tensorflow as tf
@@ -20,6 +21,8 @@ from collections import defaultdict
 from six.moves import range
 from dataset import NumpyPathDataset
 from utils import count_parameters, image_grid, parse_tuple
+from PIL import Image
+
 
 import keras
 import keras.backend as K
@@ -75,56 +78,34 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
     if xpower !=1.:
         X = np.power(X, xpower)
         
+    # x=ecal data; y=energy data; ecal=summed ecal(x); ang=angle data
     return X, Y, ang, ecal
+
+# Takes 51x51x25 image array --> 64x64x32 image array (so it is multiples of 2)
+def resize(image_array):
+    og_dims = [51, 51, 25]
+    desired_dims = [64, 64, 32]
+    img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
+    
+    #potential resizing option
+    resized_img = tf.image.resize(img, desired_dims, method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
+    #resized_img = tf.image.resize(img, [64, 64, 32], method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
+    #resized_img = tf.image.resize(img, [64, 64, 32], method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
+    resized_image_array = np.asarray(resized_img)
+    
+    #scipy.misc.imresize(arr, size, interp='lanczos', mode=None) #deprecated in scipy 1.3?
+    
+    #generic padding function option
+    resized_image_array = np.pad(image_array, ((7,6), (7,6), (3,4)), mode='minimum') # try other padding methods?
+        
+    return resized_image_array
 
 
 # TODO! preprocess data (np.arrays), address resolution concerns
-def dataset():
-    """TODO: Docstring for dataset.
-    
-
-    :function: TODO
-    :returns: Return NumpyDataset
-
-    """
-    ######################## Anglegan ################################
-    # Read test data into a single array
-    for index, dtest in enumerate(Testfiles):
-       if index == 0:
-           X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-       else:
-           if X_test.shape[0] < nb_Test:
-              X_temp, Y_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-              X_test = np.concatenate((X_test, X_temp))
-              Y_test = np.concatenate((Y_test, Y_temp))
-              ang_test = np.concatenate((ang_test, ang_temp))
-              ecal_test = np.concatenate((ecal_test, ecal_temp))
-    if X_test.shape[0] > nb_Test:
-        X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
-    else:
-        nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
-    
-    # Read train data into a single array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
-    for index, dtrain in enumerate(Trainfiles):
-        if index == 0:
-            X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-        else:
-            X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-            X_train = np.concatenate((X_train, X_temp))
-            Y_train = np.concatenate((Y_train, Y_temp))
-            ang_train = np.concatenate((ang_train, ang_temp))
-            ecal_train = np.concatenate((ecal_train, ecal_temp))
-    
-    ####################### Possible resizing methods: ########################
-    #tf.image.resize(images, size, method=ResizeMethod.BILINEAR, preserve_aspect_ratio=False, antialias=False, name=None)
-    # try method = lanczos3 or lanczos5?
-    
-    #scipy.misc.imresize(arr, size, interp='bilinear', mode=None)
-    # try interp ='lanczos'
-    
-    #generic padding function
-    
+def dataset(phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels):
+        
     ####################### Pgan/main Dataset block of code ############################
+    size = 2 * 2 ** phase
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
     
@@ -162,8 +143,8 @@ def optimizers():
         optimizer_gen = tf.train.GradientDescentOptimizer(learning_rate=1e-3)
         optimizer_disc = tf.train.GradientDescentOptimizer(learning_rate=1e-3)
     elif args.optimizer == 'RAdam':     
-        optimizer_gen = RAdamOptimizer(learning_rate=args.g_lr, beta1=args.beta1, beta2=args.beta2)
-        optimizer_disc = RAdamOptimizer(learning_rate=args.d_lr, beta1=args.beta1, beta2=args.beta2)
+        optimizer_gen = tf.train.RAdamOptimizer(learning_rate=args.g_lr, beta1=args.beta1, beta2=args.beta2)
+        optimizer_disc = tf.train.RAdamOptimizer(learning_rate=args.d_lr, beta1=args.beta1, beta2=args.beta2)
     
     # from lines 169-176 in saraGAN/main
     if args.horovod:
@@ -215,23 +196,23 @@ def networks():
         # Alpha init
         init_alpha = alpha.assign(1)
 
-            # Specify alpha update op for mixing phase.
-            num_steps = args.mixing_nimg // (batch_size * global_size)
-            alpha_update = 1 / num_steps
-            # noinspection PyTypeChecker
-            update_alpha = alpha.assign(tf.maximum(alpha - alpha_update, 0))
+        # Specify alpha update op for mixing phase.
+        num_steps = args.mixing_nimg // (args.batch_size * args.global_size)
+        alpha_update = 1 / num_steps
+        # noinspection PyTypeChecker
+        update_alpha = alpha.assign(tf.maximum(alpha - alpha_update, 0))
 
         if args.optim_strategy == 'simultaneous':
             gen_loss, disc_loss, gp_loss, gen_sample = forward_simultaneous(
-                generator,
-                discriminator,
-                real_image_input,
+                args.generator,
+                args.discriminator,
+                args.real_image_input,
                 args.latent_dim,
                 alpha,
-                phase,
-                num_phases,
-                base_dim,
-                base_shape,
+                args.phase,
+                args.num_phases,
+                args.base_dim,
+                args.base_shape,
                 args.activation,
                 args.leakiness,
                 args.network_size,
@@ -241,13 +222,13 @@ def networks():
             gen_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
             disc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
 
-            g_gradients, g_variables = zip(*optimizer_gen.compute_gradients(gen_loss,
+            g_gradients, g_variables = zip(*args.optimizer_gen.compute_gradients(gen_loss,
                                                                             var_list=gen_vars))
             if args.g_clipping:
                 g_gradients, _ = tf.clip_by_global_norm(g_gradients, 1.0)
 
 
-            d_gradients, d_variables = zip(*optimizer_disc.compute_gradients(disc_loss,
+            d_gradients, d_variables = zip(*args.optimizer_disc.compute_gradients(disc_loss,
                                                                              var_list=disc_vars))
             if args.d_clipping:
                 d_gradients, _ = tf.clip_by_global_norm(d_gradients, 1.0)
@@ -262,41 +243,41 @@ def networks():
         elif args.optim_strategy == 'alternate':
 
             disc_loss, gp_loss = forward_discriminator(
-                generator,
-                discriminator,
-                real_image_input,
+                args.generator,
+                args.discriminator,
+                args.real_image_input,
                 args.latent_dim,
                 alpha,
-                phase,
-                num_phases,
+                args.phase,
+                args.num_phases,
                 args.base_dim,
-                base_shape,
+                args.base_shape,
                 args.activation,
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
                 args.gp_weight,
-                conditioning=real_label
+                conditioning=args.real_label
             )
 
             disc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
-            d_gradients = optimizer_disc.compute_gradients(disc_loss, var_list=disc_vars)
+            d_gradients = args.optimizer_disc.compute_gradients(disc_loss, var_list=disc_vars)
             d_norms = tf.stack([tf.norm(grad) for grad, var in d_gradients if grad is not None])
             max_d_norm = tf.reduce_max(d_norms)
 
-            train_disc = optimizer_disc.apply_gradients(d_gradients)
+            train_disc = args.optimizer_disc.apply_gradients(d_gradients)
 
             with tf.control_dependencies([train_disc]):
                 gen_sample, gen_loss = forward_generator(
-                    generator,
-                    discriminator,
-                    real_image_input,
+                    args.generator,
+                    args.discriminator,
+                    args.real_image_input,
                     args.latent_dim,
-                    alpha,
-                    phase,
-                    num_phases,
-                    base_dim,
-                    base_shape,
+                    args.alpha,
+                    args.phase,
+                    args.num_phases,
+                    args.base_dim,
+                    args.base_shape,
                     args.activation,
                     args.leakiness,
                     args.network_size,
@@ -305,15 +286,15 @@ def networks():
                 )
 
                 gen_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
-                g_gradients = optimizer_gen.compute_gradients(gen_loss, var_list=gen_vars)
+                g_gradients = args.optimizer_gen.compute_gradients(gen_loss, var_list=gen_vars)
                 g_norms = tf.stack([tf.norm(grad) for grad, var in g_gradients if grad is not None])
                 max_g_norm = tf.reduce_max(g_norms)
-                train_gen = optimizer_gen.apply_gradients(g_gradients)
+                train_gen = args.optimizer_gen.apply_gradients(g_gradients)
 
         else:
             raise ValueError("Unknown optim strategy ", args.optim_strategy)
 
-        if verbose:
+        if args.verbose:
             print(f"Generator parameters: {count_parameters('generator')}")
             print(f"Discriminator parameters:: {count_parameters('discriminator')}")
 
@@ -556,6 +537,7 @@ def get_args():
 # DO WE NEED TO ADDRESS THE CHANNELS_FIRST (CPU) VS CHANNELS_LAST FORMATTING?
 # channels format: want channels_first for cpu
 def set_format(channel_format):
+    global daxis
     if channel_format == 'channels_first':
         print('Setting th channel ordering (NCHW)')
         K.set_image_dim_ordering('th')
@@ -564,6 +546,12 @@ def set_format(channel_format):
         print('Setting tf channel ordering (NHWC)')
         K.set_image_dim_ordering('tf')
         K.set_image_data_format('channels_last')
+        
+    if K.image_data_format() !='channels_last':
+        daxis = (2,3,4)
+    else:
+       daxis = (1,2,3)
+    
 
 
 # Creates a list of lists, used in Gan3DTrainAngle()
@@ -633,9 +621,9 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     # build combined Model
     # generator: latent vector --> fake image
     latent = Input(shape=(latent_size, ), name='combined_z')   # random latent vector = generator input
-    fake_image = generator( latent)     # fake image = generator output
-     # discriminator: fake image --> fake, aux, ang, ecal, add_loss
-     discriminator.trainable = False
+    fake_image = generator(latent)     # fake image = generator output
+    # discriminator: fake image --> fake, aux, ang, ecal, add_loss
+    discriminator.trainable = False
     fake, aux, ang, ecal, add_loss= discriminator(fake_image)
     combined = Model(
         input=[latent],
@@ -698,7 +686,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     if len(Testfiles) == 0:
        print('Error reading the Testfiles. The enumerated list will show up as empty. Check the GANutils.py file in 3Dgan/keras/analysis/utils.')
        
-    # Read test data into a single array
+    # Read test data into an array with the size of nb_Test
     for index, dtest in enumerate(Testfiles):
        if index == 0:
            X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
@@ -712,9 +700,9 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     if X_test.shape[0] > nb_Test:
         X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
     else:
-        nb_Test = X_test.shape[0] # the nb_test maybe different if total events are less than nEvents
+        nb_Test = X_test.shape[0] # the nb_test may be different if total events are less than nEvents
     
-    # Read train data into a single array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
+    # Read train data into an array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
             X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
@@ -765,8 +753,8 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
         ecal_batches = genbatches(ecal_train, batch_size)  # creates len(ecal_train) index ranges for len(batch_size) # of items
         ang_batches = genbatches(ang_train, batch_size)    # creates len(ang_train) index ranges for len(batch_size) # of items
         
-         # go through batches: train the generator and discriminator
-         for index in range(int(total_batches)):
+        # go through batches: train the generator and discriminator
+        for index in range(int(total_batches)):
             start = time.time()         
             image_batch = next(image_batches) 
             energy_batch = next(energy_batches)
@@ -854,8 +842,8 @@ def configure():
     ######## ANGLEGAN ###########
     # configure the session
     config = tf.ConfigProto(log_device_placement=True)
-    config.intra_op_parallelism_threads = params.intraop
-    config.inter_op_parallelism_threads = params.interop
+    config.intra_op_parallelism_threads = args.intraop
+    config.inter_op_parallelism_threads = args.interop
     os.environ['KMP_BLOCKTIME'] = str(1)
     os.environ['KMP_SETTINGS'] = str(1)
     os.environ['KMP_AFFINITY'] = 'granularity=fine,compact'
@@ -998,7 +986,7 @@ def run(config):
         tf.reset_default_graph()
         
         # call dataset() -- replaces dataset block of code in pgan main()
-        npy_data = dataset() 
+        npy_data = dataset(phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels) 
         
         # call optimizers() -- replaces block of code in pgan main()
         # get the optimizers specified in the parameters
