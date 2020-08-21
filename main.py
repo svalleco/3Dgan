@@ -51,57 +51,64 @@ os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 
 
 # Pasted from GetDataAngle() in AngleTrain
-# get data for training - returns X, Y, ang, ecal; called in Gan3DTrainAngle
-def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4):
+# get data for training - returns img3d, e_p, ang, ecal; called in Gan3DTrainAngle
+def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale=1, angtype='theta', thresh=1e-4):
     print ('Loading Data from .....', datafile)
-    f = h5py.File(datafile,'r')            # load data into f variable
-    ang = np.array(f.get(angtype))         # ang is an array of angle data from f
-    X = np.array(f.get('ECAL'))* xscale    # x is an array of scaled ecal data from f
-    Y = np.array(f.get('energy'))/yscale   # y is an array of scaled energy data from f
-    X[X < thresh] = 0            # when X values are less than the threshold, they are reset to 0
+    f = h5py.File(datafile,'r')                    # load data into f variable
+    ang = np.array(f.get(angtype))                 # ang is an array of angle data from f, one value is concatenated onto the latent vector
+    img3d = np.array(f.get('ECAL'))* img3dscale    # img3d is a 3d array, cut from the cylinder that the calorimeter produces (has 25 layers along z-axis)
+    e_p = np.array(f.get('energy'))/e_pscale       # e_p is an array of scaled energy data from f, one value is concatenated onto the latent vector
+    img3d[img3d < thresh] = 0        # when img3d values are less than the threshold, they are reset to 0
     
-    # set X, Y, and ang o float 32 datatypes
-    X = X.astype(np.float32)
-    Y = Y.astype(np.float32)
+    # set img3d, e_p, and ang o float 32 datatypes
+    img3d = img3d.astype(np.float32)
+    e_p = e_p.astype(np.float32)
     ang = ang.astype(np.float32)
     
-    X = np.expand_dims(X, axis=-1)         # insert a new axis at the beginning for X
+    img3d = np.expand_dims(img3d, axis=-1)         # insert a new axis at the beginning for img3d
     
     # check data format and sum along axis
     if K.image_data_format() !='channels_last':
-       X = np.moveaxis(X, -1, 1)
-       ecal = np.sum(X, axis=(2, 3, 4))
+       img3d = np.moveaxis(img3d, -1, 1)
+       ecal = np.sum(img3d, axis=(2, 3, 4))
     else:
-       ecal = np.sum(X, axis=(1, 2, 3))
+       ecal = np.sum(img3d, axis=(1, 2, 3))    # summed img3d data, used for training the discriminator
      
-    # X ^ xpower
-    if xpower !=1.:
-        X = np.power(X, xpower)
+    # img3d ^ img3dpower
+    if img3dpower !=1.:
+        img3d = np.power(img3d, img3dpower)
         
-    # x=ecal data; y=energy data; ecal=summed ecal(x); ang=angle data
-    return X, Y, ang, ecal
+    img3d = resize(img3d)     # resize the 3d image to x2 dimensions for pgan
+    
+    # img3d=ecal data; e_p=energy data; ecal=summed img3d; ang=angle data
+    return img3d, e_p, ang, ecal
+
 
 # Takes 51x51x25 image array --> 64x64x32 image array (so it is multiples of 2)
 def resize(image_array):
-    og_dims = [51, 51, 25]
-    desired_dims = [64, 64, 32]
-    img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
+    og_dims =    [51, 51, 25]
+    large_dims = [64, 64, 25]  
+    small_dims = [32, 32, 25]
+    #img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
     
     #potential resizing option
-    resized_img = tf.image.resize(img, desired_dims, method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
-    #resized_img = tf.image.resize(img, [64, 64, 32], method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
-    #resized_img = tf.image.resize(img, [64, 64, 32], method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
-    resized_image_array = np.asarray(resized_img)
+    #resized_img = tf.image.resize(img, large_dims, method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
+    #resized_img = tf.image.resize(img, large_dims, method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
+    #resized_img = tf.image.resize(img, large_dims, method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
+    #resized_image_array = np.asarray(resized_img)
     
     #scipy.misc.imresize(arr, size, interp='lanczos', mode=None) #deprecated in scipy 1.3?
     
-    #generic padding function option
-    resized_image_array = np.pad(image_array, ((7,6), (7,6), (3,4)), mode='minimum') # try other padding methods?
-        
+    #generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
+    #resized_image_array = np.pad(image_array, ((7,6), (7,6), (0,0)), mode='empty') #minimum') # try other padding methods?
+       
+    # crop -- gul rukh's suggestion
+    resized_image_array = image_array[9:41, 9:41, : ]  # cropped to the small_dims
+    
     return resized_image_array
 
 
-# TODO! preprocess data (np.arrays), address resolution concerns
+# dataset function from pgan code
 def dataset(phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels):
         
     ####################### Pgan/main Dataset block of code ############################
@@ -473,9 +480,9 @@ def get_args():
     parser.add_argument('--verbose', action='store_true', help='Whether or not to use a progress bar')
     parser.add_argument('--weightsdir', action='store', type=str, default='weights/3dgan_weights', help='Directory to store weights.')
     parser.add_argument('--pklfile', action='store', type=str, default='results/3dgan_history.pkl', help='Pickle file to store losses.')
-    parser.add_argument('--xscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
-    parser.add_argument('--xpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
-    parser.add_argument('--yscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
+    parser.add_argument('--img3dscale', action='store', type=int, default=1, help='Multiplication factor for ecal deposition')
+    parser.add_argument('--img3dpower', action='store', type=float, default=0.85, help='pre processing of cell energies by raising to a power')
+    parser.add_argument('--e_pscale', action='store', type=int, default=100, help='Division Factor for Primary Energy.')
     parser.add_argument('--ascale', action='store', type=int, default=1, help='Multiplication factor for angle input')
     parser.add_argument('--resultfile', action='store', type=str, default='results/3dgan_analysis.pkl', help='File to save losses.')
     parser.add_argument('--analyse', action='store_true', default=False, help='Whether or not to perform analysis')
@@ -561,7 +568,7 @@ def genbatches(a,n):
         yield a[i:i+n]
 
 
-# Shuffles 4 arrays, used in Gan3DTrainAngle(X_train, Y_train, ecal_train, ang_train)
+# Shuffles 4 arrays, used in Gan3DTrainAngle(img3d_train, Y_train, ecal_train, ang_train)
 def randomize(a, b, c, d):
     assert a.shape[0] == b.shape[0]
     # Generate the permutation index array.
@@ -593,7 +600,7 @@ def hist_count(x, p=1):
 # Pasted from Gan3DTrainAngle() in AngleTrain
 # Training Function - build & compile discriminator, build & compile generator, run the generator and discriminator, unused callback list functions, read TrainFiles & TestFiles,
 #                     run through epochs, train the generator & discriminator, collect discriminator losses, collect generator losses, test, save weights every epoch
-def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
+def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', img3dscale=1, img3dpower=1, angscale=1, angtype='theta', e_pscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
     start_init = time.time()
     verbose = False    
     particle='Ele'
@@ -689,31 +696,31 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     # Read test data into an array with the size of nb_Test
     for index, dtest in enumerate(Testfiles):
        if index == 0:
-           X_test, Y_test, ang_test, ecal_test = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+           img3d_test, e_p_test, ang_test, ecal_test = GetDataAngle(dtest, img3dscale=img3dscale, img3dpower=img3dpower, angscale=angscale, angtype=angtype, thresh=thresh)
        else:
-           if X_test.shape[0] < nb_Test:
-              X_temp, Y_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-              X_test = np.concatenate((X_test, X_temp))
-              Y_test = np.concatenate((Y_test, Y_temp))
+           if img3d_test.shape[0] < nb_Test:
+              img3d_temp, e_p_temp, ang_temp,  ecal_temp = GetDataAngle(dtest, img3dscale=img3dscale, img3dpower=img3dpower, angscale=angscale, angtype=angtype, thresh=thresh)
+              img3d_test = np.concatenate((img3d_test, img3d_temp))
+              e_p_test = np.concatenate((e_p_test, e_p_temp))
               ang_test = np.concatenate((ang_test, ang_temp))
               ecal_test = np.concatenate((ecal_test, ecal_temp))
-    if X_test.shape[0] > nb_Test:
-        X_test, Y_test, ang_test, ecal_test = X_test[:nb_Test], Y_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
+    if img3d_test.shape[0] > nb_Test:
+        img3d_test, e_p_test, ang_test, ecal_test = img3d_test[:nb_Test], e_p_test[:nb_Test], ang_test[:nb_Test], ecal_test[:nb_Test]
     else:
-        nb_Test = X_test.shape[0] # the nb_test may be different if total events are less than nEvents
+        nb_Test = img3d_test.shape[0] # the nb_test may be different if total events are less than nEvents
     
     # Read train data into an array, make sure it is the same length as nb_Train (The number of train files calculated from fraction of nEvents)
     for index, dtrain in enumerate(Trainfiles):
         if index == 0:
-            X_train, Y_train, ang_train, ecal_train = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
+            img3d_train, e_p_train, ang_train, ecal_train = GetDataAngle(dtrain, img3dscale=img3dscale, img3dpower=img3dpower, angscale=angscale, angtype=angtype, thresh=thresh)
         else:
-            X_temp, Y_temp, ang_temp, ecal_temp = GetDataAngle(dtrain, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh)
-            X_train = np.concatenate((X_train, X_temp))
-            Y_train = np.concatenate((Y_train, Y_temp))
+            img3d_temp, e_p_temp, ang_temp, ecal_temp = GetDataAngle(dtrain, img3dscale=img3dscale, img3dpower=img3dpower, angscale=angscale, angtype=angtype, thresh=thresh)
+            img3d_train = np.concatenate((img3d_train, img3d_temp))
+            e_p_train = np.concatenate((e_p_train, e_p_temp))
             ang_train = np.concatenate((ang_train, ang_temp))
             ecal_train = np.concatenate((ecal_train, ecal_temp))
 
-    nb_train = X_train.shape[0]    # Total events in training files
+    nb_train = img3d_train.shape[0]    # Total events in training files
     total_batches = nb_train / global_batch_size
     
     if hvd.rank()==0:
@@ -721,14 +728,14 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
 
     if hvd.rank()==0:           # will throw an error if the number of epochs is not large enough
        print('Test Data loaded of shapes:')
-       print(X_test.shape)
-       print(Y_test.shape)
+       print(img3d_test.shape)
+       print(e_p_test.shape)
        print('*************************************************************************************')
        print('Ang varies from {} to {} with mean {}'.format(np.amin(ang_test), np.amax(ang_test), np.mean(ang_test)))
-       print('Cell varies from {} to {} with mean {}'.format(np.amin(X_test[X_test>0]), np.amax(X_test[X_test>0]), np.mean(X_test[X_test>0])))
+       print('Cell varies from {} to {} with mean {}'.format(np.amin(img3d_test[img3d_test>0]), np.amax(img3d_test[img3d_test>0]), np.mean(img3d_test[img3d_test>0])))
        
        if analyse:
-          var = gan.sortEnergy(X_test, Y_test, ang_test, ecal_test, energies)
+          var = gan.sortEnergy(img3d_test, e_p_test, ang_test, ecal_test, energies)
        train_history = defaultdict(list)
        test_history = defaultdict(list)
        analysis_history = defaultdict(list)
@@ -743,13 +750,13 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
  
         epoch_gen_loss = []
         epoch_disc_loss = []
-        randomize(X_train, Y_train, ecal_train, ang_train)
+        randomize(img3d_train, e_p_train, ecal_train, ang_train)
 
         epoch_gen_loss = []
         epoch_disc_loss = []
         
-        image_batches = genbatches(X_train, batch_size)    # creates len(X_train) index ranges for len(batch_size) # of items
-        energy_batches = genbatches(Y_train, batch_size)   # creates len(Y_train) index ranges for len(batch_size) # of items
+        image_batches = genbatches(img3d_train, batch_size)    # creates len(img3d_train) index ranges for len(batch_size) # of items
+        energy_batches = genbatches(e_p_train, batch_size)   # creates len(e_p_train) index ranges for len(batch_size) # of items
         ecal_batches = genbatches(ecal_train, batch_size)  # creates len(ecal_train) index ranges for len(batch_size) # of items
         ang_batches = genbatches(ang_train, batch_size)    # creates len(ang_train) index ranges for len(batch_size) # of items
         
@@ -760,7 +767,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
             energy_batch = next(energy_batches)
             ecal_batch = next(ecal_batches)
             ang_batch = next(ang_batches)
-            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower), axis=-1)
+            add_loss_batch = np.expand_dims(loss_ftn(image_batch, img3dpower), axis=-1)
             noise = np.random.normal(0, 1, (batch_size, latent_size-2))
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
@@ -930,13 +937,13 @@ def run(config):
     
     # Building AngleGAN discriminator and generator
     gan.safe_mkdir(weightdir)
-    d=discriminator(xpower)
+    d=discriminator(img3dpower)
     g=generator(latent_size)
     
     # train the generator and discriminator with the Gan3DTrainANgle() function
     Gan3DTrainAngle(d, g, opt, datapath, nEvents, weightdir, pklfile, global_batch_size=global_batch_size, nb_epochs=nb_epochs, batch_size=batch_size,
-                    latent_size=latent_size, loss_weights=loss_weights, xscale = xscale, xpower=xpower, angscale=ascale,
-                    yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
+                    latent_size=latent_size, loss_weights=loss_weights, img3dscale = img3dscale, img3dpower=img3dpower, angscale=ascale,
+                    e_pscale=e_pscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
                     energies=energies, warmup_epochs=warmup_epochs)
     
     
