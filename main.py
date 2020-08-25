@@ -85,26 +85,37 @@ def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale
 
 
 # Takes 51x51x25 image array --> 64x64x32 image array (so it is multiples of 2)
-def resize(image_array):
-    og_dims =    [51, 51, 25]
-    large_dims = [64, 64, 25]  
-    small_dims = [32, 32, 25]
-    #img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
+def resize(image_array, size):
+    #og_dims =    [51, 51, 25]
+    #large_dims = [64, 64, 25]  
     
-    #potential resizing option
-    #resized_img = tf.image.resize(img, large_dims, method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
-    #resized_img = tf.image.resize(img, large_dims, method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
-    #resized_img = tf.image.resize(img, large_dims, method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
-    #resized_image_array = np.asarray(resized_img)
+    if size == 4:
+        resized_image_array = image_array[23:26, 23:26, :]  # cropped to [4,4,25]
+        
+    elif size == 8:
+        resized_image_array = image_array[21:28, 21:28, :]  # cropped to [8,8,25]
     
-    #scipy.misc.imresize(arr, size, interp='lanczos', mode=None) #deprecated in scipy 1.3?
+    elif size == 16:
+        resized_image_array = image_array[17:32, 17:32, :]  # cropped to [16,16,25]
     
-    #generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
-    #resized_image_array = np.pad(image_array, ((7,6), (7,6), (0,0)), mode='empty') #minimum') # try other padding methods?
+    elif size == 32:
+        resized_image_array = image_array[9:41, 9:41, :]  # cropped to [32,32,25]     
+    
+    elif size == 64:
+        #generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
+        resized_image_array = np.pad(image_array, ((7,6), (7,6), (0,0)), mode='empty') #minimum') # try other padding methods?
        
-    # crop -- gul rukh's suggestion
-    resized_image_array = image_array[9:41, 9:41, : ]  # cropped to the small_dims
+        #or you could try stretching the image! there are 2 methods and this may disrupt the physics info or take a long time
+        #scipy.misc.imresize(arr, size, interp='lanczos', mode=None) #deprecated in scipy 1.3?
+        #img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
+        #potential resizing option
+        #resized_img = tf.image.resize(img, large_dims, method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
+        #resized_img = tf.image.resize(img, large_dims, method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
+        #resized_img = tf.image.resize(img, large_dims, method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
+        #resized_image_array = np.asarray(resized_img)
     
+    else: 
+        print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
     return resized_image_array
 
 
