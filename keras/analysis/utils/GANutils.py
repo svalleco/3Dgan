@@ -6,7 +6,10 @@ import math
 import time
 import glob
 import numpy.core.umath_tests as umath
-
+import keras
+import keras.backend as K
+import tensorflow as tf
+kv2 = keras.__version__.startswith('2') 
 
 if K.image_data_format() =='channels_last':
     daxis=(1,2,3)
