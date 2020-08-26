@@ -23,6 +23,8 @@ from dataset import NumpyPathDataset
 from utils import count_parameters, image_grid, parse_tuple
 from PIL import Image
 
+# I moved extra functions to keras/analysis/utils/GANutils.py
+from GANutils import hist_count, randomize, genbatches
 
 import keras
 import keras.backend as K
@@ -39,15 +41,6 @@ except ImportError:
     
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
 #import nvgpu
-
-
-################################### EM TODO! ####################################
-    # TIE TOGETHER PGAN AND ANGLEGAN!
-    # REMOVE KERAS?
-    # UNDERSTAND PGAN + REVIEW PGAN PAPER
-    # DATA PROCESSING FUNCTION + GETDATAANGLE
-    # INTEGRATE GAN3DTRAINANGLE() WITH PGAN BETTER
-
 
 
 # Pasted from GetDataAngle() in AngleTrain
@@ -84,10 +77,11 @@ def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale
     return img3d, e_p, ang, ecal
 
 
-# Takes 51x51x25 image array --> 64x64x32 image array (so it is multiples of 2)
+# Takes [51x51x25] image array and size parameter --> [sizexsizex25]
 def resize(image_array, size):
     #og_dims =    [51, 51, 25]
     #large_dims = [64, 64, 25]  
+    size = int(size)
     
     if size == 4:
         resized_image_array = image_array[23:26, 23:26, :]  # cropped to [4,4,25]
@@ -116,6 +110,7 @@ def resize(image_array, size):
     
     else: 
         print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
+    
     return resized_image_array
 
 
@@ -569,43 +564,6 @@ def set_format(channel_format):
         daxis = (2,3,4)
     else:
        daxis = (1,2,3)
-    
-
-
-# Creates a list of lists, used in Gan3DTrainAngle()
-def genbatches(a,n):
-    for i in range(0, len(a), n):
-        # Create an index range for l of n items:
-        yield a[i:i+n]
-
-
-# Shuffles 4 arrays, used in Gan3DTrainAngle(img3d_train, Y_train, ecal_train, ang_train)
-def randomize(a, b, c, d):
-    assert a.shape[0] == b.shape[0]
-    # Generate the permutation index array.
-    permutation = np.random.permutation(a.shape[0])
-    # Shuffle the arrays by giving the permutation in the square brackets.
-    shuffled_a = a[permutation]
-    shuffled_b = b[permutation]
-    shuffled_c = c[permutation]
-    shuffled_d = d[permutation]
-    
-    return shuffled_a, shuffled_b, shuffled_c, shuffled_d
-
-
-# histogram count - sums 8 bins btwn [0.05, 0.03, 0.02, 0.0125, 0.008, 0.003, 0]**p
-def hist_count(x, p=1):
-    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
-    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
-    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=daxis)
-    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=daxis)
-    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=daxis)
-    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=daxis)
-    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=daxis)
-    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
-    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
-    bins[np.where(bins==0)]=1
-    return bins
 
 
 # Pasted from Gan3DTrainAngle() in AngleTrain
@@ -616,7 +574,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     verbose = False    
     particle='Ele'
     f = [0.9, 0.1]
-    loss_ftn = hist_count
+    loss_ftn = hist_count    # why is this function not passed parameters in gul rukh's code?
     
     if hvd.rank()==0:
         print('[INFO] Building discriminator')

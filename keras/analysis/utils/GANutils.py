@@ -7,6 +7,138 @@ import time
 import glob
 import numpy.core.umath_tests as umath
 
+
+if K.image_data_format() =='channels_last':
+    daxis=(1,2,3)
+else:
+    daxis=(2,3,4)
+
+# Creates a list of lists, used in Gan3DTrainAngle()
+def genbatches(a,n):
+    for i in range(0, len(a), n):
+        # Create an index range for l of n items:
+        yield a[i:i+n]
+       
+        
+# Shuffles 4 arrays, used in Gan3DTrainAngle(img3d_train, Y_train, ecal_train, ang_train)
+def randomize(a, b, c, d):
+    assert a.shape[0] == b.shape[0]
+    # Generate the permutation index array.
+    permutation = np.random.permutation(a.shape[0])
+    # Shuffle the arrays by giving the permutation in the square brackets.
+    shuffled_a = a[permutation]
+    shuffled_b = b[permutation]
+    shuffled_c = c[permutation]
+    shuffled_d = d[permutation]
+    
+    return shuffled_a, shuffled_b, shuffled_c, shuffled_d
+
+
+# Summming cell energies
+def ecal_sum(image, power):
+    image = K.pow(image, 1./power)
+    sum = K.sum(image, axis=daxis)
+    return sum
+
+
+# counting entries for different energy bins
+def count(image, power):
+    bin1 = K.sum(K.tf.where(image > 0.05**power, K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < 0.05**power, image > 0.03**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < 0.03**power, image > 0.02**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < 0.02**power, image > 0.0125**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < 0.0125**power, image > 0.008**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < 0.008**power, image > 0.003**power), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < 0.003**power, image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
+    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), -1)
+    return bins
+
+
+# Calculating angle from image
+def ecal_angle(image, power):
+    if K.image_data_format() =='channels_last':
+       image = K.squeeze(image, axis=4)
+    else: 
+       image = K.squeeze(image, axis=1)
+    image = K.pow(image, 1./power)
+    
+    # size of ecal
+    x_shape= K.int_shape(image)[1]
+    y_shape= K.int_shape(image)[2]
+    z_shape= K.int_shape(image)[3]
+    sumtot = K.sum(image, axis=(1,2,3))# sum of events
+    
+    # get 1. where event sum is 0 and 0 elsewhere
+    amask = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
+    masked_events = K.sum(amask) # counting zero sum events
+    
+    # ref denotes barycenter as that is our reference point
+    x_ref = K.sum(K.sum(image, axis=(2,3)) * (K.cast(K.expand_dims(K.arange(x_shape), 0), dtype='float32') + 0.5) , axis=1)# sum for x position * x index
+    y_ref = K.sum(K.sum(image, axis=(1,3)) * (K.cast(K.expand_dims(K.arange(y_shape), 0), dtype='float32') + 0.5), axis=1)
+    z_ref = K.sum(K.sum(image, axis=(1,2)) * (K.cast(K.expand_dims(K.arange(z_shape), 0), dtype='float32') + 0.5), axis=1)
+    x_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(x_ref) , x_ref/sumtot)# return max position if sumtot=0 and divide by sumtot otherwise
+    y_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(y_ref) , y_ref/sumtot)
+    z_ref = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(z_ref), z_ref/sumtot)
+    
+    # reshape    
+    x_ref = K.expand_dims(x_ref, 1)
+    y_ref = K.expand_dims(y_ref, 1)
+    z_ref = K.expand_dims(z_ref, 1)
+
+    sumz = K.sum(image, axis =(1,2)) # sum for x,y planes going along z
+
+    # Get 0 where sum along z is 0 and 1 elsewhere
+    zmask = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz) , K.ones_like(sumz))
+        
+    x = K.expand_dims(K.arange(x_shape), 0) # x indexes
+    x = K.cast(K.expand_dims(x, 2), dtype='float32') + 0.5
+    y = K.expand_dims(K.arange(y_shape), 0)# y indexes
+    y = K.cast(K.expand_dims(y, 2), dtype='float32') + 0.5
+  
+    # barycenter for each z position
+    x_mid = K.sum(K.sum(image, axis=2) * x, axis=1)
+    y_mid = K.sum(K.sum(image, axis=1) * y, axis=1)
+    x_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), x_mid/sumz) # if sum != 0 then divide by sum
+    y_mid = K.tf.where(K.equal(sumz, 0.0), K.zeros_like(sumz), y_mid/sumz) # if sum != 0 then divide by sum
+
+    # Angle Calculations
+    z = (K.cast(K.arange(z_shape), dtype='float32') + 0.5)  * K.ones_like(z_ref) # Make an array of z indexes for all events
+    zproj = K.sqrt(K.maximum((x_mid-x_ref)**2.0 + (z - z_ref)**2.0, K.epsilon()))# projection from z axis with stability check
+    m = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj), (y_mid-y_ref)/zproj)# to avoid divide by zero for zproj =0
+    m = K.tf.where(K.tf.less(z, z_ref),  -1 * m, m)# sign inversion
+    ang = (math.pi/2.0) - tf.atan(m)# angle correction
+    zmask = K.tf.where(K.equal(zproj, 0.0), K.zeros_like(zproj) , zmask)
+    ang = ang * zmask # place zero where zsum is zero
+    
+    ang = ang * z  # weighted by position
+    sumz_tot = z * zmask # removing indexes with 0 energies or angles
+
+    #zunmasked = K.sum(zmask, axis=1) # used for simple mean 
+    #ang = K.sum(ang, axis=1)/zunmasked # Mean does not include positions where zsum=0
+
+    ang = K.sum(ang, axis=1)/K.sum(sumz_tot, axis=1) # sum ( measured * weights)/sum(weights)
+    ang = K.tf.where(K.equal(amask, 0.), ang, 100. * K.ones_like(ang)) # Place 100 for measured angle where no energy is deposited in events
+    
+    ang = K.expand_dims(ang, 1)
+    return ang
+
+
+# histogram count - sums 8 bins btwn [0.05, 0.03, 0.02, 0.0125, 0.008, 0.003, 0]**p
+def hist_count(x, daxis, p=1):
+    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
+    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
+    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=daxis)
+    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=daxis)
+    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=daxis)
+    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=daxis)
+    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=daxis)
+    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
+    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
+    bins[np.where(bins==0)]=1
+    return bins
+
+
 # return a fit for Ecalsum/Ep for Ep
 def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
     if mod==0:
