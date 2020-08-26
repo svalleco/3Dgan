@@ -26,6 +26,9 @@ from PIL import Image
 # I moved extra functions to keras/analysis/utils/GANutils.py
 from GANutils import hist_count, randomize, genbatches
 
+# used for resizing -- I don't know if this will be too slow
+from scipy.ndimage import zoom
+
 import keras
 import keras.backend as K
 from keras.layers import Input
@@ -53,7 +56,7 @@ def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale
     e_p = np.array(f.get('energy'))/e_pscale       # e_p is an array of scaled energy data from f, one value is concatenated onto the latent vector
     img3d[img3d < thresh] = 0        # when img3d values are less than the threshold, they are reset to 0
     
-    # set img3d, e_p, and ang o float 32 datatypes
+    # set img3d, e_p, and ang as float 32 datatypes
     img3d = img3d.astype(np.float32)
     e_p = e_p.astype(np.float32)
     ang = ang.astype(np.float32)
@@ -70,44 +73,25 @@ def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale
     # img3d ^ img3dpower
     if img3dpower !=1.:
         img3d = np.power(img3d, img3dpower)
-        
-    img3d = resize(img3d)     # resize the 3d image to x2 dimensions for pgan
-    
-    # img3d=ecal data; e_p=energy data; ecal=summed img3d; ang=angle data
+            
+    # img3d=ecal data; e_p=energy data; ecal=summed img3d (used to train the discriminator); ang=angle data
     return img3d, e_p, ang, ecal
 
 
 # Takes [51x51x25] image array and size parameter --> [sizexsizex25]
 def resize(image_array, size):
-    #og_dims =    [51, 51, 25]
-    #large_dims = [64, 64, 25]  
+    #og_dims =    [51, 51, 25] 
     size = int(size)
     
-    if size == 4:
-        resized_image_array = image_array[23:26, 23:26, :]  # cropped to [4,4,25]
-        
-    elif size == 8:
-        resized_image_array = image_array[21:28, 21:28, :]  # cropped to [8,8,25]
-    
-    elif size == 16:
-        resized_image_array = image_array[17:32, 17:32, :]  # cropped to [16,16,25]
-    
-    elif size == 32:
-        resized_image_array = image_array[9:41, 9:41, :]  # cropped to [32,32,25]     
-    
-    elif size == 64:
-        #generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
+    img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
+    if size < 64:
+        resized_img = tf.image.resize(img, [size, size, 25], method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
+        #resized_img = tf.image.resize(img, [size, size, 25], method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
+        #resized_img = tf.image.resize(img, [size, size, 25], method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
+        resized_image_array = np.asarray(resized_img)
+    elif size == 64:    
         resized_image_array = np.pad(image_array, ((7,6), (7,6), (0,0)), mode='empty') #minimum') # try other padding methods?
-       
-        #or you could try stretching the image! there are 2 methods and this may disrupt the physics info or take a long time
-        #scipy.misc.imresize(arr, size, interp='lanczos', mode=None) #deprecated in scipy 1.3?
-        #img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
-        #potential resizing option
-        #resized_img = tf.image.resize(img, large_dims, method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_img = tf.image.resize(img, large_dims, method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_img = tf.image.resize(img, large_dims, method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_image_array = np.asarray(resized_img)
-    
+        # pad to [64x64x25] - generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
     else: 
         print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
     
@@ -115,15 +99,19 @@ def resize(image_array, size):
 
 
 # dataset function from pgan code
-def dataset(phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels):
-        
-    ####################### Pgan/main Dataset block of code ############################
-    size = 2 * 2 ** phase
+def dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels):
+  
+    img3d, e_p, ang, ecal = GetDataAngle(datafile)
+    # we need to decide later how to incorporate the e_p and ang variables (anglegan concatenates them to the latent vector)
+    size = 2 * 2 ** phase   #[4,8,16,32,64] 
+    resized_img3d = resize(img3d, size)   #51x51x25 --> size x size x 25
+    
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
     
     return npy_data
 
+    ####################### Pgan/main Dataset block of code ############################
     # Get DataLoader
     batch_size = max(1, args.base_batch_size // (2 ** (phase - 1)))
     
@@ -569,7 +557,7 @@ def set_format(channel_format):
 # Pasted from Gan3DTrainAngle() in AngleTrain
 # Training Function - build & compile discriminator, build & compile generator, run the generator and discriminator, unused callback list functions, read TrainFiles & TestFiles,
 #                     run through epochs, train the generator & discriminator, collect discriminator losses, collect generator losses, test, save weights every epoch
-def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', img3dscale=1, img3dpower=1, angscale=1, angtype='theta', e_pscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
+def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir, pklfile, global_batch_size, nb_epochs=30, batch_size=128, latent_size=254, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', img3dscale=1, img3dpower=1, angscale=1, angtype='theta', e_pscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], warmup_epochs=0):
     start_init = time.time()
     verbose = False    
     particle='Ele'
@@ -962,7 +950,7 @@ def run(config):
         tf.reset_default_graph()
         
         # call dataset() -- replaces dataset block of code in pgan main()
-        npy_data = dataset(phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels) 
+        npy_data = dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels) 
         
         # call optimizers() -- replaces block of code in pgan main()
         # get the optimizers specified in the parameters

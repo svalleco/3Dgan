@@ -26,7 +26,7 @@ else:
 
 
 # Generator - 7 layers (stronger G = better results), uses ReLu (sparsity), clustered up-sampling operations to help with convergence at the lower distribution tails.
-def generator(latent_size=200, return_intermediate=False):
+def generator(latent_size=254, return_intermediate=False):
     if K.image_data_format() =='channels_last':
         dim = (9,9,8,8)
         baxis=-1 # axis for BatchNormalization
