@@ -48,6 +48,8 @@ def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale
     e_p = np.array(f.get('energy'))/e_pscale       # e_p is an array of scaled energy data from f, one value is concatenated onto the latent vector
     img3d[img3d < thresh] = 0        # when img3d values are less than the threshold, they are reset to 0
     
+    img3d = img3d[0, :, :, :, 0]    #[5000,51,51,25,1] --> [51,51,25]
+    
     # set img3d, e_p, and ang as float 32 datatypes
     img3d = img3d.astype(np.float32)
     e_p = e_p.astype(np.float32)
