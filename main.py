@@ -44,57 +44,70 @@ def GetDataAngle(datafile, img3dscale =1, img3dpower=1, e_pscale = 100, angscale
     print ('Loading Data from .....', datafile)
     f = h5py.File(datafile,'r')                    # load data into f variable
     ang = np.array(f.get(angtype))                 # ang is an array of angle data from f, one value is concatenated onto the latent vector
-    img3d = np.array(f.get('ECAL'))* img3dscale    # img3d is a 3d array, cut from the cylinder that the calorimeter produces (has 25 layers along z-axis)
+    3d_imgs = np.array(f.get('ECAL'))* img3dscale    # img3d is a 3d array, cut from the cylinder that the calorimeter produces (has 25 layers along z-axis)
     e_p = np.array(f.get('energy'))/e_pscale       # e_p is an array of scaled energy data from f, one value is concatenated onto the latent vector
-    img3d[img3d < thresh] = 0        # when img3d values are less than the threshold, they are reset to 0
+    3d_imgs[3d_imgs < thresh] = 0        # when 3d_imgs values are less than the threshold, they are reset to 0
     
-    img3d = img3d[0, :, :, :, 0]    #[5000,51,51,25,1] --> [51,51,25]
-    
-    # set img3d, e_p, and ang as float 32 datatypes
-    img3d = img3d.astype(np.float32)
+    # set 3d_imgs, e_p, and ang as float 32 datatypes
+    3d_imgs = 3d_imgs.astype(np.float32)
     e_p = e_p.astype(np.float32)
     ang = ang.astype(np.float32)
     
-    img3d = np.expand_dims(img3d, axis=-1)         # insert a new axis at the beginning for img3d
+    3d_imgs = np.expand_dims(3d_imgs, axis=-1)         # insert a new axis at the beginning for 3d_imgs
     
     # sum along axis
-    ecal = np.sum(img3d, axis=(1, 2, 3))    # summed img3d data, used for training the discriminator
+    ecal = np.sum(3d_imgs, axis=(1, 2, 3))    # summed 3d_imgs data, used for training the discriminator
      
-    # img3d ^ img3dpower
-    if img3dpower !=1.:
-        img3d = np.power(img3d, img3dpower)
+    # 3d_imgs ^ 3d_imgspower
+    if 3d_imgspower !=1.:
+        3d_imgs = np.power(3d_imgs, 3d_imgspower)
             
-    # img3d=ecal data; e_p=energy data; ecal=summed img3d (used to train the discriminator); ang=angle data
-    return img3d, e_p, ang, ecal
+    # 3d_imgs=ecal data; e_p=energy data; ecal=summed 3d_imgs (used to train the discriminator); ang=angle data
+    return 3d_imgs, e_p, ang, ecal
 
 
-# Takes [51x51x25] image array and size parameter --> [sizexsizex25]
-def resize(image_array, size):
-
-    img = PIL.Image.fromarray(image_array, mode=None)  #51x51x25 image
-    if size < 64:
-        resized_img = tf.image.resize(img, [size, size, 25], method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_img = tf.image.resize(img, [size, size, 25], method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_img = tf.image.resize(img, [size, size, 25], method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_img = tf.image.resize(img, [size, size, 25], method='bilinear', preserve_aspect_ratio=False, antialias=False, name=None)
-        #resized_img = tf.image.resize(img, [size, size, 25], method='nearest', preserve_aspect_ratio=False, antialias=False, name=None)
-        resized_image_array = np.asarray(resized_img)
-    elif size == 64:    
-        resized_image_array = np.pad(image_array, ((7,6), (7,6), (0,0)), mode='empty') #minimum') # try other padding methods?
-        # pad to [64x64x25] - generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
-    else: 
-        print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
+# Takes [5000x51x51x25] image array and size parameter --> [sizexsizex25]
+def resize(3d_imgs, size):
+    resized_3d_imgs = np.array([]) # create an array to hold all 5000 resized 3d_imgs
     
-    return resized_image_array
+    for num_img in np.arange(5000):     #index through the 5000 3d images packed in
+        3d_img = 3d_imgs[num_img, :, :, :, 0]    #[5000,51,51,25,1] --> an individual [51,51,25] 3d image
+        
+        resized_3d_img = np.zeros(size, size, 25)   # create an empty 3d_image to store each of the 25 adjusted 2d images when we are done adjusting their size
+        
+        for cal_layer in np.arange(25):    #index through the 25 calorimeter layers
+            2d_img = 3d_img[:, :, cal_layer]
+            
+            if size < 64:
+                2d_img = PIL.Image.fromarray(2d_img, mode=None)  #51x51x25 image
+                resized_2d_img = tf.image.resize(img, [size, size, 25], method='neares', preserve_aspect_ratio=False, antialias=False, name=None)
+                #resized_img = tf.image.resize(img, [size, size, 25], method='lanczos3', preserve_aspect_ratio=False, antialias=False, name=None)
+                #resized_img = tf.image.resize(img, [size, size, 25], method='lanczos5', preserve_aspect_ratio=False, antialias=False, name=None)
+                #resized_img = tf.image.resize(img, [size, size, 25], method='bilinear', preserve_aspect_ratio=False, antialias=False, name=None)
+                #resized_img = tf.image.resize(img, [size, size, 25], method='bicubic', preserve_aspect_ratio=False, antialias=False, name=None)
+                resized_2d_img = np.asarray(resized_img)
+            
+            elif size == 64:    
+                resized_2d_img = np.pad(2d_img, ((7,6), (7,6), (0,0)), mode='empty') #minimum') # try other padding methods?
+                # pad to [64x64x25] - generic padding function option - Gul rukh prefers this to bicubic/lanczos (so no data disruption)
+            else: 
+                print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
+    
+            resized_3d_img[:, :, cal_layer] = resized_2d_img   # save our resized_2d_img in the 3d_img corresponding to the calorimeter layer
+                
+        resized_3d_imgs = np.append(resized_3d_imgs, resized_3d_img)   # save our 3d image in the array holding all 5000 3d images
+    
+    return resized_3d_imgs   #returns an array of the 5000 resized 3d images
 
 
 # dataset function from pgan code
 def dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels):
   
-    img3d, e_p, ang, ecal = GetDataAngle(datafile)
+    3d_imgs, e_p, ang, ecal = GetDataAngle(datafile)
+    resized_3d_imgs = resize(3d_imgs, size)
+    
     # we need to decide later how to incorporate the e_p and ang variables (anglegan concatenates them to the latent vector)
     size = 2 * 2 ** phase   #[4,8,16,32,64] 
-    resized_img3d = resize(img3d, size)   #51x51x25 --> size x size x 25
     
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
