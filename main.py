@@ -99,7 +99,6 @@ def dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_
     data_path = os.path.join(args.dataset_path, f'{args.size}x{args.size}/')
     npy_data = NumpyPathDataset(data_path, args.scratch_path, copy_files=local_rank == 0, is_correct_phase=phase >= args.starting_phase)
     
-    return npy_data
 
     ####################### Pgan/main Dataset block of code ############################
     # Get DataLoader
@@ -121,6 +120,7 @@ def dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_
     if real_label is not None:
         real_label = tf.one_hot(real_label, depth=args.num_labels)
 
+    return npy_data, real_image_input, real_label, base_shape, batch_size
 
 # returns optimizers (Adam=default) and gen/disc learning rates, called in run() during phase loop, replaces optimizers block of code in pgan main()
 def optimizers():
@@ -178,10 +178,10 @@ def optimizers():
         update_g_lr = g_lr.assign(g_lr * args.g_annealing)
         update_d_lr = d_lr.assign(d_lr * args.d_annealing)
 
-    return g_lr, d_lr, optimizer_gen, optimizer_disc
+    return g_lr, d_lr, optimizer_gen, optimizer_disc, lr_step, update_step, update_g_lr, update_d_lr
 
 
-def networks():
+def networks(config, phase, generator, discriminator, g_lr, d_lr, optimizer_gen, optimizer_disc, lr_step, update_step, update_g_lr, update_d_lr, npy_data, real_image_input, real_label, base_shape, batch_size, base_dim, num_phases, var_list, verbose, logdir, writer):
     with tf.variable_scope('alpha'):
         alpha = tf.Variable(1, name='alpha', dtype=tf.float32)
         # Alpha init
@@ -195,15 +195,15 @@ def networks():
 
         if args.optim_strategy == 'simultaneous':
             gen_loss, disc_loss, gp_loss, gen_sample = forward_simultaneous(
-                args.generator,
-                args.discriminator,
-                args.real_image_input,
+                generator,
+                discriminator,
+                real_image_input,
                 args.latent_dim,
                 alpha,
-                args.phase,
-                args.num_phases,
-                args.base_dim,
-                args.base_shape,
+                phase,
+                num_phases,
+                base_dim,
+                base_shape,
                 args.activation,
                 args.leakiness,
                 args.network_size,
@@ -213,13 +213,13 @@ def networks():
             gen_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
             disc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
 
-            g_gradients, g_variables = zip(*args.optimizer_gen.compute_gradients(gen_loss,
+            g_gradients, g_variables = zip(*optimizer_gen.compute_gradients(gen_loss,
                                                                             var_list=gen_vars))
             if args.g_clipping:
                 g_gradients, _ = tf.clip_by_global_norm(g_gradients, 1.0)
 
 
-            d_gradients, d_variables = zip(*args.optimizer_disc.compute_gradients(disc_loss,
+            d_gradients, d_variables = zip(*optimizer_disc.compute_gradients(disc_loss,
                                                                              var_list=disc_vars))
             if args.d_clipping:
                 d_gradients, _ = tf.clip_by_global_norm(d_gradients, 1.0)
@@ -234,29 +234,29 @@ def networks():
         elif args.optim_strategy == 'alternate':
 
             disc_loss, gp_loss = forward_discriminator(
-                args.generator,
-                args.discriminator,
-                args.real_image_input,
+                generator,
+                discriminator,
+                real_image_input,
                 args.latent_dim,
                 alpha,
-                args.phase,
-                args.num_phases,
+                phase,
+                num_phases,
                 args.base_dim,
-                args.base_shape,
+                base_shape,
                 args.activation,
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
                 args.gp_weight,
-                conditioning=args.real_label
+                conditioning=real_label
             )
 
             disc_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='discriminator')
-            d_gradients = args.optimizer_disc.compute_gradients(disc_loss, var_list=disc_vars)
+            d_gradients = optimizer_disc.compute_gradients(disc_loss, var_list=disc_vars)
             d_norms = tf.stack([tf.norm(grad) for grad, var in d_gradients if grad is not None])
             max_d_norm = tf.reduce_max(d_norms)
 
-            train_disc = args.optimizer_disc.apply_gradients(d_gradients)
+            train_disc = optimizer_disc.apply_gradients(d_gradients)
 
             with tf.control_dependencies([train_disc]):
                 gen_sample, gen_loss = forward_generator(
@@ -280,7 +280,7 @@ def networks():
                 g_gradients = args.optimizer_gen.compute_gradients(gen_loss, var_list=gen_vars)
                 g_norms = tf.stack([tf.norm(grad) for grad, var in g_gradients if grad is not None])
                 max_g_norm = tf.reduce_max(g_norms)
-                train_gen = args.optimizer_gen.apply_gradients(g_gradients)
+                train_gen = optimizer_gen.apply_gradients(g_gradients)
 
         else:
             raise ValueError("Unknown optim strategy ", args.optim_strategy)
@@ -374,7 +374,7 @@ def networks():
 
             var_list = gen_vars + disc_vars
 
-            if phase < args.starting_phase:
+            if phase < args.starting_phase: 
                 continue
 
             if phase == args.starting_phase:
@@ -550,8 +550,9 @@ def setup_horovod():
 # calls: dataset(), optimizers(), builds generator and discriminator
 # calls get_args(), sets the channels, initializes horovod (similar to main() in AngleTrain and saraGAN/main())
 def run(config):
-    # parse and return global arguments (params)
+    # parse and return global arguments 
     get_args()
+    global global_size, global_rank, global_step
     
     # Get the discriminator and generator from the architecture of choice
     if args.architecture == 'AngleArch3dGAN':
@@ -608,14 +609,14 @@ def run(config):
         tf.reset_default_graph()
         
         # call dataset() -- replaces dataset block of code in pgan main()
-        npy_data = dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels) 
+        npy_data, real_image_input, real_label, base_shape, batch_size = dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels) 
         
         # call optimizers() -- replaces block of code in pgan main()
         # get the optimizers specified in the parameters
-        g_lr, d_lr, optimizer_gen, optimizer_disc = optimizers()
+        g_lr, d_lr, optimizer_gen, optimizer_disc, lr_step, update_step, update_g_lr, update_d_lr = optimizers()
         
         # call networks() -- replaces networks block of code in pgan main()
-        networks()
+        networks(config, phase, generator, discriminator, g_lr, d_lr, optimizer_gen, optimizer_disc, lr_step, update_step, update_g_lr, update_d_lr, npy_data, real_image_input, real_label, base_shape, batch_size, base_dim, num_phases, var_list, verbose, logdir, writer)
         
         
 # calls run()
