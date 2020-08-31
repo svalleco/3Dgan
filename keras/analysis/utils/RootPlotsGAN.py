@@ -1816,7 +1816,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
       plot_max(var["max_pos_act" + str(energy)], var["max_pos_gan" + str(energy)],
                x, y, z, os.path.join(actdir, maxlfile),
                os.path.join(gendir, maxlfile), os.path.join(comdir, 'log' + maxlfile),
-               energy, labels, log=1, p=p, stest=stest, ifpdf=ifpdf, grid=grid, leg=leg, mono=mono)
+               energy, labels, log=1, p=p, stest=stest, ifpdf=ifpdf, grid=grid, leg=leg, statbox=statbox, mono=mono)
       plots+=1
       plot_energy_hist_root(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)],
                                var["sumsz_act"+ str(energy)], var["sumsx_gan"+ str(energy)],
@@ -2131,7 +2131,7 @@ def PlotEvent(event, energy, theta, out_file, n, opt="", unit='degrees', label="
    canvas.Update()
    canvas.Print(out_file)
 
-def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees', label="", logz=0):
+def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees', label="", logz=0, ifC=0):
    x = aevent.shape[0]
    y = aevent.shape[1]
    z = aevent.shape[2]
@@ -2317,7 +2317,7 @@ def PlotEvent2(aevent, gevent, energy, theta, out_file, n, opt="", unit='degrees
 
    canvas.Update()
    canvas.Print(out_file + '.pdf')
-   canvas.Print(out_file + '.C')
+   if ifC: canvas.Print(out_file + '.C')
 
 def PlotEventFixed(event, energy, out_file, n, opt="", label="", log=0):
    canvas = ROOT.TCanvas("canvas" ,"GAN Hist" ,200 ,10 ,700 ,500) #make
