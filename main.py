@@ -66,37 +66,59 @@ def GetDataAngle(datafile, imgs3dscale =1, imgs3dpower=1, e_pscale = 100, angsca
     return imgs3d, e_p, ang, ecal     
  
 
-# Takes [5000x51x51x25] image array and size parameter --> returns [5000 x size x size x 25] np.array that is 5000 3d images
-def resize(imgs3d, size):
-    resized_imgs3d = np.zeros((5000, size, size, 25)) # create an array to hold all 5000 resized imgs3d
-    
+# Takes [5000x51x51x25] image array and size parameter --> returns [5000 x size x size x size or size/2] np.array that is 5000 3d images
+def resize(imgs3d, size, mode='rectangle'):
+    if mode == 'square':
+        resized_imgs3d = np.zeros((5000, size, size, size)) # create an array to hold all 5000 resized imgs3d
+    else:    # mode == 'rectangle'
+        resized_imgs3d = np.zeros((5000, size, size, int(size/2))) # create an array to hold all 5000 resized imgs3d
+
+
     for num_img in np.arange(5000):     # index through the 5000 3d images packed in
         img3d = imgs3d[num_img, :, :, :, 0]    # grab an individual [51,51,25] 3d image
-        
-        resized_img3d = np.zeros((size, size, 25))   # create an empty 3d_image to store each of the 25 adjusted 2d images when we are done adjusting their size
-        
-        for cal_layer in np.arange(25):    # index through the 25 calorimeter layers
-            img2d = img3d[:, :, cal_layer]
+       if size < 64:
             
-            if size < 64:
+           # resize XY-plane to (size x size)
+            xy_resized_img3d = np.zeros((size, size, 25))   # create an empty 3d_image to store changes
+            for z_index in np.arange(25):    # index through the 25 calorimeter layers of the z-axis
+                img2d = img3d[:, :, z_index]   # grab a 2d image from the xy plane
                 resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
-            elif size == 64:    
-                resized_img2d = np.pad(img2d, ((7,6), (7,6)), mode='minimum') #empty') # try other padding methods? pad to [64x64x25] 
-            else: 
+                xy_resized_img3d[:, :, z_index] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
+
+            # resize YZ-plane to (size x size or size/2)        
+            if mode == 'square':
+                resized_img3d = np.zeros((size, size, size))   # create an empty 3d_image to store changes
+            else:    # mode == 'rectangle'
+                resized_img3d = np.zeros((size, size, int(size/2)))   # create an empty 3d_image to store changes            # resize YZ-plane to (size,size)=square or (size,size/2)=rectangle
+            for x_index in np.arange(size):    # index through the 51 values of x-axis
+                img2d = xy_resized_img3d[x_index, :, :]
+                if mode == 'square':
+                    resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
+                else:    # mode == 'rectangle'
+                    resized_img2d = cv2.resize(img2d, dsize=(int(size/2), size), interpolation=cv2.INTER_NEAREST)
+                resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
+            
+        elif size == 64: # NOTE: WON'T WORK WELL TO USE SIZE 64 IF YOU ARE USING THE SQUARE MODE (STRETCHING 25 --> 64), STOP AT SIZE 32
+            if mode == 'rectangle':
+                resized_img3d = np.pad(img3d, ((7,6), (7,6), (4,3)), mode='minimum')  # pad centrally with zeroes to [64x64x32] 
+            elif mode == 'square':
+                resized_img3d = np.pad(img3d, ((7,6), (7,6), (19, 20)), mode='minimum')  # pad centrally with zeroes to [64x64x64] -- MIGHT BE MESSY!
+        
+        elif size == 51:   # unchanged
+            return resized_imgs3d
+        else: 
                 print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
     
-            resized_img3d[:, :, cal_layer] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
-
         resized_imgs3d[num_img, :, :, :] = resized_img3d   # save our 3d image in the matrix holding all 5000 3d images
+    return resized_imgs3d   # returns a [5000, size, size, size or size/2] np.array matrix that is 5000 3d images [size, size, size or size/2]
 
-    return resized_imgs3d   # returns a [5000, size, size, 25] np.array matrix that is 5000 3d images [size, size, 25]
 
 
 # dataset function from pgan code
 def dataset(datafile, phase, local_rank, global_size, verbose, final_shape, num_phases, image_channels):
   
     imgs3d, e_p, ang, ecal = GetDataAngle(datafile)
-    resized_imgs3d = resize(imgs3d, size)    # returns np.array of 5000 sizexsizex25 3d images
+    resized_imgs3d = resize(imgs3d, size, mode='rectangle')    # returns np.array of 5000 sizexsizex25 3d images
     
     # we need to decide later how to incorporate the e_p and ang variables (anglegan concatenates them to the latent vector)
     size = 2 * 2 ** phase   #[4,8,16,32,64] 
