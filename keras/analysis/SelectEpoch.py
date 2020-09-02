@@ -16,7 +16,7 @@ import ROOT
 import argparse
 from scipy import stats
 from scipy.stats import wasserstein_distance as wass
-if 'cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
+if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used
     tlab = True
 else:
     tlab= False
@@ -53,7 +53,8 @@ def main():
    leg= params.leg
    statbox= params.statbox
    mono= params.mono
-   gweightdir= params.gweightsdir
+   gweightdir= params.gweightsdir if isinstance(params.gweightsdir, list) else [params.gweightsdir]
+   labels = params.labels if isinstance(params.labels, list) else [params.labels]
    xscale= params.xscale 
    yscale= params.yscale
    xpower = params.xpower
@@ -61,82 +62,83 @@ def main():
    dformat = params.dformat
    fits = params.fits if isinstance(params.fits, list) else [params.fits]
    opt = params.opt if isinstance(params.opt, list) else [params.opt]
-   if ang==1:
+   if ang:
      from AngleArch3dGAN import generator # architecture
+     dscale = 50.
      if not xscale:
        xscale=1.
      if not xpower:
        xpower = 0.85
      if not latent:
        latent = 256
-   if ang==2:
-     from AngleArch3dGAN_2 import generator # architecture
-     if not xscale:
-       xscale=1.
-     if not xpower:
-       xpower = 0.85
-     if not latent:
-       latent = 256
+     if datapath=='reduced':
+       if tlab:
+         datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
+       else:
+         datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path for 100-200 GeV must be changed here 
+       events_per_file = 5000
+       energies = [0, 110, 150, 190]
+     else:
+       if datapath=='full':
+         datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech
+       else:
+         datapath = datapath + "/*scan/*scan_RandomAngle_*.h5"
+       events_per_file = 10000
+       energies =[0, 50, 100, 150, 200, 250, 300, 350, 400, 450]
    else:
-     from EcalEnergyGan2 import generator
+     from EcalEnergyGan import generator
+     dscale = 1.
      if not xscale:
        xscale=100.
      if not xpower:
        xpower = 1.
      if not latent:
        latent =200
-   
-   if ang:
-     if datapath=='reduced':
-       datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV
-       events_per_file = 5000
-       energies = [0, 110, 150, 190]
-       dscale = 50.
-     elif datapath=='full':
-       datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-       events_per_file = 10000
-       energies =[0, 50, 100, 150, 200, 250, 300, 350, 400, 450]
-       dscale = 50.
-   else: 
-     datapath = "/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5"
+     if datapath=='full':
+       datapath = "/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5"
+     else:
+       datapath = datapath + "/*scan/*scan_*.h5"
      events_per_file = 10000
      energies =[0, 100, 200, 300, 400]
-     dscale = 1.
-    
-   if tlab:
-     datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
-   
-   genpath =  gweightdir +'/*generator*.hdf5'# path to weights
+
+   genpaths =[]
+   # get a list of paths for all weight directories from different trainings
+   for gweight in gweightdir:
+      genpaths.append( gweight +'/*generator*.hdf5')# path to weights
    sorted_path = 'Anglesorted'  # where sorted data is to be placed
-   g= generator(latent_size=latent)
-   
+   print(latent)
+   g= generator(latent_size=latent, dformat=dformat) # generator
    gen_weights=[]
-      
-   gan.safe_mkdir(outdir)
-
-   for f in sorted(glob.glob(genpath)):
-      gen_weights.append(f)
+   gan.safe_mkdir(outdir) # make a diretory for results
+   # list of lists of weights for each path
+   for index, genpath in enumerate(genpaths):
+      gen_weights.append(sorted(glob.glob(genpath))) # append all weights for a particular path
+      gen_weights[index]=gen_weights[index][start:stop] # select weights based on start and stop
+   epochs = []
+   for index, gen_weight in enumerate(gen_weights):
+     epoch=[]
+     for i in np.arange(len(gen_weight)):
+        name = os.path.basename(gen_weight[i])
+        num = int(filter(str.isdigit, name)[:-1])# get the epoch number from the weights
+        epoch.append(num) # make a list of epochs from one path
+     epochs.append(epoch)# append this list to a list for all paths
+     print("{} weights are found in {}".format(len(gen_weight), gweightdir[index])) 
    
-   gen_weights=gen_weights[start:stop]
-   epoch = []
-   for i in np.arange(len(gen_weights)):
-      name = os.path.basename(gen_weights[i])
-      num = int(filter(str.isdigit, name)[:-1])
-      epoch.append(num)
-
-   print("{} weights are found".format(len(gen_weights)))
+   # Get results and errors
    result, error_bar = GetResults(opt, outdir, gen_weights, g, datapath, sorted_path, particle
             , scale=xscale, power=xpower, thresh=thresh, ang=ang, concat=concat, latent=latent
             , energies=energies, nbEvents=nbEvents, eventsperfile=events_per_file, dscale=dscale
              )
+   # make plots
    for i, op in enumerate(opt):
-      r= result[i::len(opt)]
+      r=[]
+      for res in result:
+        r.append(res[i::len(opt)])     
       if op=='mre':
-         #error_bar = error_bar[i::len(opt)]
-         PlotResultsErrors(r, error_bar, op, outdir, epoch, fits, sl, ang=ang, particle=particle)
+         PlotResultsErrors(r, error_bar, op, outdir, epochs, fits, sl=sl, labels=labels, ang=ang)
       else:
-         PlotResultsRoot(r, op, outdir, epoch, fits, sl, ang=ang)
-
+         PlotResultsRoot(r, op, outdir, epochs, fits, sl=sl, labels=labels, ang=ang)
+ 
 def get_parser():
     # defaults apply at caltech
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -146,7 +148,7 @@ def get_parser():
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle used.')
     parser.add_argument('--outdir', action='store', type=str, default='results/best_epoch_gan_training/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
-    parser.add_argument('--nbEvents', action='store', type=int, default=10000, help='Max limit for events used for Testing')
+    parser.add_argument('--nbEvents', action='store', type=int, default=20000, help='Max limit for events used for Testing')
     parser.add_argument('--eventsperfile', action='store', type=int, default=5000, help='Number of events in a file')
     parser.add_argument('--binevents', action='store', type=int, default=10000, help='Number of events in each bin')
     parser.add_argument('--start', action='store', type=int, default=0, help='plot beginning from epoch')
@@ -161,7 +163,8 @@ def get_parser():
     parser.add_argument('--leg', action='store_true', default=False, help='add legends')
     parser.add_argument('--statbox', action='store_true', default=False, help='add statboxes')
     parser.add_argument('--mono', action='store_true', default=False, help='changing line style as well as color for comparison')
-    parser.add_argument('--gweightsdir', action='store', type=str, default='../weights/3dgan_weights_gan_training_epsilon_2_500GeV//', help='paths to Generator weights.')
+    parser.add_argument('--gweightsdir', action='store', type=str, nargs='+', default='../weights/3dgan_weights_gan_training_epsilon_2_500GeV/', help='paths to Generator weights.')
+    parser.add_argument('--labels', action='store', type=str, nargs='+', default='', help='labels for Generator weights.')
     parser.add_argument('--xscale', action='store', type=int, help='Multiplication factors for cell energies')
     parser.add_argument('--yscale', action='store', help='Division Factor for Primary Energy.')
     parser.add_argument('--xpower', action='store', help='Power of cell energies')
@@ -183,49 +186,50 @@ def taking_power(n, xscale=1, power=1):
 def inv_power(n, xscale=1, power=1.):
     return np.power(n, 1./power)/xscale
 
-def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, ang=1, particle='Ele'):
+def PlotResultsErrors(results, error_bars, opt, resultdir, epochs, fits, labels=[''], sl=10, ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
-    #c1.SetGrid ()
     legend = ROOT.TLegend(.4, .7, .89, .89)
     legend.SetTextSize(0.028)
     legend.SetBorderSize(0)
     mg=ROOT.TMultiGraph()
-    colors = [2, 8, 4, 6, 7]
-    num = len(result)
-    sf_e  = np.zeros((num))
-    er = np.zeros((num))
-    epoch = np.zeros((num))
+    colors = [4, 6, 7, 8, 3]
+    graphs=[]
+    for index, result in enumerate(results):
+       num = len(result)
+       sf_e  = np.zeros((num))
+       er = np.zeros((num))
+       epoch = np.zeros((num))
       
-    mins =1000
-    mins_n =0
-    j=0
-    for i, item in enumerate(result):
-      if item!=0:
-        epoch[j] = epochs[i]       
-        sf_e[j]=item
-        er[j] = error_bar[i]
-        j+=1
-    if  num<sl: sl=num
-    for i in range(num):
-      if epoch[i] > epoch[num-1]-sl:
-        if sf_e[i] <= mins:
-         mins = sf_e[i]
-         mins_n = epoch[i]
-    er_x = 0.5 * np.zeros((num))                                         
-    gs = ROOT.TGraphErrors(j, epoch[:j], sf_e[:j], er_x[:j], er[:j])
-    gs.SetLineColor(colors[0])
-    legend.AddEntry(gs, "min for epoch {}= {:.4f}".format(mins_n, mins), "l")
-    c1.Update()
+       mins =1000
+       mins_n =0
+       j=0
+       for i, item in enumerate(result):
+         if item!=0:
+           epoch[j] = epochs[index][i]       
+           sf_e[j]=item
+           er[j] = error_bars[index][i]
+           j+=1
+       if  num<sl: sl=num
+       for i in range(num):
+        if epoch[i] > epoch[num-1]-sl:
+          if sf_e[i] <= mins:
+            mins = sf_e[i]
+            mins_n = epoch[i]
+       er_x = 0.5 * np.zeros((num))                                         
+       graphs.append(ROOT.TGraphErrors(j, epoch[:j], sf_e[:j], er_x[:j], er[:j]))
+       gs = graphs[index]
+       gs.SetLineColor(colors[index])
+       mg.Add(gs)
+       legend.AddEntry(gs, "{} (min epoch {}= {:.4f})".format(labels[index], mins_n, mins), "l")
+       c1.Update()
     if opt=='chi2' or opt=='ks':
        title = "-log[{}] for sampling fraction (selecting from last {} epochs);Epochs;{}"
     else:
-       title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"                    
-    gs.SetTitle(title.format(opt, sl, opt))
-    gs.Draw()
-    if particle=='ChPi':
-      gs.GetYaxis().SetRangeUser(0, 0.5)
-    else:
-      gs.GetYaxis().SetRangeUser(0, 0.2)
+       title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"
+    print(title.format(opt, sl, opt))
+    mg.SetTitle(title.format(opt, sl, opt))
+    mg.Draw('APL')
+    mg.GetYaxis().SetRangeUser(0, 0.2)
     c1.Update()
     legend.Draw()
     c1.Update()
@@ -233,47 +237,52 @@ def PlotResultsErrors(result, error_bar, opt, resultdir, epochs, fits, sl=10, an
 
 
 #Plots results in a root file
-def PlotResultsRoot(result, opt, resultdir, epochs, fits, sl=10, ang=1):
+def PlotResultsRoot(results, opt, resultdir, epochs, fits, labels=[''], sl=10, ang=1):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
-    #c1.SetGrid ()
     legend = ROOT.TLegend(.4, .7, .89, .89)
-    legend.SetTextSize(0.028)
     legend.SetBorderSize(0)
     mg=ROOT.TMultiGraph()
-    colors = [2, 8, 4, 6, 7]
-    num = len(result)
-    sf_e  = np.zeros((num))
-    epoch = np.zeros((num))
+    colors = [4, 6, 7, 8, 3]
+    graphs=[]
+    print(epochs)
+    for index, result in enumerate(results):
+      num = len(result)
+      sf_e  = np.zeros((num))
+      epoch = np.zeros((num))
       
-    mins =1000
-    mins_n =0
-    j=0
-    for i, item in enumerate(result):
-      if item!=0:
-        epoch[j] = epochs[i]       
-        sf_e[j]=item
-        j+=1
-    if  num<sl: sl=num
-    for i in range(num):
-      if epoch[i] > num-sl:
-        if sf_e[i] <= mins:
-         mins = sf_e[i]
-         mins_n = epoch[i]
+      mins =1000
+      mins_n =0
+      j=0
+      for i, item in enumerate(result):
+        if item!=0:
+          epoch[j] = epochs[index][i]       
+          sf_e[j]=item
+          j+=1
+      if  num<sl: sl=num
+      for i in range(num):
+        if epoch[i] > num-sl:
+          if sf_e[i] <= mins:
+            mins = sf_e[i]
+            mins_n = epoch[i]
                                          
-    gs = ROOT.TGraph(j, epoch[:j], sf_e[:j])
-    gs.SetLineColor(colors[0])
-    gs.SetMarkerColor(colors[0])
-    gs.SetMarkerStyle(5)
-    mg.Add(gs)
-    legend.AddEntry(gs, "min for epoch {}= {:.4f}".format(mins_n, mins), "l")
-    c1.Update()
+      graphs.append(ROOT.TGraph(j, epoch[:j], sf_e[:j]))
+      gs = graphs[index]
+      gs.SetLineColor(colors[index])
+      gs.SetMarkerColor(colors[index])
+      gs.SetMarkerStyle(5)
+      mg.Add(gs)
+      legend.AddEntry(gs, "{} (min epoch {}= {:.4f})".format(labels[index], mins_n, mins), "l")
+      c1.Update()
     if opt=='chi2' or opt=='ks':
-       title = "-log[{}] for sampling fraction (selecting from last {} epochs);Epochs;{}"
+      title = "-log[{}] for sampling fraction (selecting from last {} epochs);Epochs;{}"
+      ymax = 1.2 * np.amax(sf_e)
     else:
-       title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"                    
+      title = "{} for sampling fraction (selecting from last {} epochs);Epochs;{}"
+      ymax= 0.02
     mg.SetTitle(title.format(opt, sl, opt))
     mg.Draw('ALP')
-    mg.GetYaxis().SetRangeUser(0, 1.2 * np.amax(sf_e))
+    
+    mg.GetYaxis().SetRangeUser(0, ymax)
     c1.Update()
     legend.Draw()
     c1.Update()
@@ -281,10 +290,10 @@ def PlotResultsRoot(result, opt, resultdir, epochs, fits, sl=10, ang=1):
 
     for i, fit in enumerate(fits):
       mg.SetTitle(title.format(opt, sl, opt))  
-      
-      gs.Fit(fit)
-      gs.GetFunction(fit).SetLineColor(colors[0])
-      gs.GetFunction(fit).SetLineStyle(2)
+      for index, gs in enumerate(graphs):
+        gs.Fit(fit)
+        gs.GetFunction(fit).SetLineColor(colors[index])
+        gs.GetFunction(fit).SetLineStyle(2)
 
       if i == 0:
         legend.AddEntry(gs.GetFunction(fit), '{} ({} fit)'.format(opt, fit), "l")
@@ -301,26 +310,32 @@ def postproc(n, scale=1):
         
 # results are obtained using metric and saved to a log file
 def GetResults(opt, resultdir, gen_weights, g, datapath, sorted_path, particle="Ele", scale=100, power=1, thresh=1e-6, ang=1, concat=1, latent = 256, energies=[110, 150, 190], nbEvents=100000, eventsperfile=5000, dscale=1.):
-    resultfile = os.path.join(resultdir,  'result_log.txt')
-    file = open(resultfile,'w')
     n = len(opt)
-    result, error_bar = analyse(g, False,True, gen_weights, datapath, sorted_path, opt, scale, power, particle, 
+    results=[]
+    error_bars=[]
+    for index, gen_weight in enumerate(gen_weights):
+       resultfile = os.path.join(resultdir,  'result_log{}'.format(index))
+       resultfile = resultfile + '.txt'
+       file = open(resultfile,'w')
+       result, error_bar = analyse(g, False,True, gen_weight, datapath, sorted_path, opt, scale, power, particle, 
                      thresh=thresh, ang=ang, concat=concat, latent=latent, energies=energies,
                      nbEvents= nbEvents, eventsperfile=eventsperfile, dscale=dscale)
-    for i, r in enumerate(result):
-       if i !=0 and i % n==0:
-         file.write('\n')
-       file.write(str(r)+'\t')
-    #print all results together at end                                                                               
-    for i in range(len(gen_weights)):                                                                                            
-       print ('The results for ......',gen_weights[i])
-       reslog = " The result = {}".format(result[n*i:n*i + n])
-       if 'mre' in opt:
-          reslog = reslog +' mre error {}'.format(error_bar[i])
-       print (reslog)
-    file.close
-    print ('The results are saved to {}.txt'.format(resultfile))
-    return result, error_bar
+       for i, r in enumerate(result):
+         if i !=0 and i % n==0:
+           file.write('\n')
+         file.write(str(r)+'\t')
+       file.close
+       #print all results together at end                                                                               
+       for i in range(len(gen_weights)):                                                                                            
+         print ('The results for ......',gen_weights[index][i])
+         reslog = " The result = {}".format(result[n*i:n*i + n])
+         if 'mre' in opt:
+            reslog = reslog +' mre error {}'.format(error_bar[i])
+         print (reslog)
+       print ('The results are saved to {}.txt'.format(resultfile))
+       results.append(result)
+       error_bars.append(error_bar)
+    return results, error_bars
 
 def GetAngleData_reduced(datafile, thresh=1e-6):
     #get data for training
@@ -416,14 +431,12 @@ def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimiz
 def mre(var, energies, ang=1):
    metrics = 0
    d = 0
-
    for energy in energies:
      #Relative error on mean moment value for each moment and each axis
      mean_sf_g4 = np.mean(var["sf_act"+ str(energy)])
      mean_sf_gan = np.mean(var["sf_gan"+ str(energy)])
      N = var["sf_act"+ str(energy)].shape[0]
      sf_error = np.divide(np.absolute(mean_sf_g4 - mean_sf_gan), mean_sf_g4)
-     #er = np.square((np.sqrt(N)/N) * sf_error)
      er = (np.square(np.std(var["sf_gan"+ str(energy)])/mean_sf_g4)/N) + (np.square(np.std(var["sf_act"+ str(energy)])/mean_sf_gan)/N)
      metrics +=sf_error
      d += er
@@ -497,7 +510,6 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     amask = np.ones_like(sumtot)
     amask[indexes] = 0
 
-    #amask = K.tf.where(K.equal(sumtot, 0.0), K.ones_like(sumtot) , K.zeros_like(sumtot))
     masked_events = np.sum(amask) # counting zero sum events
 
     x_ref = np.sum(np.sum(image, axis=(2, 3)) * np.expand_dims(np.arange(x_shape) + 0.5, axis=0), axis=1)
@@ -537,7 +549,6 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     ang = (math.pi/2.0) - np.arctan(m)
     ang = ang * zmask
 
-    #ang = np.sum(ang, axis=1)/zunmasked_events #mean
     ang = ang * z # weighted by position
     sumz_tot = z * zmask
     ang = np.sum(ang, axis=1)/np.sum(sumz_tot, axis=1)
