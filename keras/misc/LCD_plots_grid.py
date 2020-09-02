@@ -5,8 +5,8 @@ import math
 import sys
 import ROOT
 import os
-sys.path.insert(0,'../keras')
-sys.path.insert(0,'../keras/analysis')
+sys.path.insert(0,'../')
+sys.path.insert(0,'../analysis')
 import utils.GANutils as gan
 from utils.GANutils import perform_calculations_angle, safe_mkdir  # to calculate different Physics quantities
 import utils.ROOTutils as my # common utility functions for root
@@ -21,17 +21,17 @@ def main():
     from AngleArch3dGAN import generator, discriminator
 
     #Weights
-    disc_weight1="../keras/weights/surfsara_weights/params_discriminator_epoch_099.hdf5"
-    gen_weight1= "../keras/weights/surfsara_weights/params_generator_epoch_099.hdf5"
+    disc_weight1="../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_discriminator_epoch_021.hdf5"
+    gen_weight1= "../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5"
 
     #Path to store results
-    plotsdir = "results/analysis_grid_surfara_32nd"
+    plotsdir = "results/analysis_grid_epsilon_2_500GeV_ep21/"
     safe_mkdir(plotsdir)
     #Parameters
     latent = 256 # latent space
-    num_data = 500000
+    num_data = 800000
     num_events = 10000
-    num_events1 = 20000
+    num_events1 = 5000
     events_per_file = 10000
     thresh_hits = 3e-4
     m = 3  # number of moments
@@ -40,21 +40,21 @@ def main():
     concat = 2 # if concatenting angle to latent space
     cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
     corr=1 # if making correlation plots
-    # energies=[0, 50, 100, 200, 300, 400, 500] # energy bins
-    energies = [0, 110, 150, 190] 
-    angles = [62, 90, 118] #[math.radians(x) for x in [62, 90, 118]] # angle bins
+    energies=[0, 50, 100, 200, 300, 400, 500] # energy bins
+    #energies = [0, 110, 150, 190] 
+    angles = [70, 90, 110] #[math.radians(x) for x in [62, 90, 118]] # angle bins
     angtype = 'mtheta'# the angle data to be read from file
     particle='Ele'# partcile type
     thresh=0 # Threshold for ecal energies
-    #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
-    datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
+    datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate
+    #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path
     #datapath = "/bigdata/shared/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"
     sortdir = 'SortedAngleData'  # if saving sorted data
     gendir = 'SortedAngleGen'  # if saving generated events
     discdir = 'SortedAngleDisc' # if saving disc outputs
 
     Test = True # use test data
-    stest = False # K and chi2 test
+    stest = True # K and chi2 test
 
     #following flags are used to save sorted and GAN data and to load from sorted data. These are used while development and should be False for one time analysis
     save_data = False # True if the sorted data is to be saved. It only saves when read_data is false
@@ -144,11 +144,11 @@ def main():
                               
            energy_act.append(var["energy"+ str(energy) + "ang_" + str(theta)])
         thetas = [0, 62, 90, 118]
-        PlotSamplingGrid(ecal_act, ecal_gan, energy_act, hits_act, hits_gan, os.path.join(edir, 'samplig_grid{}'.format(energy)), energy, thetas, p=p, states=states,leg=legs, norm=norm, ifC=ifC)
-        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid{}'.format(energy)), energy, thetas, p=p, states=states,leg=legs, norm=norm, ifC=ifC)
-        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid_log{}'.format(energy)), energy, thetas, p=p, log=1, states=states,leg=legs, norm=norm, ifC=ifC)
-        PlotMomentHistGrid(momentx_act, momenty_act, momentz_act, momentx_gan, momenty_gan, momentz_gan, os.path.join(edir, 'moment_grid{}'.format(energy)), energy, thetas, p=p, states=states, leg=legs, norm=norm, ifC=ifC)
-        PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, os.path.join(edir, 'ratio_grid{}'.format(energy)), energy, thetas, p=p, states=states, leg=legs, norm=norm, ifC=ifC)        
+        PlotSamplingGrid(ecal_act, ecal_gan, energy_act, hits_act, hits_gan, os.path.join(edir, 'samplig_grid{}'.format(energy)), energy, thetas, p=p, states=states,leg=legs, norm=norm, ifC=ifC, stest=stest)
+        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid{}'.format(energy)), energy, thetas, p=p, states=states,leg=legs, norm=norm, ifC=ifC, stest=stest)
+        PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, os.path.join(edir, 'shapes_grid_log{}'.format(energy)), energy, thetas, p=p, log=1, states=states,leg=legs, norm=norm, ifC=ifC, stest=stest)
+        PlotMomentHistGrid(momentx_act, momenty_act, momentz_act, momentx_gan, momenty_gan, momentz_gan, os.path.join(edir, 'moment_grid{}'.format(energy)), energy, thetas, p=p, states=states, leg=legs, norm=norm, ifC=ifC, stest=stest)
+        PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, os.path.join(edir, 'ratio_grid{}'.format(energy)), energy, thetas, p=p, states=states, leg=legs, norm=norm, ifC=ifC, stest=stest)        
 
 def taking_power(n, scale=1.0, power=1.0):
     return(np.power(n * scale, power))
@@ -156,7 +156,7 @@ def taking_power(n, scale=1.0, power=1.0):
 def inv_power(n, scale=1.0, power=1.0):
     return(np.power(n, 1.0/power))/scale
       
-def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0):
+def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0, stest=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,300) #make
     canvas.SetGrid()
 
@@ -196,7 +196,7 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
             Eprof.SetStats(0)
             Gprof.SetStats(0)
         error = np.mean(np.abs(((ecal1[i]/penergy[i]) - (ecal2[i]/penergy[i]) )/(ecal1[i]/penergy[i])))
-        my.fill_profile(Eprof, ecal1[i]/(penergy[i]), penergy[i])
+        my.fill_profile(Eprof, penergy[i], ecal1[i]/(penergy[i]))
         Eprof.SetTitle(title)
         Eprof.SetTitleSize(0.8)
         Eprof.GetXaxis().SetTitle("Ep GeV")
@@ -211,8 +211,9 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         Eprof.GetXaxis().SetTitleOffset()
         legs[pad-1].AddEntry(Eprof, "G4", 'l')
         legs[pad-1].AddEntry(Gprof, "GAN", 'l')
-        #legs[pad-1].AddEntry(Eprof, "MAE={:.4f}".format(error), 'l')
-        my.fill_profile(Gprof, ecal2[i]/(penergy[i]), penergy[i])
+        if stest:
+          legs[pad-1].AddEntry(Eprof, "MAE={:.4f}".format(error), 'l')
+        my.fill_profile(Gprof, penergy[i], ecal2[i]/(penergy[i]))
         Gprof.SetLineColor(4)
         Gprof.SetLineStyle(2)
         #Gprof.SetMarkerStyle(3)
@@ -272,6 +273,9 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         if leg:
             legs[pad-1].AddEntry(h_act[i], "G4", 'l')
             legs[pad-1].AddEntry(h_gan[i], "GAN", 'l')
+            if stest:
+                k = h_act[i].KolmogorovTest(h_gan[i], 'WW')
+                legs[pad-1].AddEntry(h_gan[i], "k={:.4f}".format(k), 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -284,7 +288,7 @@ def PlotSamplingGrid(ecal1, ecal2, penergy, hits_act, hits_gan, out_file, energy
         canvas.Print(out_file + '.C')
                         
 
-def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0):
+def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0, stest=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,400) #make
     canvas.SetGrid()
    
@@ -471,7 +475,7 @@ def PlotEnergyHistGrid(sumx_act, sumx_gan, sumy_act, sumy_gan, sumz_act, sumz_ga
     if ifC:
         canvas.Print(out_file + '.C')
                         
-def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0):
+def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ratio3_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0, stest=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,500) #make
     canvas.SetGrid()
     label = "Weighted Histograms for {} GeV".format(energy)
@@ -535,6 +539,9 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if leg:
             legs[pad-1].AddEntry(r1_act[i], "G4", 'l')
             legs[pad-1].AddEntry(r1_gan[i], "GAN", 'l')
+            if stest:
+                k = r1_act[i].KolmogorovTest(r1_gan[i])
+                legs[pad-1].AddEntry(r1_gan[i], "k={:.4f}".format(k), 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -588,6 +595,10 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if leg:
             legs[pad-1].AddEntry(r2_act[i], "G4", 'l')
             legs[pad-1].AddEntry(r2_gan[i], "GAN", 'l')
+            if stest:
+               k = r2_act[i].KolmogorovTest(r2_gan[i])
+               legs[pad-1].AddEntry(r2_gan[i], "k={:.4f}".format(k), 'l')
+
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -644,6 +655,10 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
         if leg:
             legs[pad-1].AddEntry(r3_act[i], "G4", 'l')
             legs[pad-1].AddEntry(r3_gan[i], "GAN", 'l')
+            if stest:
+              k = r3_act[i].KolmogorovTest(r3_gan[i])
+              legs[pad-1].AddEntry(r3_gan[i], "k={:.4f}".format(k), 'l')
+
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -656,7 +671,7 @@ def PlotRatioGrid(ratio1_act, ratio2_act, ratio3_act, ratio1_gan, ratio2_gan, ra
     if ifC:
         canvas.Print(out_file + '.C')
 
-def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0):
+def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file, energy, thetas, log=0, ifC=False, p=[100, 200], states=0, leg=1, norm=0, stest=0):
     canvas = ROOT.TCanvas("canvas" ,"abc" ,200 ,10 ,800 ,500) #make
     canvas.SetGrid()
     label = "Weighted Histograms for {} GeV".format(energy)
@@ -709,8 +724,9 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if i==0:
           ymax = max(mmtx_act[i].GetMaximum(), mmtx_gan[i].GetMaximum())
         else:
-          ymax = max(ymax, mmtx_act[i].GetMaximum(), mmtx_gan[i].GetMaximum())
-
+          ymax = max(mmtx_act[i].GetMaximum(), mmtx_gan[i].GetMaximum())
+        ymax = 0.8
+        
         mmtx_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
 
         legs[pad-1].SetHeader('X2 moment', "C")
@@ -725,6 +741,9 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if leg:
             legs[pad-1].AddEntry(mmtx_act[i], "G4", 'l')
             legs[pad-1].AddEntry(mmtx_gan[i], "GAN", 'l')
+            if stest:
+               k = mmtx_act[i].KolmogorovTest(mmtx_gan[i])
+               legs[pad-1].AddEntry(mmtx_gan[i], "k={:.4f}".format(k), 'l')
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -767,8 +786,8 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if i==0:
           ymax = max(mmty_act[i].GetMaximum(), mmty_gan[i].GetMaximum())
         else:
-          ymax = max(ymax, mmty_act[i].GetMaximum(), mmty_gan[i].GetMaximum())
-
+          ymax = max(mmty_act[i].GetMaximum(), mmty_gan[i].GetMaximum())
+        ymax=0.7 if theta==90 else 0.3
         mmty_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
      
         canvas.Update()
@@ -782,6 +801,10 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if leg:
             legs[pad-1].AddEntry(mmty_act[i], "G4", 'l')
             legs[pad-1].AddEntry(mmty_gan[i], "GAN", 'l')
+            if stest:
+               k = mmty_act[i].KolmogorovTest(mmty_gan[i])
+               legs[pad-1].AddEntry(mmty_gan[i], "k={:.4f}".format(k), 'l')
+
             legs[pad-1].Draw()
         canvas.Update()
         if states:
@@ -825,8 +848,8 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if i==0:
           ymax = max(mmtz_act[i].GetMaximum(), mmtz_gan[i].GetMaximum())
         else:
-          ymax = max(ymax, mmtz_act[i].GetMaximum(), mmtz_gan[i].GetMaximum())
-
+          ymax = max(mmtz_act[i].GetMaximum(), mmtz_gan[i].GetMaximum())
+        ymax= 0.25
         mmtz_act[i].GetYaxis().SetRangeUser(0., 1.2 * ymax)
 
         canvas.Update()
@@ -840,6 +863,10 @@ def PlotMomentHistGrid(mx_act, my_act, mz_act, mx_gan, my_gan, mz_gan, out_file,
         if leg:
             legs[pad-1].AddEntry(mmtz_act[i], "G4", 'l')
             legs[pad-1].AddEntry(mmtz_gan[i], "GAN", 'l')
+            if stest:
+               k = mmtz_act[i].KolmogorovTest(mmtz_gan[i])
+               legs[pad-1].AddEntry(mmtz_gan[i], "k={:.4f}".format(k), 'l')
+
             legs[pad-1].Draw()
         canvas.Update()
         if states:
