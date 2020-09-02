@@ -14,7 +14,7 @@ import time
 import math
 import ROOT
 from scipy.stats import wasserstein_distance as wass
-import ot
+#import ot
 import scipy as sp
 
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
@@ -26,9 +26,8 @@ try:
     import setGPU #if Caltech
 except:
     pass
-
-import utils.GANutils as gan
 sys.path.insert(0,'../')
+import analysis.utils.GANutils as gan
 
 def main():
     from AngleArch3dGAN import generator
@@ -65,7 +64,7 @@ def main():
       num = int(filter(str.isdigit, name)[:-1])
       epoch.append(num)
     print("{} weights are found".format(len(gen_weights)))
-
+    print(metric)
     result = GetResults(metric, plotsdir, gen_weights, g, datapath, sorted_path, particle
                         , scale, power=power, thresh=threshold, ang=ang, concat=concat
             , preproc = taking_power, postproc=inv_power
