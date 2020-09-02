@@ -9,28 +9,29 @@ import time
 import glob
 import sys
 import numpy.core.umath_tests as umath
-sys.path.insert(0,'../keras/analysis')
-sys.path.insert(0,'../keras')
+#sys.path.insert(0,'../analysis')
+sys.path.insert(0,'../')
 #sys.path.insert(0,'/nfshome/gkhattak/keras/architectures_tested/')
-import utils.GANutils as gan
-import utils.ROOTutils as r
+import analysis.utils.GANutils as gan
+import analysis.utils.ROOTutils as r
 import setGPU
 
 def main():
-   #datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
-   datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/EleEscan/EleEscan_RandomAngle_1_1.h5"
+   datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
+   #datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/EleEscan/EleEscan_RandomAngle_1_1.h5"
    #datapath3 = '/bigdata/shared/LCD/NewV1/EleEscan/EleEscan_1_1.h5'
-   #genweight1 = "../keras/weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_127.hdf5"
+   genweight1 = "../weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_049.hdf5"
+   genweight2 = "../../weights/3dgan_weights_bins_pow_p85/params_generator_epoch_049.hdf5"
    #genweight2 = "../keras/weights/surfsara_weights/params_generator_epoch_099.hdf5"
    #genweight3 = "../keras/weights/surfsara_128n/params_generator_epoch_193.hdf5"
    #genweight4 = "../keras/weights/surfsara_256n/params_generator_epoch_139.hdf5"
-   genweight1 = '../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5'
-   genweight2 = '../keras/weights/surfsara_2_500GeV/params_generator_epoch_068.hdf5'
+   #genweight1 = '../keras/weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5'
+   #genweight2 = '../keras/weights/surfsara_2_500GeV/params_generator_epoch_068.hdf5'
    from AngleArch3dGAN import generator
-
+   from AngleArch3dGAN_old import generator as generator2
    numdata = 1000
    scale=1
-   outdir = 'results/ecal_tails_bulk_80n/'
+   outdir = 'results/ecal_tails_bulk_arch/'
    gan.safe_mkdir(outdir)
    outfile = os.path.join(outdir, 'Ecal')
    x, y, ang=GetAngleData(datapath, numdata)
@@ -46,9 +47,9 @@ def main():
    x_gen1 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
    x_gen1 = (1./50.) * np.power(x_gen1, 1./0.85)
 
-   #g=generator(latent) # build generator
-   g.load_weights(genweight2) # load weights
-   x_gen2 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
+   g2=generator2(latent) # build generator
+   g2.load_weights(genweight2) # load weights
+   x_gen2 = gan.generate(g2, numdata, [y/100, ang], latent, concat=1)
    x_gen2 = (1./50.) * np.power(x_gen2, 1./0.85)
 
    #g=generator(latent) # build generator
@@ -63,7 +64,7 @@ def main():
 
 
   
-   labels = ['G4', 'GAN single node', 'GAN 80 node']
+   labels = ['G4', 'GAN (upsampling first)', 'GAN (upsampling after each conv)']
    plot_ecal_flatten_hist([x, x_gen1, x_gen2], outfile, y, labels)
    plot_ecal_flatten_hist([x, x_gen1, x_gen2], outfile + '_log', y, labels, logy=1)
    plot_ecal_flatten_hist([x[:, 10:40, 10:40, :], x_gen1[:, 10:40, 10:40, :], x_gen2[:, 10:40, 10:40, :]], outfile + 'bulk', y, labels, logy=0)
@@ -111,11 +112,12 @@ def GetData2(datafile, numevents, scale=1, thresh=1e-6):
 
 def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set_range=0, ifpdf=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
-   c1.SetGrid()
+   #c1.SetGrid()
    ROOT.gPad.SetLogx()
    
    title = "Cell energy deposits for 100-200 GeV "
-   legend = ROOT.TLegend(.1, .1, .3, .2)
+   legend = ROOT.TLegend(.11, .11, .3, .3)
+   legend.SetBorderSize(0)
    color =2
    if logy:
       ROOT.gPad.SetLogy()
@@ -124,7 +126,7 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set
    for i, (event, label) in enumerate(zip(events, labels)):
       hds.append(ROOT.TH1F(label, "", 100, -12, 2))
       hd = hds[i]
-      #hd.SetStats(0)
+      hd.SetStats(0)
       r.BinLogX(hd)
       data = event.flatten()
       r.fill_hist(hd, data)
@@ -148,7 +150,7 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set
          hds[0].SetMaximum(1.1 * val)
         color+=1
         c1.Update()
-        r.stat_pos(hd)
+        #r.stat_pos(hd)
       legend.AddEntry(hd,label ,"l")
       c1.Modified()
       c1.Update()
