@@ -29,7 +29,7 @@ import analysis.utils.GANutils as gan
 def main():
     # All of the following needs to be adjusted
     from AngleArch3dGAN import generator # architecture
-    weightdir = '3dgan_weights_wt_aux/params_generator*.hdf5'
+    weightdir = '3dgan_weights_wt_bin_2_500GeV/params_generator*.hdf5'
     if tlab:
       datapath = '/gkhattak/data/*Measured3ThetaEscan/*.h5'
       #datapath = '/gkhattak/data/*100GeV/*.h5'
@@ -41,7 +41,7 @@ def main():
     datapath = '/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5'
     #datapath = '/storage/group/gpu/bigdata/LCD/NewV1/*scan/*scan_*.h5' 
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_results_wt_aux/' # plot directory
+    plotsdir = 'results/optimization_results_wt_bin/' # plot directory
     particle = "Ele" 
     scale = 1.
     threshold = 0
@@ -56,8 +56,8 @@ def main():
     disc_weights=[]
     fits = ['pol1', 'pol2', 'expo']
     #energies =[200, 250, 300]
-    energies =[110, 150, 190]
-    #energies = [100, 200, 300, 400]
+    #energies =[110, 150, 190]
+    energies = [100, 200, 300, 400]
     gan.safe_mkdir(plotsdir)
     for f in sorted(glob.glob(genpath)):
       gen_weights.append(f)
