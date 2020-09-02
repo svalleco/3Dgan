@@ -312,8 +312,14 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
             # Train discriminator first on real batch and then the fake batch
+            #print(energy_batch)
             real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+
+            print(real_batch_loss)
+            print(fake_batch_loss)
+
+            print(discriminator.metrics_names)
 
             #if ecal sum has 100% loss(generating empty events) then end the training 
             if fake_batch_loss[3] == 100.0 and index >10:
@@ -337,9 +343,14 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
+            
+            print(gen_losses)
+            return
+            
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
             epoch_gen_loss.append(generator_loss)
             index +=1
+
 
         # Testing
         # Test process will also be accomplished in batches to reduce memory consumption
