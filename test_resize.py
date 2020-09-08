@@ -35,6 +35,7 @@ def GetDataAngle(datafile, imgs3dscale =1, imgs3dpower=1, e_pscale = 100, angsca
       
 # note that all the images will be a bit off center because 51 --> 64 is an odd number (unequal central padding)
 def resize(imgs3d, size, mode='rectangle'):
+    channel = imgs3d[0,0,0,0,:]
     imgs3d = imgs3d[:, :, :, :, 0]    # drop the channels dimension
 
     if size == 51:   # return the unchanged image [51,51,25]
@@ -97,7 +98,14 @@ def resize(imgs3d, size, mode='rectangle'):
                     
                 # save our 3d image in the matrix holding all 5000 3d images
                 resized_imgs3d[num_img, :, :, :] = resized_img3d   
-                
+    
+    # reorganize dimensions: (num_imgs, x,y,z) --> (num_imgs, z,x,y)
+    resized_imgs3d = np.moveaxis(resized_imgs3d, 3, 1)
+    
+    # put the channel back in: channels_first
+    resized_imgs3d = np.expand_dims(resized_imgs3d, axis=0)
+    resized_imgs3d[:,0,0,0,0] = channel
+            
     return resized_imgs3d   # returns a [5000, size, size, size||size/2] np.array matrix that is 5000 3d images [size, size, size||size/2]
 
 
