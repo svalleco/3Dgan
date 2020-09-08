@@ -1,38 +1,9 @@
-import argparse
-import time
 import os
 import sys
 import numpy as np
-import random
 import h5py
-import math
-import importlib
-#import analysis.utils.GANutils as gan
-import tensorflow as tf
-import horovod as hvd #AngleGAN
-import horovod.tensorflow as hvd #pgan
-import horovod.keras as hvd
 import cv2
 
-from rectified_adam import RAdamOptimizer
-from networks.loss import forward_simultaneous, forward_generator, forward_discriminator
-from networks.ops import num_filters
-from collections import defaultdict
-from six.moves import range
-from dataset import NumpyPathDataset
-from utils import count_parameters, image_grid, parse_tuple
-from PIL import Image
-
-# I moved extra functions to keras/analysis/utils/GANutils.py
-#from GANutils import hist_count, randomize, genbatches
-
-# used for resizing -- I don't know if this will be too slow
-from scipy.ndimage import zoom
-
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
 
 
 """
@@ -122,70 +93,72 @@ def GetDataAngle(datafile, imgs3dscale =1, imgs3dpower=1, e_pscale = 100, angsca
 
 
 
+# note that all the images will be a bit off center because 51 --> 64 is an odd number (unequal central padding)
 def resize(imgs3d, size, mode='rectangle'):
+    imgs3d = imgs3d[:, :, :, :, 0]    # drop the channels dimension
 
-    """Short summary.
-        Takes [5000x51x51x25] image array and size parameter --> returns [5000 x size x size x size or size/2] np.array that is 5000 3d images
-    Parameters
-    ----------
-    imgs3d : type
-        Description of parameter `imgs3d`.
-    size : type
-        Description of parameter `size`.
-    mode : type
-        Description of parameter `mode`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
-    if mode == 'square':
-        resized_imgs3d = np.zeros((5000, size, size, size)) # create an array to hold all 5000 resized imgs3d
-    else:    # mode == 'rectangle'
-        resized_imgs3d = np.zeros((5000, size, size, int(size/2))) # create an array to hold all 5000 resized imgs3d
-
-
-    for num_img in np.arange(5000):     # index through the 5000 3d images packed in
-        img3d = imgs3d[num_img, :, :, :, 0]    # grab an individual [51,51,25] 3d image
-        if size < 64:
-
-           # resize XY-plane to (size x size)
-            xy_resized_img3d = np.zeros((size, size, 25))   # create an empty 3d_image to store changes
-            for z_index in np.arange(25):    # index through the 25 calorimeter layers of the z-axis
-                img2d = img3d[:, :, z_index]   # grab a 2d image from the xy plane
-                resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
-                xy_resized_img3d[:, :, z_index] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
-
-            # resize YZ-plane to (size x size or size/2)
-            if mode == 'square':
-                resized_img3d = np.zeros((size, size, size))   # create an empty 3d_image to store changes
-            else:    # mode == 'rectangle'
-                resized_img3d = np.zeros((size, size, int(size/2)))   # create an empty 3d_image to store changes            # resize YZ-plane to (size,size)=square or (size,size/2)=rectangle
-            for x_index in np.arange(size):    # index through the 51 values of x-axis
-                img2d = xy_resized_img3d[x_index, :, :]
-                if mode == 'square':
+    if size == 51:   # return the unchanged image [51,51,25]
+        return imgs3d
+     
+    if mode == 'rectangle':    
+        resized_imgs3d = np.zeros((5000, size, size, int(size/2)))    # create an array to hold all 5000 resized imgs3d
+        
+        for num_img in np.arange(5000):         # index through the 5000 3d images packed in
+            img3d = imgs3d[num_img, :, :, :]    # grab an individual [51,51,25] 3d image
+            
+            # pad centrally with zeroes to [64x64x32], do this step first so that the framing is the same for all images
+            resized_img3d = np.pad(img3d, ((7,6), (7,6), (4,3)), mode='minimum')  
+        
+            if size == 64:   # put in the padded image [64,64,32]
+                resized_imgs3d[num_img, :, :, :] = resized_img3d  
+            
+            else:   # size < 64: we need to zoom out to lower the resolution
+                # resize XY-plane to (size x size)
+                xy_resized_img3d = np.zeros((size, size, 25))   # create an empty 3d_image to store changes
+                for z_index in np.arange(25):    # index through the 25 calorimeter layers of the z-axis
+                    img2d = img3d[:, :, z_index]   # grab a 2d image from the xy plane
                     resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
-                else:    # mode == 'rectangle'
+                    xy_resized_img3d[:, :, z_index] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
+
+                # resize YZ-plane to (size x size/2)        
+                resized_img3d = np.zeros((size, size, int(size/2)))   # create an empty 3d_image to store changes            # resize YZ-plane to (size,size)=square or (size,size/2)=rectangle
+                for x_index in np.arange(size):    # index through the x-axis
+                    img2d = xy_resized_img3d[x_index, :, :]
                     resized_img2d = cv2.resize(img2d, dsize=(int(size/2), size), interpolation=cv2.INTER_NEAREST)
-                resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
-
-        elif size == 64: # NOTE: WON'T WORK WELL TO USE SIZE 64 IF YOU ARE USING THE SQUARE MODE (STRETCHING 25 --> 64), STOP AT SIZE 32
-            if mode == 'rectangle':
-                resized_img3d = np.pad(img3d, ((7,6), (7,6), (4,3)), mode='minimum')  # pad centrally with zeroes to [64x64x32]
-            elif mode == 'square':
-                resized_img3d = np.pad(img3d, ((7,6), (7,6), (19, 20)), mode='minimum')  # pad centrally with zeroes to [64x64x64] -- MIGHT BE MESSY!
-
-        elif size == 51:   # unchanged
-            return resized_imgs3d
+                    resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the x layer
+                
+            # save the resized 3d image in the matrix holding all 5000 3d images
+            resized_imgs3d[num_img, :, :, :] = resized_img3d   
+           
+    elif mode == 'square':
+        if size == 64:
+            print('ERROR - Square mode is not compatible with size 64! The max size for square mode is 32.')
         else:
-                print('ERROR, size: '+str(size)+' passed is incompatible. Make sure the size is one of the following: [4,8,16,32,64]')
+            resized_imgs3d = np.zeros((5000, size, size, size)) # create an array to hold all 5000 resized imgs3d
+        
+            for num_img in np.arange(5000):     # index through the 5000 3d images packed in
+                img3d = imgs3d[num_img, :, :, :]    # grab an individual [51,51,25] 3d image
 
-        resized_imgs3d[num_img, :, :, :] = resized_img3d   # save our 3d image in the matrix holding all 5000 3d images
-    print("reised images : ", resized_imgs3d.shape)
-    return resized_imgs3d   # returns a [5000, size, size, size or size/2] np.array matrix that is 5000 3d images [size, size, size or size/2]
+                img3d = np.pad(img3d, ((0,0), (0,0), (4,3)), mode='minimum') # pad centrally with zeroes to [51x51x32]
 
+                # resize XY-plane to (size x size)
+                xy_resized_img3d = np.zeros((size, size, 25))   # create an empty 3d_image to store changes
+                for z_index in np.arange(25):    # index through the 25 calorimeter layers of the z-axis
+                    img2d = img3d[:, :, z_index]   # grab a 2d image from the xy plane
+                    resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
+                    xy_resized_img3d[:, :, z_index] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
+                    
+                # resize YZ-plane to (size x size)        
+                resized_img3d = np.zeros((size, size, size))   # create an empty 3d_image to store changes
+                for x_index in np.arange(size):    # index through the 51 values of x-axis
+                    img2d = xy_resized_img3d[x_index, :, :]
+                    resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
+                    resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the x layer
+                    
+                # save our 3d image in the matrix holding all 5000 3d images
+                resized_imgs3d[num_img, :, :, :] = resized_img3d   
+                
+    return resized_imgs3d   # returns a [5000, size, size, size||size/2] np.array matrix that is 5000 3d images [size, size, size||size/2]
 
 
 def createNumpyFiles(imgs3d, size):
