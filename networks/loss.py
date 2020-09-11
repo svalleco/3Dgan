@@ -14,11 +14,13 @@ def forward_generator(generator,
                       leakiness,
                       network_size,
                       loss_fn,
+                      e_p,
+                      ang,
                       is_reuse=False
                       ):
-    z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim])
+    z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim-2])
+    tf.concat([z, e_p, ang], 1)
     gen_sample = generator(z, alpha, phase, num_phases,
-
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, is_reuse=is_reuse)
 
@@ -53,9 +55,12 @@ def forward_discriminator(generator,
                           network_size,
                           loss_fn,
                           gp_weight,
+                          e_p,
+                          ang,
                           is_reuse=False,
                           ):
     z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim])
+    tf.concat([z, e_p, ang], 1)
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, is_reuse=is_reuse)
@@ -112,9 +117,12 @@ def forward_simultaneous(generator,
                          network_size,
                          loss_fn,
                          gp_weight,
+                         e_p,
+                         ang,
                          conditioning=None
                          ):
     z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim])
+    tf.concat([z, e_p, ang], 1)
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, conditioning=conditioning)
