@@ -95,24 +95,41 @@ def GetDataAngle(datafile, imgs3dscale =1, imgs3dpower=1, e_pscale = 100, angsca
 
 # note that all the images will be a bit off center because 51 --> 64 is an odd number (unequal central padding)
 def resize(imgs3d, size, mode='rectangle'):
+    """Short summary.
+
+    Parameters
+    ----------
+    imgs3d : type
+        Description of parameter `imgs3d`.
+    size : type
+        Description of parameter `size`.
+    mode : type
+        Description of parameter `mode`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
+    """
     channel = imgs3d[0,0,0,0,:]
     imgs3d = imgs3d[:, :, :, :, 0]    # drop the channels dimension
 
     if size == 51:   # return the unchanged image [51,51,25]
         return imgs3d
-     
-    if mode == 'rectangle':    
+
+    if mode == 'rectangle':
         resized_imgs3d = np.zeros((5000, size, size, int(size/2)))    # create an array to hold all 5000 resized imgs3d
-        
+
         for num_img in np.arange(5000):         # index through the 5000 3d images packed in
             img3d = imgs3d[num_img, :, :, :]    # grab an individual [51,51,25] 3d image
-            
+
             # pad centrally with zeroes to [64x64x32], do this step first so that the framing is the same for all images
-            resized_img3d = np.pad(img3d, ((7,6), (7,6), (4,3)), mode='minimum')  
-        
+            resized_img3d = np.pad(img3d, ((7,6), (7,6), (4,3)), mode='minimum')
+
             if size == 64:   # put in the padded image [64,64,32]
-                resized_imgs3d[num_img, :, :, :] = resized_img3d  
-            
+                resized_imgs3d[num_img, :, :, :] = resized_img3d
+
             else:   # size < 64: we need to zoom out to lower the resolution
                 # resize XY-plane to (size x size)
                 xy_resized_img3d = np.zeros((size, size, 25))   # create an empty 3d_image to store changes
@@ -121,22 +138,22 @@ def resize(imgs3d, size, mode='rectangle'):
                     resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
                     xy_resized_img3d[:, :, z_index] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
 
-                # resize YZ-plane to (size x size/2)        
+                # resize YZ-plane to (size x size/2)
                 resized_img3d = np.zeros((size, size, int(size/2)))   # create an empty 3d_image to store changes            # resize YZ-plane to (size,size)=square or (size,size/2)=rectangle
                 for x_index in np.arange(size):    # index through the x-axis
                     img2d = xy_resized_img3d[x_index, :, :]
                     resized_img2d = cv2.resize(img2d, dsize=(int(size/2), size), interpolation=cv2.INTER_NEAREST)
                     resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the x layer
-                
+
             # save the resized 3d image in the matrix holding all 5000 3d images
-            resized_imgs3d[num_img, :, :, :] = resized_img3d   
-           
+            resized_imgs3d[num_img, :, :, :] = resized_img3d
+
     elif mode == 'square':
         if size == 64:
             print('ERROR - Square mode is not compatible with size 64! The max size for square mode is 32.')
         else:
             resized_imgs3d = np.zeros((5000, size, size, size)) # create an array to hold all 5000 resized imgs3d
-        
+
             for num_img in np.arange(5000):     # index through the 5000 3d images packed in
                 img3d = imgs3d[num_img, :, :, :]    # grab an individual [51,51,25] 3d image
 
@@ -148,28 +165,28 @@ def resize(imgs3d, size, mode='rectangle'):
                     img2d = img3d[:, :, z_index]   # grab a 2d image from the xy plane
                     resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
                     xy_resized_img3d[:, :, z_index] = resized_img2d   # save our resized_img2d in the img3d corresponding to the calorimeter layer
-                    
-                # resize YZ-plane to (size x size)        
+
+                # resize YZ-plane to (size x size)
                 resized_img3d = np.zeros((size, size, size))   # create an empty 3d_image to store changes
                 for x_index in np.arange(size):    # index through the 51 values of x-axis
                     img2d = xy_resized_img3d[x_index, :, :]
                     resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
                     resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the x layer
-                    
+
                 # save our 3d image in the matrix holding all 5000 3d images
-                resized_imgs3d[num_img, :, :, :] = resized_img3d   
-    
+                resized_imgs3d[num_img, :, :, :] = resized_img3d
+
     # reorganize dimensions: (num_imgs, x,y,z) --> (num_imgs, z,x,y)
     resized_imgs3d = np.moveaxis(resized_imgs3d, 3, 1)
-    
+
     # put the channel back in: channels_first
     resized_imgs3d = np.expand_dims(resized_imgs3d, axis=0)
     resized_imgs3d[:,0,0,0,0] = channel
-            
+
     return resized_imgs3d   # returns a [5000, size, size, size||size/2] np.array matrix that is 5000 3d images [size, size, size||size/2]
 
 
-def createNumpyFiles(imgs3d, size):
+def createNumpyFiles(imgs3d, eps, angs, size):
     """Short summary.
         Creating Numpy array by file by size
     Parameters
@@ -185,15 +202,36 @@ def createNumpyFiles(imgs3d, size):
         Description of returned object.
 
     """
-    output_folder = os.path.join(output, f'{size}x{size}')
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    output_images = os.path.join(output, f'images')
+    output_en = os.path.join(output, f'en')
+    output_ang = os.path.join(output, f'ang')
+    output_folder_images = os.path.join(output_images, f'{size}x{size}')
+    output_folder_en = os.path.join(output_en, f'{size}x{size}')
+    output_folder_ang = os.path.join(output_ang, f'{size}x{size}')
+    #output_folder = os.path.join(output, f'{size}x{size}')
+    if not os.path.exists(output_images):
+        os.makedirs(output_images)
+        os.makedirs(output_en)
+        os.makedirs(output_ang)
+
+    if not os.path.exists(output_folder_images):
+        os.makedirs(output_folder_images)
+        os.makedirs(output_folder_en)
+        os.makedirs(output_folder_ang)
 
     for i, tensor in enumerate(imgs3d):
         #array = tensor.numpy()
-        print("saving : ", tensor.shape)
-        filename = os.path.join(output_folder, f'{i:04}.npy')
-        np.save(filename, tensor)
+        #print("saving : ", tensor.shape)
+        filename_image = os.path.join(output_folder_images, f'{i:04}.npy')
+        np.save(filename_image, tensor)
+
+    for i, tensor in enumerate(eps)
+        filename_en = os.path.join(output_folder_en, f'{i:04}.npy')
+        np.save(filename_en, tensor)
+
+    for i, tensor in enumerate(angs)
+        filename_ang = os.path.join(output_folder_ang, f'{i:04}.npy')
+        np.save(filename_ang, tensor)
 
 
 # calls run()
@@ -208,26 +246,36 @@ def convert():
     """
     filespath = load_files(root)
     allimages = np.empty((5000,51,51,25,1))
+    all_ep = np.empty(5000,)
+    all_ang = np.empty(5000,)
     for afile in filespath:
+        print("afile now : ", afile)
         imgs3d, e_p, ang, ecal = GetDataAngle(afile)
+        #print("!!! : ",imgs3d.shape)
         allimages = np.concatenate((allimages, imgs3d))
+        all_ep = np.concatenate((all_ep, e_p))
+        all_ang = np.concatenate ((all_ang, ang))
+        #print("OUI OUIIIIIII :", allimages.shape[0])
 
-    print("allimages shape", allimages)
-    imgs3d_resized = resize(allimages, 4)
-    createNumpyFiles(allimages, 4)
+    #print("all ep :::::", all_ep.shape)
+    print("all angle :::::", all_ang.shape)
+    print("allimages shape", allimages.shape)
+    imgs3d_4 = resize(allimages, 4)
+    createNumpyFiles(imgs3d_4, e_p, ang, 4)
 
-    imgs3d_resized = resize(allimages, 8)
-    createNumpyFiles(allimages, 8)
+    imgs3d_8 = resize(allimages, 8)
+    createNumpyFiles(imgs3d_8, e_p, ang,  8)
 
-    imgs3d_resized = resize(allimages, 16)
-    createNumpyFiles(imgs3d_resized, 16)
+    imgs3d_16 = resize(allimages, 16)
+    createNumpyFiles(imgs3d_16, e_p, ang,  16)
 
-    imgs3d_resized = resize(allimages, 32)
-    createNumpyFiles(imgs3d_resized, 32)
+    imgs3d_32 = resize(allimages, 32)
+    createNumpyFiles(imgs3d_32, e_p, ang, 32)
 
-    imgs3d_resized = resize(allimages, 64)
-    createNumpyFiles(imgs3d_resized, 64)
+    imgs3d_64 = resize(allimages, 64)
+    createNumpyFiles(imgs3d_64, e_p, ang, 64)
 
+    
 # calls convert()
 if __name__ == "__main__":
     convert()
