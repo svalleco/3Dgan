@@ -34,7 +34,7 @@ def load_files(path):
     #print("file naime : ", abs_filenames)
     assert all(filename for filename in abs_filenames)
     #for filename in abs_filenames:
-    #    print(filename)
+    #    print(filname)
     return abs_filenames
 
 
@@ -113,15 +113,16 @@ def resize(imgs3d, size, mode='rectangle'):
 
     """
     channel = imgs3d[0,0,0,0,:]
+    print("GOT the CHANNEL :::::::", channel)
     imgs3d = imgs3d[:, :, :, :, 0]    # drop the channels dimension
-
+    nmbr_of_images = len(imgs3d)
     if size == 51:   # return the unchanged image [51,51,25]
         return imgs3d
 
     if mode == 'rectangle':
-        resized_imgs3d = np.zeros((5000, size, size, int(size/2)))    # create an array to hold all 5000 resized imgs3d
+        resized_imgs3d = np.zeros((nmbr_of_images, size, size, int(size/2)))    # create an array to hold all nmbr_of_images resized imgs3d
 
-        for num_img in np.arange(5000):         # index through the 5000 3d images packed in
+        for num_img in np.arange(nmbr_of_images):         # index through the nmbr_of_images 3d images packed in
             img3d = imgs3d[num_img, :, :, :]    # grab an individual [51,51,25] 3d image
 
             # pad centrally with zeroes to [64x64x32], do this step first so that the framing is the same for all images
@@ -145,16 +146,16 @@ def resize(imgs3d, size, mode='rectangle'):
                     resized_img2d = cv2.resize(img2d, dsize=(int(size/2), size), interpolation=cv2.INTER_NEAREST)
                     resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the x layer
 
-            # save the resized 3d image in the matrix holding all 5000 3d images
+            # save the resized 3d image in the matrix holding all nmbr_of_images 3d images
             resized_imgs3d[num_img, :, :, :] = resized_img3d
 
     elif mode == 'square':
         if size == 64:
             print('ERROR - Square mode is not compatible with size 64! The max size for square mode is 32.')
         else:
-            resized_imgs3d = np.zeros((5000, size, size, size)) # create an array to hold all 5000 resized imgs3d
+            resized_imgs3d = np.zeros((nmbr_of_images, size, size, size)) # create an array to hold all nmbr_of_images resized imgs3d
 
-            for num_img in np.arange(5000):     # index through the 5000 3d images packed in
+            for num_img in np.arange(nmbr_of_images):     # index through the nmbr_of_images 3d images packed in
                 img3d = imgs3d[num_img, :, :, :]    # grab an individual [51,51,25] 3d image
 
                 img3d = np.pad(img3d, ((0,0), (0,0), (4,3)), mode='minimum') # pad centrally with zeroes to [51x51x32]
@@ -173,20 +174,48 @@ def resize(imgs3d, size, mode='rectangle'):
                     resized_img2d = cv2.resize(img2d, dsize=(size, size), interpolation=cv2.INTER_NEAREST)
                     resized_img3d[x_index, :, :] = resized_img2d   # save our resized_img2d in the img3d corresponding to the x layer
 
-                # save our 3d image in the matrix holding all 5000 3d images
+                # save our 3d image in the matrix holding all nmbr_of_images 3d images
                 resized_imgs3d[num_img, :, :, :] = resized_img3d
 
     # reorganize dimensions: (num_imgs, x,y,z) --> (num_imgs, z,x,y)
+    print("before &&&& :", resized_imgs3d.shape)
     resized_imgs3d = np.moveaxis(resized_imgs3d, 3, 1)
 
+    print("after  &&&& :", resized_imgs3d.shape)
     # put the channel back in: channels_first
-    resized_imgs3d = np.expand_dims(resized_imgs3d, axis=0)
-    resized_imgs3d[:,0,0,0,0] = channel
+    resized_imgs3d = np.expand_dims(resized_imgs3d, axis=1)
+    print("after after channel  &&&& :", resized_imgs3d.shape)
+    resized_imgs3d[0,0,0,0,:] = channel
+    print("channel channel  &&&& :", resized_imgs3d.shape)
 
-    return resized_imgs3d   # returns a [5000, size, size, size||size/2] np.array matrix that is 5000 3d images [size, size, size||size/2]
+    return resized_imgs3d   # returns a [nmbr_of_images, size, size, size||size/2] np.array matrix that is nmbr_of_images 3d images [size, size, size||size/2]
 
 
-def createNumpyFiles(imgs3d, eps, angs, size):
+def create_numpy_en_ang_files(all_ep, all_ang, i):
+
+    output_en = os.path.join(output, f'en')
+    output_ang = os.path.join(output, f'ang')
+    #output_folder_en = os.path.join(output_en, f'{size}x{size}')
+    #output_folder_ang = os.path.join(output_ang, f'{size}x{size}')
+    #output_folder = os.path.join(output, f'{size}x{size}')
+    if not os.path.exists(output_en):
+        os.makedirs(output_en)
+        os.makedirs(output_ang)
+    num_ep = i
+    for j, tensor in enumerate(all_ep):
+        print("numero ep stored :::::", num_ep)
+        filename_en = os.path.join(output_en, f'{num_ep:04}.npy')
+        np.save(filename_en, tensor)
+        num_ep += 1
+
+    num_ang = i
+    for j, tensor in enumerate(all_ang):
+        print("numero ang stored :::::", num_ang)
+        filename_ang = os.path.join(output_ang, f'{num_ang:04}.npy')
+        np.save(filename_ang, tensor)
+        num_ang += 1
+
+def createNumpyFiles(imgs3d, size, i):
     """Short summary.
         Creating Numpy array by file by size
     Parameters
@@ -203,35 +232,19 @@ def createNumpyFiles(imgs3d, eps, angs, size):
 
     """
     output_images = os.path.join(output, f'images')
-    output_en = os.path.join(output, f'en')
-    output_ang = os.path.join(output, f'ang')
     output_folder_images = os.path.join(output_images, f'{size}x{size}')
-    output_folder_en = os.path.join(output_en, f'{size}x{size}')
-    output_folder_ang = os.path.join(output_ang, f'{size}x{size}')
-    #output_folder = os.path.join(output, f'{size}x{size}')
     if not os.path.exists(output_images):
         os.makedirs(output_images)
-        os.makedirs(output_en)
-        os.makedirs(output_ang)
 
     if not os.path.exists(output_folder_images):
         os.makedirs(output_folder_images)
-        os.makedirs(output_folder_en)
-        os.makedirs(output_folder_ang)
 
-    for i, tensor in enumerate(imgs3d):
-        #array = tensor.numpy()
-        #print("saving : ", tensor.shape)
-        filename_image = os.path.join(output_folder_images, f'{i:04}.npy')
+    num_image = i
+    for j, tensor in enumerate(imgs3d):
+        print("numero d'iamge stored :::::", num_image)
+        filename_image = os.path.join(output_folder_images, f'{num_image:04}.npy')
         np.save(filename_image, tensor)
-
-    for i, tensor in enumerate(eps)
-        filename_en = os.path.join(output_folder_en, f'{i:04}.npy')
-        np.save(filename_en, tensor)
-
-    for i, tensor in enumerate(angs)
-        filename_ang = os.path.join(output_folder_ang, f'{i:04}.npy')
-        np.save(filename_ang, tensor)
+        num_image+=1
 
 
 # calls run()
@@ -245,37 +258,36 @@ def convert():
 
     """
     filespath = load_files(root)
-    allimages = np.empty((5000,51,51,25,1))
-    all_ep = np.empty(5000,)
-    all_ang = np.empty(5000,)
+    i = 0
     for afile in filespath:
+
         print("afile now : ", afile)
         imgs3d, e_p, ang, ecal = GetDataAngle(afile)
-        #print("!!! : ",imgs3d.shape)
-        allimages = np.concatenate((allimages, imgs3d))
-        all_ep = np.concatenate((all_ep, e_p))
-        all_ang = np.concatenate ((all_ang, ang))
-        #print("OUI OUIIIIIII :", allimages.shape[0])
+        #print ("num image ::::", i)
+        #print("sahpe :::", imgs3d.shape)
+        #print("indice ::::", len(imgs3d))
+        #print("num image suit :::", i)
+        create_numpy_en_ang_files(e_p, ang, i)
 
-    #print("all ep :::::", all_ep.shape)
-    print("all angle :::::", all_ang.shape)
-    print("allimages shape", allimages.shape)
-    imgs3d_4 = resize(allimages, 4)
-    createNumpyFiles(imgs3d_4, e_p, ang, 4)
+        imgs3d_4 = resize(imgs3d, 4)
+        #print("after resige ******:", imgs3d_4.shape)
+        createNumpyFiles(imgs3d_4, 4, i)
 
-    imgs3d_8 = resize(allimages, 8)
-    createNumpyFiles(imgs3d_8, e_p, ang,  8)
+        imgs3d_8 = resize(imgs3d, 8)
+        createNumpyFiles(imgs3d_8, 8, i)
 
-    imgs3d_16 = resize(allimages, 16)
-    createNumpyFiles(imgs3d_16, e_p, ang,  16)
+        imgs3d_16 = resize(imgs3d, 16)
+        createNumpyFiles(imgs3d_16, 16, i)
 
-    imgs3d_32 = resize(allimages, 32)
-    createNumpyFiles(imgs3d_32, e_p, ang, 32)
+        imgs3d_32 = resize(imgs3d, 32)
+        createNumpyFiles(imgs3d_32, 32, i)
 
-    imgs3d_64 = resize(allimages, 64)
-    createNumpyFiles(imgs3d_64, e_p, ang, 64)
+        imgs3d_64 = resize(imgs3d, 64)
+        createNumpyFiles(imgs3d_64, 64, i)
+        i += len(imgs3d)
 
-    
+
 # calls convert()
 if __name__ == "__main__":
     convert()
+e
