@@ -112,8 +112,6 @@ def resize(imgs3d, size, mode='rectangle'):
         Description of returned object.
 
     """
-    channel = imgs3d[0,0,0,0,:]   # save channel separately
-    print("GOT the CHANNEL :::::::", channel)
     imgs3d = imgs3d[:, :, :, :, 0]    # drop the channels dimension
     nmbr_of_images = len(imgs3d)
 
@@ -178,15 +176,9 @@ def resize(imgs3d, size, mode='rectangle'):
     # reorganize dimensions: (num_imgs, x,y,z) --> (num_imgs, z,x,y)
     print("before &&&& :", resized_imgs3d.shape)
     resized_imgs3d = np.moveaxis(resized_imgs3d, 3, 1)
-
     print("after  &&&& :", resized_imgs3d.shape)
-    # put the channel back in: channels_first
-    resized_imgs3d = np.expand_dims(resized_imgs3d, axis=1)
-    print("after after channel  &&&& :", resized_imgs3d.shape)
-    resized_imgs3d[0,:,0,0,0] = channel
-    print("channel channel  &&&& :", resized_imgs3d.shape)
 
-    return resized_imgs3d   # returns a [nmbr_of_images, channel, size||size/2, size, size] np.array matrix that is nmbr_of_images 3d images [size||size/2, size, size]
+    return resized_imgs3d   # returns a [nmbr_of_images, size||size/2, size, size] np.array matrix that is nmbr_of_images 3d images [size||size/2, size, size]
 
 
 def create_numpy_en_ang_files(all_ep, all_ang, i):

@@ -32,7 +32,7 @@ def Gan3DTrainAngle(discriminator, generator, opt, datapath, nEvents, WeightsDir
     latent = Input(shape=(latent_size, ), name='combined_z')   # random latent vector = generator input
     fake_image = generator( latent)     # fake image = generator output
      # discriminator: fake image --> fake, aux, ang, ecal, add_loss
-     discriminator.trainable = False
+    discriminator.trainable = False
     fake, aux, ang, ecal, add_loss= discriminator(fake_image)
     combined = Model(
         input=[latent],
