@@ -18,8 +18,13 @@ def forward_generator(generator,
                       ang,
                       is_reuse=False
                       ):
-    z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim-2])
-    tf.concat([z, e_p, ang], 1)
+    z_batch_size = tf.shape(real_image_input)[0]                 # this value should be an integer
+    z = tf.random.normal(shape=[z_batch_size, latent_dim-2])   
+    start = (z_batch_size * (phase-1))
+    e_p_vector = e_p[start:(start+z_batch_size)].reshape(z_batch_size,1)   # need z_batch_size x 1
+    ang_vector = ang[start:(start+z_batch_size)].reshape(z_batch_size,1)   # need z_batch_size x 1
+    z = tf.concat([ z, e_p_vector, ang_vector ], 1)    # shape = (z_batch_size, 256)
+    
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, is_reuse=is_reuse)
@@ -59,8 +64,13 @@ def forward_discriminator(generator,
                           ang,
                           is_reuse=False,
                           ):
-    z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim])
-    tf.concat([z, e_p, ang], 1)
+    z_batch_size = tf.shape(real_image_input)[0]                 # this value should be an integer
+    z = tf.random.normal(shape=[z_batch_size, latent_dim-2])   
+    start = (z_batch_size * (phase-1))
+    e_p_vector = e_p[start:(start+z_batch_size)].reshape(z_batch_size,1)   # need z_batch_size x 1
+    ang_vector = ang[start:(start+z_batch_size)].reshape(z_batch_size,1)   # need z_batch_size x 1
+    z = tf.concat([ z, e_p_vector, ang_vector ], 1)    # shape = (z_batch_size, 256)
+    
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, is_reuse=is_reuse)
@@ -121,8 +131,13 @@ def forward_simultaneous(generator,
                          ang,
                          conditioning=None
                          ):
-    z = tf.random.normal(shape=[tf.shape(real_image_input)[0], latent_dim])
-    tf.concat([z, e_p, ang], 1)
+    z_batch_size = tf.shape(real_image_input)[0]                 # this value should be an integer
+    z = tf.random.normal(shape=[z_batch_size, latent_dim-2])   
+    start = (z_batch_size * (phase-1))
+    e_p_vector = e_p[start:(start+z_batch_size)].reshape(z_batch_size,1)   # need z_batch_size x 1
+    ang_vector = ang[start:(start+z_batch_size)].reshape(z_batch_size,1)   # need z_batch_size x 1
+    z = tf.concat([ z, e_p_vector, ang_vector ], 1)    # shape = (z_batch_size, 256)
+    
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, conditioning=conditioning)
