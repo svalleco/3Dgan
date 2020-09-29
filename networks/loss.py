@@ -21,11 +21,11 @@ def forward_generator(generator,
     z_batch_size = tf.shape(real_image_input)[0]                 # this value should be an integer
 
     #Adel is passing e_p and ang as the correct batch sized numpy arrays
-    e_p_vector = e_p.reshape(z_batch_size,1)   # need z_batch_size x 1
-    ang_vector = ang.reshape(z_batch_size,1)   # need z_batch_size x 1
-
+    e_p_tensor = tf.reshape(e_p, [z_batch_size,1])   # need z_batch_size x 1
+    ang_tensor = tf.reshape(ang, [z_batch_size,1])   # need z_batch_size x 1
+    
     z = tf.random.normal(shape=[z_batch_size, latent_dim-2])   
-    z = tf.concat([ z, e_p_vector, ang_vector ], 1)    # shape = (z_batch_size, 256)
+    z = tf.concat([z, e_p_tensor, ang_tensor], 1)    # shape = (z_batch_size, 256)
     
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
@@ -69,11 +69,11 @@ def forward_discriminator(generator,
     z_batch_size = tf.shape(real_image_input)[0]                 # this value should be an integer
 
     #Adel is passing e_p and ang as the correct batch sized numpy arrays
-    e_p_vector = e_p.reshape(z_batch_size,1)   # need z_batch_size x 1
-    ang_vector = ang.reshape(z_batch_size,1)   # need z_batch_size x 1
-
+    e_p_tensor = tf.reshape(e_p, [z_batch_size,1])   # need z_batch_size x 1
+    ang_tensor = tf.reshape(ang, [z_batch_size,1])   # need z_batch_size x 1
+    
     z = tf.random.normal(shape=[z_batch_size, latent_dim-2])   
-    z = tf.concat([ z, e_p_vector, ang_vector ], 1)    # shape = (z_batch_size, 256)
+    z = tf.concat([z, e_p_tensor, ang_tensor], 1)    # shape = (z_batch_size, 256)
     
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
@@ -138,11 +138,11 @@ def forward_simultaneous(generator,
     z_batch_size = tf.shape(real_image_input)[0]                 # this value should be an integer
 
     #Adel is passing e_p and ang as the correct batch sized numpy arrays
-    e_p_vector = e_p.reshape(z_batch_size,1)   # need z_batch_size x 1
-    ang_vector = ang.reshape(z_batch_size,1)   # need z_batch_size x 1
-
+    e_p_tensor = tf.reshape(e_p, [z_batch_size,1])   # need z_batch_size x 1
+    ang_tensor = tf.reshape(ang, [z_batch_size,1])   # need z_batch_size x 1
+    
     z = tf.random.normal(shape=[z_batch_size, latent_dim-2])   
-    z = tf.concat([ z, e_p_vector, ang_vector ], 1)    # shape = (z_batch_size, 256)
+    z = tf.concat([z, e_p_tensor, ang_tensor], 1)    # shape = (z_batch_size, 256)
     
     gen_sample = generator(z, alpha, phase, num_phases,
                            base_dim, base_shape, activation=activation,
