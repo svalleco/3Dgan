@@ -1,8 +1,9 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from tensorflow.compat.v1.keras.layers import BatchNormalization
 from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
-                          Dropout, BatchNormalization, Activation, Embedding)
+                          Dropout, Activation, Embedding)
 from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)
@@ -108,24 +109,24 @@ def discriminator(power=1.0, dformat='channels_last'):
 
     x = Conv3D(16, (5, 6, 6), padding='same')(image)
     x = LeakyReLU()(x)
-    x = Dropout(0.2)(x)
+    # x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
-    x = Dropout(0.2)(x)
+    # x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
-    x = Dropout(0.2)(x)
+    # x = Dropout(0.2)(x)
 
     x = Conv3D(8, (5, 6, 6), padding='valid')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
-    x = Dropout(0.2)(x)
+    # x = Dropout(0.2)(x)
 
     x = AveragePooling3D((2, 2, 2))(x)
     h = Flatten()(x)

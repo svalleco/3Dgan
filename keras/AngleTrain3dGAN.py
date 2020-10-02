@@ -3,13 +3,13 @@
 from __future__ import print_function
 import os
 ## setting seed ###
-#from numpy.random import seed
-#seed(1)
-#from tensorflow import set_random_seed
-#set_random_seed(1)
-#import random
-#random.seed(1)
-#os.environ['PYTHONHASHSEED'] = '0' 
+# from numpy.random import seed
+# seed(1)
+# from tensorflow.random import set_seed
+# set_seed(1)
+# import random
+# random.seed(1)
+# os.environ['PYTHONHASHSEED'] = '0' 
 ##################
 
 from collections import defaultdict
@@ -17,7 +17,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import keras
+#import keras
 import argparse
 import sys
 import h5py 
@@ -25,12 +25,15 @@ import numpy as np
 import time
 import math
 import tensorflow as tf
+
+from tensorflow.keras.utils import plot_model
+
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
 import analysis.utils.GANutils as gan
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
-    tlab = True
-else:
-    tlab= False
+# if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
+#     tlab = True
+# else:
+#     tlab= False
     
 try:
     import setGPU #if Caltech
@@ -38,11 +41,11 @@ except:
     pass
 
 #from memory_profiler import profile # used for memory profiling
-import keras.backend as K
-from keras.layers import Input
-from keras.models import Model
-from keras.optimizers import Adadelta, Adam, RMSprop
-from keras.utils.generic_utils import Progbar
+import tensorflow.keras.backend as K
+from tensorflow.keras import Input
+from tensorflow.keras import Model
+from tensorflow.keras.optimizers import Adadelta, Adam, RMSprop
+from tensorflow.keras.utils import Progbar
 config = tf.compat.v1.ConfigProto(log_device_placement=True)
 
 def main():
@@ -103,8 +106,8 @@ def main():
     weightdir = outpath + 'weights/3dgan_weights_' + params.name
     pklfile = outpath + 'results/3dgan_history_' + params.name + '.pkl'# loss history
     resultfile = outpath + 'results/3dgan_analysis' + params.name + '.pkl'# optimization metric history   
-    prev_gweights = outpath + 'weights/' + params.prev_gweights
-    prev_dweights = outpath + 'weights/' + params.prev_dweights
+    prev_gweights = params.prev_gweights #outpath + 'weights/' + params.prev_gweights
+    prev_dweights = params.prev_dweights #outpath + 'weights/' + params.prev_dweights
 
     print(params)
     
@@ -194,6 +197,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
     loss_ftn = hist_count # function used for additional loss
+
+    filefortests = '/data/redacost/filefortests.pkl'
     
     # apply settings according to data format
     if dformat=='channels_last':
@@ -234,6 +239,8 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         loss_weights=loss_weights
     )
 
+    #plot_model(discriminator,  show_shapes=True ,expand_nested=True)
+
     #initialize with previous weights
     if warm:
         generator.load_weights(prev_gweights)
@@ -259,6 +266,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     init_time = time.time()- start_init
     analysis_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
+    print(tf.__version__)
+
+    # generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
+    # discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
     
     # Start training
     for epoch in range(nb_epochs):
@@ -308,18 +319,35 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
             file_index +=1
             # Generate Fake events with same energy and angle as data batch
-            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+            #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+            with open(filefortests, 'rb') as f:
+                x = pickle.load(f) 
+            noise = np.asarray(x['noise'])
+            #print(noise)
+            print(len(energy_batch))
+            # for layer in discriminator.layers:
+            #     print(layer.get_config())#, layer.get_weights())
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
+            print(generated_images)
             # Train discriminator first on real batch and then the fake batch
-            #print(energy_batch)
-            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+            ganflip1 = x['ganflip1'] # gan.BitFlip(np.ones(batch_size).astype(np.float32))
+            ganflip2 = x['ganflip2'] # gan.BitFlip(np.zeros(batch_size).astype(np.float32))
+            # ganflip1 = gan.BitFlip(np.ones(batch_size).astype(np.float32))
+            # ganflip2 = gan.BitFlip(np.zeros(batch_size).astype(np.float32))
+            real_batch_loss = discriminator.train_on_batch(image_batch, [ganflip1, energy_batch, ang_batch, ecal_batch, add_loss_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [ganflip2, energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
             print(real_batch_loss)
             print(fake_batch_loss)
+            return
+            
+            # if index == 9:
+            #     return
 
-            print(discriminator.metrics_names)
+            #index +=1
+            #continue
+
 
             #if ecal sum has 100% loss(generating empty events) then end the training 
             if fake_batch_loss[3] == 100.0 and index >10:
@@ -335,22 +363,30 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             ])
             
             trick = np.ones(batch_size).astype(np.float32)
+            #trick = x['trick']
             gen_losses = []
             # Train generator twice using combined model
             for _ in range(2):
                 noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+                #noise = x['noise']
                 generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
                     [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
             
-            print(gen_losses)
-            return
+            #print(gen_losses)
+            #return
             
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
             epoch_gen_loss.append(generator_loss)
             index +=1
+            #print(generator_loss)
+            #print(index)
 
+        # print(real_batch_loss)
+        # print(generator_loss)
+
+        # return
 
         # Testing
         # Test process will also be accomplished in batches to reduce memory consumption
@@ -396,7 +432,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
            ang_batch = ang_test[(file_index * batch_size):(file_index + 1) * batch_size]
            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
            file_index +=1
-           # Generate fake events                                                            
+           # Generate fake events                                                           
            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
            generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
            generated_images = generator.predict(generator_ip, verbose=False)

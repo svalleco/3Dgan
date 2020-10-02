@@ -1,8 +1,9 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from tensorflow.compat.v1.keras.layers import BatchNormalization
 from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
-                          Dropout, BatchNormalization, Activation, Embedding)
+                          Dropout, Activation, Embedding)
 from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)

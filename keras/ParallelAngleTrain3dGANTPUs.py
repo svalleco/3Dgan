@@ -53,8 +53,8 @@ from tensorflow.keras.utils import Progbar
 
 #Configs
 config = tf.compat.v1.ConfigProto(log_device_placement=True)
-config.gpu_options.allow_growth = True
-main_session = tf.compat.v1.InteractiveSession(config=config)
+#config.gpu_options.allow_growth = True
+#main_session = tf.compat.v1.InteractiveSession(config=config)
 
 
 #tf.config.experimental_run_functions_eagerly(True)
@@ -90,9 +90,7 @@ def main():
     angtype = params.angtype
     particle = params.particle
     warm = params.warm
-    saved_models = params.saved_models
     lr = params.lr
-    prev_epoch = params.prev_epoch
     events_per_file = 5000
     energies = [0, 110, 150, 190]
 
@@ -120,12 +118,23 @@ def main():
     weightdir = outpath + 'weights/3dgan_weights_' + params.name
     pklfile = outpath + 'results/3dgan_history_' + params.name + '.pkl'# loss history
     resultfile = outpath + 'results/3dgan_analysis' + params.name + '.pkl'# optimization metric history   
-    prev_gweights = params.prev_gweights #outpath + 'weights/' + params.prev_gweights
-    prev_dweights = params.prev_dweights #outpath + 'weights/' + params.prev_dweights
+    prev_gweights = outpath + 'weights/' + params.prev_gweights
+    prev_dweights = outpath + 'weights/' + params.prev_dweights
 
+    #setting up tpu strategy
+    #tpu_address = 
+    #tpu_address = os.environ["TPU_NAME"]
+    cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=tpu_address)
+    tf.config.experimental_connect_to_cluster(cluster_resolver)
+    tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
+
+    
     #setting up parallel strategy
     #strategy = tf.distribute.MirroredStrategy() #initialize parallel strategy
-    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0"])#, "/gpu:1"]) #if there are more than one person using the cluster change to this
+    #strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0", "/gpu:1"]) #if there are more than one person using the cluster change to this
+    strategy = tf.distribute.TPUStrategy(cluster_resolver)
+
+
 
     print ('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     # global_batch_size = batch_size * strategy.num_replicas_in_sync
@@ -136,14 +145,8 @@ def main():
     # Building discriminator and generator
     gan.safe_mkdir(weightdir)
     with strategy.scope():
-        if saved_models:
-            print('loading discriminator model')
-            discriminator = tf.keras.models.load_model(weightdir + '/model_discriminator.h5')
-            print('loading generator model')
-            generator = tf.keras.models.load_model(weightdir + '/model_generator.h5')
-        else:
-            d=discriminator(xpower, dformat=dformat)
-            g=generator(latent_size, dformat=dformat)
+        d=discriminator(xpower, dformat=dformat)
+        g=generator(latent_size, dformat=dformat)
 
 
     # GAN training 
@@ -151,7 +154,7 @@ def main():
                     latent_size=latent_size, loss_weights=loss_weights, lr=lr, xscale = xscale, xpower=xpower, angscale=ascale,
                     yscale=yscale, thresh=thresh, angtype=angtype, analyse=analyse, resultfile=resultfile,
                     energies=energies, dformat=dformat, particle=particle, verbose=verbose, warm=warm,
-                    prev_gweights= prev_gweights, prev_dweights=prev_dweights, prev_epoch=prev_epoch, saved_models=saved_models )
+                    prev_gweights= prev_gweights, prev_dweights=prev_dweights   )
 
 def get_parser():
     parser = argparse.ArgumentParser(description='3D GAN Params' )
@@ -181,8 +184,6 @@ def get_parser():
     parser.add_argument('--prev_gweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_131.hdf5', help='Initial generator weights for warm start')
     parser.add_argument('--prev_dweights', type=str, default='3dgan_weights_gan_training_epsilon_k2/params_discriminator_epoch_131.hdf5', help='Initial discriminator weights for warm start')
     parser.add_argument('--name', action='store', type=str, default='gan_training', help='Unique identifier can be set for each training')
-    parser.add_argument('--prev_epoch', action='store', type=int, default=-1, help='Previous epoch mainly used for continue the training')
-    parser.add_argument('--saved_models', action='store', default=False, help='load saved models')
     return parser
 
 # A histogram function that counts cells in different bins
@@ -230,17 +231,6 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
 
 
 def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
-    #print ('Loading Data from .....', dataset)
-    #replica_context = tf.distribute.get_replica_context()
-    #tf.print("Replica id: ", replica_context.replica_id_in_sync_group, " of ", replica_context.num_replicas_in_sync)
-
-
-    
-    # tf.print(dataset.get('energy'))
-    # Y=tf.math.divide(dataset.get('energy'),yscale)
-    # main_session.run(tf.compat.v1.global_variables_initializer())
-    # print(Y.eval(session=main_session))
-    
     X=np.array(dataset.get('ECAL'))* xscale
     Y=np.array(dataset.get('energy'))/yscale
     X[X < thresh] = 0
@@ -264,7 +254,7 @@ def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1,
 
     return final_dataset
 
-def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, batch_size_per_replica=64 ,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights='', prev_epoch=-1, saved_models=False):
+def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, batch_size_per_replica=64 ,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
@@ -280,21 +270,20 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
        daxis2=(2, 3, 4) # axis for sum
 
     with strategy.scope():
-        if not saved_models:
-            # build the discriminator
-            print('[INFO] Building discriminator')
-            discriminator.compile(
-                optimizer=RMSprop(lr),
-                loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
-                loss_weights=loss_weights
-            )
+        # build the discriminator
+        print('[INFO] Building discriminator')
+        discriminator.compile(
+            optimizer=RMSprop(lr),
+            loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+            loss_weights=loss_weights
+        )
 
-            # build the generator
-            print('[INFO] Building generator')
-            generator.compile(
-                optimizer=RMSprop(lr),
-                loss='binary_crossentropy'
-            )
+        # build the generator
+        print('[INFO] Building generator')
+        generator.compile(
+            optimizer=RMSprop(lr),
+            loss='binary_crossentropy'
+        )
  
     # build combined Model
     latent = Input(shape=(latent_size, ), name='combined_z')   
@@ -316,42 +305,16 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
     #initialize with previous weights
     if warm:
-        if not saved_models:
-            generator.load_weights(prev_gweights)
-            print('Generator initialized from {}'.format(prev_gweights))
-            discriminator.load_weights(prev_dweights)
-            print('Discriminator initialized from {}'.format(prev_dweights))
+        generator.load_weights(prev_gweights)
+        print('Generator initialized from {}'.format(prev_gweights))
+        discriminator.load_weights(prev_dweights)
+        print('Discriminator initialized from {}'.format(prev_dweights))
 
     # Getting All available Data sorted in test train fraction
     Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
     discriminator.trainable = True # to allow updates to moving averages for BatchNormalization     
     print(Trainfiles)
     print(Testfiles)
-
-
-
-
-    # @tf.function
-    # def rundist(dataset):
-    #     # print(tf.executing_eagerly())
-    #     print(tf.executing_eagerly())
-    #     #tf.config.run_functions_eagerly(True)
-    #     strategy.run(GetDataAngleParallel, args=(dataset,))
-    #     # tf.config.run_functions_eagerly(False)
-
-
-    # for element in dist_dataset:
-    #     print(element.get('energy'))
-    #     #element.get[0].numpy()
-    #     rundist(element)
-    #     return
-
-    # for debuging 
-    #print(dist_dataset)
-    # for element in Y_train_dist_dataset.as_numpy_iterator():
-    #     print('---------------------------------------------------------------')
-    #     print(element)
-    #     print('---------------------------------------------------------------')
 
 
     #------------------------------Probably not needed
@@ -376,9 +339,6 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     
     # Start training
     for epoch in range(nb_epochs):
-        if saved_models:
-            epoch = prev_epoch + 1
-            saved_models = False
         epoch_start = time.time()
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
 
@@ -402,8 +362,6 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             
             # Get the dataset from the trainfile
             dataset = tfconvert.RetrieveTFRecord(Trainfiles[nb_file])
-            #dataset = h5py.File(Trainfiles[0],'r') #to read h5py
-            #dataset = Trainfiles[nb_file]
 
             # Get the train values from the dataset
             dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
@@ -412,45 +370,12 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             #create the dataset with tensors from the train values, and batch it using the global batch size
             dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
 
-            #tf.print(dataset)
-            # for element in dataset:
-            #     print('---------------------------------------------------------------')
-            #     tf.print(element)
-            #     print('---------------------------------------------------------------')
-
-            #distribute the values to all the replicas
-            #dist_dataset = strategy.experimental_distribute_dataset(dataset)
-
-            #tf.print(Y_train_dist_dataset)
-            # for element in dist_dataset:
-            #     print('---------------------------------------------------------------')
-            #     print(element)
-            #     print('---------------------------------------------------------------')
-
-
-            # def see_in_replica(dataset):
-            #     replica_context = tf.distribute.get_replica_context()
-            #     tf.print("Replica id: ", replica_context.replica_id_in_sync_group, " of ", replica_context.num_replicas_in_sync)
-            #     tf.print(dataset.get('Y'))
-
-
-            # @tf.function
-            # def run_see(Y_train_dist_dataset):
-            #     strategy.run(see_in_replica, args=(Y_train_dist_dataset,)) 
-
-            # for el in dist_dataset:
-            #     run_see(el)
-            #     return
-
 
             #Training
-            #add Trainfiles, nb_train_batches, progress_bar, daxis, daxis2, loss_ftn, combined
             for batch in dataset:
 
-                #print(tf.shape(batch.get('Y')).numpy()[0])
                 #gets the size of the batch as it will be diferent for the last batch
                 this_batch_size = tf.shape(batch.get('Y')).numpy()[0]
-                #print(this_batch_size)
 
                 #Discriminator Training
                 real_batch_loss, fake_batch_loss = Discriminator_Train_steps(discriminator, generator, batch, nEvents, WeightsDir, pklfile, \
@@ -480,16 +405,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
                 epoch_gen_loss.append(generator_loss)
                 index +=1
-
-                #break
-
-            #break
-        #print ('Total batches were {}'.format(index))
-
-            #return
         
 
-        #X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
 
         #--------------------------------------------------------------------------------------------
@@ -516,8 +433,6 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             
             # Get the dataset from the Testfile
             dataset = tfconvert.RetrieveTFRecord(Testfiles[nb_file])
-            #dataset = h5py.File(Testfiles[0],'r') #to read h5py
-            #dataset = Testfiles[nb_file]
 
             # Get the Test values from the dataset
             dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
@@ -527,7 +442,6 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
 
             # Testing
-            #add Testfiles, nb_test_batches, daxis, daxis2, X_train(??), loss_ftn, combined
             for batch in dataset:
 
                 this_batch_size = tf.shape(batch.get('Y')).numpy()[0]
@@ -579,10 +493,6 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                                 overwrite=True)
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                     overwrite=True)
-
-        #save model every epoch
-        generator.save(WeightsDir + '/model_generator.h5'.format(g_weights), overwrite=True)
-        discriminator.save(WeightsDir + '/model_discriminator.h5'.format(d_weights), overwrite=True)
 
         epoch_time = time.time()-test_start
         print("The Testing for {} epoch took {} seconds. Weights are saved in {}".format(epoch, epoch_time, WeightsDir))
@@ -638,34 +548,14 @@ def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, Weight
     ang_batch = dataset.get('ang')#.numpy()
     add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
 
-    #print(ang_batch)
-
-    # replica_context = tf.distribute.get_replica_context()
-    # print(replica_context)
-    # tf.print("Replica id: ", replica_context.replica_id_in_sync_group, " of ", replica_context.num_replicas_in_sync)
-    # tf.print(energy_batch)
-
-
-    #file_index +=1
     # Generate Fake events with same energy and angle as data batch
     noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-    # print('NOISE-----------------------------------')
-    # print(noise)
-    # print('----------------------------------------')
-    # print(tf.reshape(energy_batch, (-1,1)))
-    # print('----------------------------------------')
     generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
-    #tf.print(generator_ip)
     generated_images = generator.predict(generator_ip, verbose=0)
-    #print(generated_images)
-    #tf.print(generated_images)
 
     # Train discriminator first on real batch and then the fake batch
-    real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
-    #print(real_batch_loss)
-    
+    real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])  
     fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
-    #print(fake_batch_loss)
 
     return real_batch_loss, fake_batch_loss
 
@@ -724,26 +614,6 @@ def Test_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, 
 
     return disc_eval_loss, gen_eval_loss
     
-
-# @tf.function
-# def distributed_train_step(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-#     #X_train, epoch_disc_loss, epoch_gen_loss = 
-#     strategy.run(Train_steps, args=(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, \
-#         Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, \
-#         nb_epochs, batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-#         angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-#         warm, prev_gweights, prev_dweights,))
-#     print('check2')
-#     return X_train, strategy.reduce(tf.distribute.ReduceOp.SUM, epoch_disc_loss, axis=None), strategy.reduce(tf.distribute.ReduceOp.SUM, epoch_gen_loss, axis=None)
-
-# @tf.function
-# def distributed_test_step(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, Testfiles, nb_test_batches, daxis, daxis2, X_train, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-#     disc_test_loss, gen_test_loss = strategy.run(Test_steps, args=(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, \
-#         Testfiles, nb_test_batches, daxis, daxis2, X_train, loss_ftn, combined, \
-#         nb_epochs, batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-#         angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-#         warm, prev_gweights, prev_dweights,))
-#     return strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss, axis=None), strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss, axis=None)
 
 
 if __name__ == '__main__':

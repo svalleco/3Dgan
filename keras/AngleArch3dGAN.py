@@ -1,11 +1,13 @@
 import numpy as np
-import keras.backend as K
-from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
-                          Dropout, BatchNormalization, Activation, Embedding)
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import (UpSampling3D, Conv3D, ZeroPadding3D,
+import tensorflow.keras.backend as K
+from tensorflow.compat.v1.keras.layers import BatchNormalization
+from tensorflow.keras.layers import (Dense, Reshape, Flatten, Lambda, 
+                          Dropout, Activation, Embedding)
+from tensorflow.keras.layers import LeakyReLU
+from tensorflow.keras.layers import (UpSampling3D, Conv3D, ZeroPadding3D,
                                         AveragePooling3D)
-from keras.models import Model, Sequential
+from tensorflow.keras import Model, Sequential
+from tensorflow.keras import Input
 import math
 import tensorflow as tf
 
@@ -105,23 +107,23 @@ def discriminator(power=1.0, dformat='channels_last'):
         daxis2=(2, 3, 4)
     image=Input(shape=dshape)
 
-    x = Conv3D(16, (5, 6, 6), padding='same')(image)
+    x = Conv3D(16, (5, 6, 6), padding='same', kernel_initializer='VarianceScaling')(image)
     x = LeakyReLU()(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid', kernel_initializer='VarianceScaling')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
     x = ZeroPadding3D((0, 0, 1))(x)
-    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid', kernel_initializer='VarianceScaling')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
 
-    x = Conv3D(8, (5, 6, 6), padding='valid')(x)
+    x = Conv3D(8, (5, 6, 6), padding='valid', kernel_initializer='VarianceScaling')(x)
     x = LeakyReLU()(x)
     x = BatchNormalization(axis=baxis, epsilon=1e-6)(x)
     x = Dropout(0.2)(x)
@@ -133,8 +135,8 @@ def discriminator(power=1.0, dformat='channels_last'):
     dnn.summary()
 
     dnn_out = dnn(image)
-    fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-    aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
+    fake = Dense(1, activation='sigmoid', kernel_initializer='VarianceScaling', name='generation')(dnn_out)
+    aux = Dense(1, activation='linear', kernel_initializer='VarianceScaling', name='auxiliary')(dnn_out)
     inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image
     ang = Lambda(ecal_angle, arguments={'daxis':daxis})(inv_image) # angle calculation
     ecal = Lambda(ecal_sum, arguments={'daxis':daxis2})(inv_image) # sum of energies
