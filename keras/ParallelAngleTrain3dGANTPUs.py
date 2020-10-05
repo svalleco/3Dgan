@@ -2,6 +2,18 @@
 
 from __future__ import print_function
 import os
+
+#--------------------------------------
+# For Google Cloud Bucket
+#--------------------------------------
+
+import logging
+import cloudstorage as gcs
+import webapp2
+
+from google.appengine.api import app_identity
+#--------------------------------------
+
 #os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 ## setting seed ###
@@ -34,15 +46,15 @@ import analysis.utils.GANutils as gan
 import TfRecordConverter as tfconvert
 
 
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
-    tlab = True
-else:
-    tlab= False
+# if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
+#     tlab = True
+# else:
+#     tlab= False
     
-try:
-    import setGPU #if Caltech
-except:
-    pass
+# try:
+#     import setGPU #if Caltech
+# except:
+#     pass
 
 #from memory_profiler import profile # used for memory profiling
 import tensorflow.keras.backend as K
@@ -123,7 +135,7 @@ def main():
 
     #setting up tpu strategy
     #tpu_address = 
-    #tpu_address = os.environ["TPU_NAME"]
+    tpu_address = os.environ["TPU_NAME"]
     cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu=tpu_address)
     tf.config.experimental_connect_to_cluster(cluster_resolver)
     tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
@@ -254,8 +266,37 @@ def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1,
 
     return final_dataset
 
+#retrieved from google cloud tutorials
+def list_bucket(bucket):
+    """Create several files and paginate through them.
+
+    Production apps should set page_size to a practical value.
+
+    Args:
+        bucket: bucket.
+    """
+    print('Listbucket result:\n')
+
+    page_size = 1
+    stats = gcs.listbucket(bucket + '/*tfrecords', max_keys=page_size)
+    while True:
+        count = 0
+        for stat in stats:
+            count += 1
+            print(repr(stat))
+            print('\n')
+
+        if count != page_size or count == 0:
+            break
+        stats = gcs.listbucket(bucket + '/*tfrecords', max_keys=page_size,marker=stat.filename)
+
 def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, batch_size_per_replica=64 ,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     
+    #define bucket name
+    bucket_name = os.environ.get('BUCKET_NAME',app_identity.get_default_gcs_bucket_name())
+    list_bucket(bucket_name)
+
+
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
 
