@@ -65,6 +65,9 @@ def forward_generator(generator,
 
     elif loss_fn == 'logistic':
         gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
+        
+    elif loss_fn == 'anglegan':
+        add_loss_batch = np.expand_dims(hist_count(image_batch, xpower), axis=-1)
 
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
@@ -85,7 +88,7 @@ def forward_discriminator(generator,
                           leakiness,
                           network_size,
                           loss_fn,
-                          loss_weights
+                          loss_weights,
                           gp_weight,
                           e_p,
                           ang,
@@ -158,7 +161,7 @@ def forward_simultaneous(generator,
                          leakiness,
                          network_size,
                          loss_fn,
-                         loss_weights
+                         loss_weights,
                          gp_weight,
                          e_p,
                          ang,
@@ -214,6 +217,9 @@ def forward_simultaneous(generator,
             tf.nn.softplus(-disc_real))
         disc_loss += gp_loss
         gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
+        
+    elif loss_fn == 'anglegan':
+        add_loss_batch = np.expand_dims(hist_count(image_batch, xpower), axis=-1)
 
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
