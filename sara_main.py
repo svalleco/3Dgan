@@ -205,6 +205,7 @@ def main(args, config):
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
+                args.loss_weights,
                 args.gp_weight
             )
             gen_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='generator')
@@ -256,6 +257,7 @@ def main(args, config):
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
+                args.loss_weights,
                 args.gp_weight,
                 conditioning=real_label
             )
@@ -282,6 +284,7 @@ def main(args, config):
                     args.leakiness,
                     args.network_size,
                     args.loss_fn,
+                    args.loss_weights,
                     is_reuse=True
                 )
 
@@ -705,7 +708,8 @@ if __name__ == '__main__':
     parser.add_argument('--stabilizing_nimg', type=int, default=2 ** 19)
     parser.add_argument('--g_lr', type=float, default=1e-3)
     parser.add_argument('--d_lr', type=float, default=1e-3)
-    parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan'])
+    parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan'])
+    parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     parser.add_argument('--gp_weight', type=float, default=1)
     parser.add_argument('--activation', type=str, default='leaky_relu')
     parser.add_argument('--leakiness', type=float, default=0.2)
