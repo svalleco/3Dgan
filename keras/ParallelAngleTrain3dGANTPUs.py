@@ -7,11 +7,14 @@ import os
 # For Google Cloud Bucket
 #--------------------------------------
 
-import logging
-import cloudstorage as gcs
-import webapp2
+#import logging
+#import cloudstorage as gcs
+#import webapp2
 
-from google.appengine.api import app_identity
+#from google.appengine.api import app_identity
+
+#from google.cloud import storage
+
 #--------------------------------------
 
 #os.environ["CUDA_VISIBLE_DEVICES"]="1"
@@ -267,35 +270,38 @@ def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1,
     return final_dataset
 
 #retrieved from google cloud tutorials
-def list_bucket(bucket):
-    """Create several files and paginate through them.
-
-    Production apps should set page_size to a practical value.
-
-    Args:
-        bucket: bucket.
-    """
-    print('Listbucket result:\n')
-
-    page_size = 1
-    stats = gcs.listbucket(bucket + '/*tfrecords', max_keys=page_size)
-    while True:
-        count = 0
-        for stat in stats:
-            count += 1
-            print(repr(stat))
-            print('\n')
-
-        if count != page_size or count == 0:
-            break
-        stats = gcs.listbucket(bucket + '/*tfrecords', max_keys=page_size,marker=stat.filename)
+#def list_bucket(bucket):
+#    """Create several files and paginate through them.
+#
+#    Production apps should set page_size to a practical value.
+#
+#    Args:
+#        bucket: bucket.
+#    """
+#    print('Listbucket result:\n')
+#
+#    page_size = 1
+#    stats = gcs.listbucket(bucket + '/*tfrecords', max_keys=page_size)
+#    while True:
+#        count = 0
+#        for stat in stats:
+#            count += 1
+#            print(repr(stat))
+#            print('\n')
+#
+#        if count != page_size or count == 0:
+#            break
+#        stats = gcs.listbucket(bucket + '/*tfrecords', max_keys=page_size,marker=stat.filename)
 
 def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, batch_size_per_replica=64 ,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     
     #define bucket name
-    bucket_name = os.environ.get('BUCKET_NAME',app_identity.get_default_gcs_bucket_name())
-    list_bucket(bucket_name)
-
+    #bucket_name = os.environ.get('BUCKET_NAME',app_identity.get_default_gcs_bucket_name())
+    #list_bucket(bucket_name)
+    #client = storage.Client()
+    #bucket = storage.Bucket("renato-tpu-bucket", user_project='u-f2547c4c-50be-4af5-b3ca')
+    #all_blobs = list(client.list_blobs(bucket))
+    #print(all_blobs)
 
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
@@ -352,8 +358,38 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         print('Discriminator initialized from {}'.format(prev_dweights))
 
     # Getting All available Data sorted in test train fraction
-    Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
-    discriminator.trainable = True # to allow updates to moving averages for BatchNormalization     
+    #Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
+    discriminator.trainable = True # to allow updates to moving averages for BatchNormalization
+    Trainfiles = ['gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_000.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_001.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_002.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_003.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_004.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_005.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_006.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_007.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_008.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_009.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_010.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_011.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_012.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_013.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_014.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_015.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_016.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_017.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_018.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_019.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_020.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_021.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_022.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_023.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_024.tfrecords']
+    Testfiles = ['gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_025.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_026.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_027.tfrecords']
+
+
     print(Trainfiles)
     print(Testfiles)
 
@@ -396,9 +432,11 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         index = 0
         file_index=0
 
+        file_time = time.time()
+
         while nb_file < len(Trainfiles):
             #if index % 100 == 0:
-            print('processed {} batches'.format(index + 1))
+            print('processed {} batches'.format(index + 1)) 
             print ('Loading Data from .....', Trainfiles[nb_file])
             
             # Get the dataset from the trainfile
@@ -417,6 +455,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
                 #gets the size of the batch as it will be diferent for the last batch
                 this_batch_size = tf.shape(batch.get('Y')).numpy()[0]
+                print(this_batch_size)
 
                 #Discriminator Training
                 real_batch_loss, fake_batch_loss = Discriminator_Train_steps(discriminator, generator, batch, nEvents, WeightsDir, pklfile, \
@@ -446,7 +485,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
                 epoch_gen_loss.append(generator_loss)
                 index +=1
-        
+                print('Time taken by file was {} seconds.'.format(time.time()-file_time))
+                file_time = time.time()
 
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
 
@@ -471,7 +511,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             print('processed {} batches'.format(index + 1))
             print ('Loading Data from .....', Testfiles[nb_file])
-            
+
             # Get the dataset from the Testfile
             dataset = tfconvert.RetrieveTFRecord(Testfiles[nb_file])
 
@@ -530,8 +570,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                                 *test_history['discriminator'][-1]))
 
         # save weights every epoch                                                                                                                                                                                                                                                    
+        #localhost_save_option = tf.saved_model.SaveOptions(experimental_io_device="/job:localhost")
         generator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(g_weights, epoch),
-                                overwrite=True)
+                                overwrite=True)#, options=localhost_save_option)
         discriminator.save_weights(WeightsDir + '/{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                     overwrite=True)
 
@@ -582,21 +623,38 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 #---------------------------------------------------------------------------------------------------------------
 
 def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    start = time.time()
     # Get a single batch    
     image_batch = dataset.get('X')#.numpy()
     energy_batch = dataset.get('Y')#.numpy()
     ecal_batch = dataset.get('ecal')#.numpy()
     ang_batch = dataset.get('ang')#.numpy()
     add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+    #print(batch_size)
+    #print('image_batch')
+    #print(image_batch)
 
     # Generate Fake events with same energy and angle as data batch
     noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+    #print('noise')
+    #print(noise) 
     generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
+    #print('generator_ip')
+    #print(generator_ip)
     generated_images = generator.predict(generator_ip, verbose=0)
+    #print('generated_images')
+    #print(generated_images)
+    #print('begin 2')
 
+    print(time.time()-start)
+    time1 = time.time()
     # Train discriminator first on real batch and then the fake batch
     real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])  
+    print(time.time()-time1)
+    time2=time.time()
     fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+    print(time.time()-time2)
+    print('begin 3')
 
     return real_batch_loss, fake_batch_loss
 
