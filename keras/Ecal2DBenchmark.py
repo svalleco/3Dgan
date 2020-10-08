@@ -41,7 +41,7 @@ if __name__ == '__main__':
     #os.environ["KMP_BLOCKTIME"] = "0"
     #os.environ["KMP_SETTINGS"] = "1" 
 
-    from EcalEnergyGanTF2 import generator, discriminator
+    from EcalEnergyGan import generator, discriminator
 
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
