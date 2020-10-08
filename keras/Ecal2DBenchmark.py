@@ -7,7 +7,7 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
-import keras
+#import keras
 import argparse
 import os
 os.environ['LD_LIBRARY_PATH'] = os.getcwd()
@@ -25,20 +25,23 @@ def bit_flip(x, prob=0.05):
 
 if __name__ == '__main__':
 
-    import keras.backend as K
-
-    K.set_image_dim_ordering('th')
-
-    from keras.layers import Input
-    from keras.models import Model
-    from keras.optimizers import Adadelta, Adam, RMSprop
-    from keras.utils.generic_utils import Progbar
-    from sklearn.cross_validation import train_test_split
+    from sklearn.model_selection import train_test_split
 
     import tensorflow as tf
-    config = tf.ConfigProto(log_device_placement=True)
-  
-    from EcalEnergyGan import generator, discriminator
+    tf.keras.backend.set_image_data_format('channels_first')
+    #tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(log_device_placement=True))
+    #config = tf.ConfigProto(inter_op_parallelism_threads = 2, intra_op_parallelism_threads = 48)
+    #tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(log_device_placement=True))    
+    #session = tf.Session(config=config)    
+    #K.set_session(session)
+
+    import os; os.environ["MKLDNN_VERBOSE"] = "1"
+    #import os; os.environ["MKL_VERBOSE"] = "1"
+    #import os; os.environ["KMP_AFFINITY"] = "granularity=tile,compact,1,0"    
+    #os.environ["KMP_BLOCKTIME"] = "0"
+    #os.environ["KMP_SETTINGS"] = "1" 
+
+    from EcalEnergyGanTF2 import generator, discriminator
 
     g_weights = 'params_generator_epoch_' 
     d_weights = 'params_discriminator_epoch_' 
@@ -46,7 +49,7 @@ if __name__ == '__main__':
     nb_epochs = 30
     batch_size = 128
     latent_size = 200
-    verbose = 'false'
+    verbose = 'false'     
     
     generator=generator(latent_size)
     discriminator=discriminator()
@@ -55,10 +58,10 @@ if __name__ == '__main__':
 
     print('[INFO] Building discriminator')
     discriminator.summary()
-    #discriminator.load_weights('veganweights/params_discriminator_epoch_019.hdf5')
+    #discriminator.load_weights('weights_cpu/params_discriminator_epoch_019.hdf5')
     discriminator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(),
+        optimizer=tf.keras.optimizers.RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[6, 0.1, 0.1]
         #loss=['binary_crossentropy', 'kullback_leibler_divergence']
@@ -67,27 +70,27 @@ if __name__ == '__main__':
     # build the generator
     print('[INFO] Building generator')
     generator.summary()
-    #generator.load_weights('veganweights/params_generator_epoch_019.hdf5')
+    #generator.load_weights('weights_cpu/params_generator_epoch_019.hdf5')
     generator.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(),
+        optimizer=tf.keras.optimizers.RMSprop(),
         loss='binary_crossentropy'
     )
 
-    latent = Input(shape=(latent_size, ), name='combined_z')
+    latent = tf.keras.Input(shape=(latent_size, ), name='combined_z')
      
     fake_image = generator( latent)
 
     discriminator.trainable = False
     fake, aux, ecal = discriminator(fake_image)
-    combined = Model(
-        input=[latent],
-        output=[fake, aux, ecal],
+    combined = tf.keras.Model(
+        inputs=[latent],
+        outputs=[fake, aux, ecal],
         name='combined_model'
     )
     combined.compile(
         #optimizer=Adam(lr=adam_lr, beta_1=adam_beta_1),
-        optimizer=RMSprop(),
+        optimizer=tf.keras.optimizers.RMSprop(),
         loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
         loss_weights=[6, 0.1, 0.1]
     )
@@ -96,8 +99,8 @@ if __name__ == '__main__':
     #d=h5py.File("/data/svalleco/Ele_v1_1_2.h5",'r')
     d=h5py.File("Ele_v1_1_2.h5",'r')
     e=d.get('target')
-    X=np.array(d.get('ECAL'))
-    y=(np.array(e[:,1]))
+    X=np.array(d.get('ECAL'),dtype='float32')
+    y=(np.array(e[:,1], dtype='float32'))
     print(X.shape)
     #print('*************************************************************************************')
     print(y)
@@ -107,16 +110,23 @@ if __name__ == '__main__':
     #print(Y)
     #print('*************************************************************************************')
 
-    
+    # removing values below 100 and above 300
+    target_result = ( y >= 100 ) & ( y <= 300 )
+    y = y[target_result]
+    X = X[target_result]
+  
+ 
    # remove unphysical values
     X[X < 1e-6] = 0
 
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9, test_size=0.1)
 
     X_train = X_train[:,12,:,:]
     X_test = X_test[:,12,:,:]
     #y_train = y_train[:,12,:,:]
     #y_test = y_test[:,12,:,:]
+    
     # tensorflow ordering
     X_train =np.expand_dims(X_train, axis=-1)
     X_test = np.expand_dims(X_test, axis=-1)
@@ -150,13 +160,16 @@ if __name__ == '__main__':
     print('*************************************************************************************')
     train_history = defaultdict(list)
     test_history = defaultdict(list)
-
+     
+    import time
+    # Measuring time:
+    start = time.time()
     for epoch in range(nb_epochs):
         print('Epoch {} of {}'.format(epoch + 1, nb_epochs))
 
         nb_batches = int(X_train.shape[0] / batch_size)
         if verbose:
-            progress_bar = Progbar(target=nb_batches)
+            progress_bar = tf.keras.utils.Progbar(target=nb_batches)
 
         epoch_gen_loss = []
         epoch_disc_loss = []
@@ -231,7 +244,7 @@ if __name__ == '__main__':
         #discriminator_test_loss = discriminator.evaluate(
         #    X, [y, aux_y, ecal], verbose=False, batch_size=batch_size)
 
-        #discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
+        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
 
         #noise = np.random.normal(0, 1, (2 * nb_test, latent_size))
         #sampled_energies = np.random.uniform(1, 5, (2 * nb_test, 1))
@@ -240,28 +253,28 @@ if __name__ == '__main__':
 
         #trick = np.ones(2 * nb_test)
 
-        #generator_test_loss = combined.evaluate(generator_ip,
-        #                                        [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
+        generator_test_loss = combined.evaluate(generator_ip,
+                                                [trick, sampled_energies.reshape((-1, 1)), ecal_ip], verbose=False, batch_size=batch_size)
 
-        #generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
+        generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
 
-        #train_history['generator'].append(generator_train_loss)
-        #train_history['discriminator'].append(discriminator_train_loss)
+        train_history['generator'].append(generator_train_loss)
+        train_history['discriminator'].append(discriminator_train_loss)
 
         #test_history['generator'].append(generator_test_loss)
         #test_history['discriminator'].append(discriminator_test_loss)
 
-        #print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
-        #    'component', *discriminator.metrics_names))
-        #print('-' * 65)
+        print('{0:<22s} | {1:4s} | {2:15s} | {3:5s}| {4:5s}'.format(
+            'component', *discriminator.metrics_names))
+        print('-' * 65)
 
-        #ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
-        #print(ROW_FMT.format('generator (train)',
-        #                     *train_history['generator'][-1]))
+        ROW_FMT = '{0:<22s} | {1:<4.2f} | {2:<15.2f} | {3:<5.2f}| {4:<5.2f}'
+        print(ROW_FMT.format('generator (train)',
+                             *train_history['generator'][-1]))
         #print(ROW_FMT.format('generator (test)',
         #                     *test_history['generator'][-1]))
-        #print(ROW_FMT.format('discriminator (train)',
-        #                     *train_history['discriminator'][-1]))
+        print(ROW_FMT.format('discriminator (train)',
+                             *train_history['discriminator'][-1]))
         #print(ROW_FMT.format('discriminator (test)',
         #                     *test_history['discriminator'][-1]))
 
@@ -271,5 +284,8 @@ if __name__ == '__main__':
         discriminator.save_weights('{0}{1:03d}.hdf5'.format(d_weights, epoch),
                                    overwrite=True)
 
-        #pickle.dump({'train': train_history, 'test': test_history},
-#open('dcgan-history.pkl', 'wb'))
+        pickle.dump({'train': train_history},
+open('dcgan-history.pkl', 'wb'))
+end = time.time()
+print('Total time:')
+print(end - start)

@@ -3,17 +3,9 @@ import h5py
 
 from h5py import File as HDF5File
 import numpy as np
+import tensorflow as tf
 
-import keras.backend as K
-from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
-                          Dropout, BatchNormalization, Activation, Embedding)
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import (UpSampling2D, Conv2D, ZeroPadding2D,
-                                        AveragePooling2D)
-
-from keras.models import Model, Sequential
-
-K.set_image_dim_ordering('th')
+tf.keras.backend.set_image_data_format('channels_first')
 
 def ecal_sum(image):
     sum = K.sum(image, axis=(2, 3))
@@ -22,73 +14,73 @@ def ecal_sum(image):
 
 def discriminator():
 
-    image = Input(shape=(1, 25, 25))
+    image = tf.keras.Input(shape=(1, 25, 25))
 
-    x = Conv2D(32, (5,5), data_format='channels_first', border_mode='same')(image)
-    x = LeakyReLU()(x)
-    x = Dropout(0.2)(x)
+    x = tf.keras.layers.Conv2D(32, (5,5), data_format='channels_first', padding='same')(image)
+    x = tf.keras.layers.LeakyReLU()(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
 
-    x = ZeroPadding2D((2,2))(x)
-    x = Conv2D(8, (5, 5), data_format='channels_first', border_mode='valid')(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = tf.keras.layers.ZeroPadding2D((2,2))(x)
+    x = tf.keras.layers.Conv2D(8, (5, 5), data_format='channels_first', padding='valid')(x)
+    x = tf.keras.layers.LeakyReLU()(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
 
-    x = ZeroPadding2D((2, 2))(x)
-    x = Conv2D(8, (5,5), data_format='channels_first', border_mode='valid')(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = tf.keras.layers.ZeroPadding2D((2, 2))(x)
+    x = tf.keras.layers.Conv2D(8, (5,5), data_format='channels_first', padding='valid')(x)
+    x = tf.keras.layers.LeakyReLU()(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
 
-    x = ZeroPadding2D((1, 1))(x)
-    x = Conv2D(8, (5, 5), data_format='channels_first', border_mode='valid')(x)
-    x = LeakyReLU()(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = tf.keras.layers.ZeroPadding2D((1, 1))(x)
+    x = tf.keras.layers.Conv2D(8, (5, 5), data_format='channels_first', padding='valid')(x)
+    x = tf.keras.layers.LeakyReLU()(x)
+    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
 
-    x = AveragePooling2D((2, 2))(x)
-    h = Flatten()(x)
+    x = tf.keras.layers.AveragePooling2D((2, 2))(x)
+    h = tf.keras.layers.Flatten()(x)
 
-    dnn = Model(image, h)
+    dnn = tf.keras.Model(image, h)
 
-    image = Input(shape=(1, 25, 25))
+    image = tf.keras.Input(shape=(1, 25, 25))
 
     dnn_out = dnn(image)
 
 
-    fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-    aux = Dense(1, activation='linear', name='auxiliary')(dnn_out)
-    ecal = Lambda(lambda x: K.sum(x, axis=(2, 3)))(image)
-    Model(input=image, output=[fake, aux, ecal]).summary()
-    return Model(input=image, output=[fake, aux, ecal])
+    fake = tf.keras.layers.Dense(1, activation='sigmoid', name='generation')(dnn_out)
+    aux = tf.keras.layers.Dense(1, activation='linear', name='auxiliary')(dnn_out)
+    ecal =tf.keras.layers.Lambda(lambda x: tf.keras.backend.sum(x, axis=(2, 3)))(image)
+    tf.keras.Model(inputs=image, outputs=[fake, aux, ecal]).summary()
+    return tf.keras.Model(inputs=image, outputs=[fake, aux, ecal])
 
 def generator(latent_size=1024, return_intermediate=False):
 
-    loc = Sequential([
-        Dense(64 * 7, input_dim=latent_size),
-        Reshape((8, 7,8)),
+    loc = tf.keras.Sequential([
+        tf.keras.layers.Dense(64 * 7, input_dim=latent_size),
+        tf.keras.layers.Reshape((8, 7,8)),
 
-        Conv2D(64, (6, 8), data_format='channels_first', border_mode='same', init='he_uniform'),
-        LeakyReLU(),
-        BatchNormalization(),
-        UpSampling2D(size=(2, 2)),
+        tf.keras.layers.Conv2D(64, (6, 8), data_format='channels_first', padding='same',  kernel_initializer='he_uniform'),
+        tf.keras.layers.LeakyReLU(),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.UpSampling2D(size=(2, 2)),
 
-        ZeroPadding2D((2, 0)),
-        Conv2D(6, (5, 8), data_format='channels_first', init='he_uniform'),
-        LeakyReLU(),
-        BatchNormalization(),
-        UpSampling2D(size=(2, 3)),
+        tf.keras.layers.ZeroPadding2D((2, 0)),
+        tf.keras.layers.Conv2D(6, (5, 8), data_format='channels_first',  kernel_initializer='he_uniform'),
+        tf.keras.layers.LeakyReLU(),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.UpSampling2D(size=(2, 3)),
 
-        ZeroPadding2D((0,3)),
-        Conv2D(6, (3, 8), data_format='channels_first', init='he_uniform'),
-        LeakyReLU(),
-        Conv2D(1, (2, 2), data_format='channels_first', bias=False, init='glorot_normal'),
-        Activation('relu')
+        tf.keras.layers.ZeroPadding2D((0,3)),
+        tf.keras.layers.Conv2D(6, (3, 8), data_format='channels_first',  kernel_initializer='he_uniform'),
+        tf.keras.layers.LeakyReLU(),
+        tf.keras.layers.Conv2D(1, (2, 2), data_format='channels_first', use_bias=False,  kernel_initializer='glorot_normal'),
+        tf.keras.layers.Activation('relu')
     ])
    
-    latent = Input(shape=(latent_size, ))
+    latent = tf.keras.Input(shape=(latent_size, ))
      
     fake_image = loc(latent)
 
-    Model(input=[latent], output=fake_image).summary()
-    return Model(input=[latent], output=fake_image)
+    tf.keras.Model(inputs=[latent], outputs=fake_image).summary()
+    return tf.keras.Model(inputs=[latent], outputs=fake_image)
