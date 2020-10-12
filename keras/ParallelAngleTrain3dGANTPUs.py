@@ -438,20 +438,35 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             #if index % 100 == 0:
             print('processed {} batches'.format(index + 1)) 
             print ('Loading Data from .....', Trainfiles[nb_file])
+
+            time_start_file = time.time()
             
             # Get the dataset from the trainfile
             dataset = tfconvert.RetrieveTFRecord(Trainfiles[nb_file])
+    
+            time_elapsed = time.time() - time_start_file
+            print("Get Dataset: " + str(time_elapsed))
+            time_start_file = time.time()
 
             # Get the train values from the dataset
             dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+            time_elapsed = time.time() - time_start_file
+            print("Preprocess: " + str(time_elapsed))
+            time_start_file = time.time()
+
             nb_file+=1
 
             #create the dataset with tensors from the train values, and batch it using the global batch size
             dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
 
+            time_elapsed = time.time() - time_start_file
+            print("Slice and Batch: " + str(time_elapsed))
+            time_start_file = time.time()
 
             #Training
             for batch in dataset:
+                file_time = time.time()
+
 
                 #gets the size of the batch as it will be diferent for the last batch
                 this_batch_size = tf.shape(batch.get('Y')).numpy()[0]
@@ -623,6 +638,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 #---------------------------------------------------------------------------------------------------------------
 
 def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    print('Discriminator')
     start = time.time()
     # Get a single batch    
     image_batch = dataset.get('X')#.numpy()
@@ -660,6 +676,8 @@ def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, Weight
 
 
 def Generator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    print('Generator') 
+    start = time.time()
     # Get a single batch    
     image_batch = dataset.get('X')#.numpy()
     energy_batch = dataset.get('Y')#.numpy()
@@ -670,13 +688,25 @@ def Generator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir
     
     trick = np.ones(batch_size).astype(np.float32)
     gen_losses = []
+    time1 = time.time() - start
+    print(time1)
+    start=time.time()
+
     # Train generator twice using combined model
     for _ in range(2):
+        start=time.time()
         noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
         generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1) # sampled angle same as g4 theta
+        time1 = time.time() - start
+        print(time1)
+        start=time.time()
         gen_losses.append(combined.train_on_batch(
             [generator_ip],
             [trick, tf.reshape(energy_batch, (-1,1)), ang_batch, ecal_batch, add_loss_batch]))
+        time1 = time.time() - start
+        print(time1)
+        
+    
     generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
 
