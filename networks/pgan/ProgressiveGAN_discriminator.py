@@ -1,6 +1,12 @@
 from networks.ops import *
+from loss_utils import ecal_angle, ecal_sum
 
-
+    
+def lambda_loss(image, power=1.0):
+    ang = Lambda(ecal_angle, arguments={'power':power})(image)
+    ecal = Lambda(ecal_sum, arguments={'power':power})(image)
+    
+    
 def discriminator_block(x, filters_in, filters_out, activation, param=None):
     with tf.variable_scope('conv_1'):
         shape = x.get_shape().as_list()[2:]
@@ -9,7 +15,6 @@ def discriminator_block(x, filters_in, filters_out, activation, param=None):
         x = apply_bias(x)
         x = act(x, activation, param=param)
     with tf.variable_scope('conv_2'):
-
         shape = x.get_shape().as_list()[2:]
         kernel = [k(s) for s in shape]
         x = conv3d(x, filters_out, kernel, activation, param=param)
@@ -24,6 +29,10 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
         # x = minibatch_stddev_layer(x)
         shape = x.get_shape().as_list()[2:]
         kernel = [k(s) for s in shape]
+        
+        # compute lambda loss terms for the incident angle measurement and the total deposited energy
+        ang, ecal = lambda_loss(image, power)
+        
         x = conv3d(x, filters_out, kernel, activation=activation, param=param)
         x = apply_bias(x)
         x = act(x, activation, param=param)
@@ -35,7 +44,7 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
             x = dense(x, 1, activation='linear')
             x = apply_bias(x)
 
-        return x
+        return x, ang, ecal
 
 
 def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim, activation, param=None, is_reuse=False, size='medium', conditioning=None):

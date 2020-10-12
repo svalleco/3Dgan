@@ -1,27 +1,7 @@
 import tensorflow as tf
 import numpy as np
-
-channel_format = 'channels_first'
-
-# set channel format - want channels_first for cpu    
-if channel_format == 'channels_first':
-   daxis = (2,3,4)
-else:
-   daxis = (1,2,3)
-   
-# histogram count - sums 8 bins btwn [0.05, 0.03, 0.02, 0.0125, 0.008, 0.003, 0]**p
-def hist_count(x, p=1):
-    bin1 = np.sum(np.where(x>(0.05**p) , 1, 0), axis=daxis)
-    bin2 = np.sum(np.where((x<(0.05**p)) & (x>(0.03**p)), 1, 0), axis=daxis)
-    bin3 = np.sum(np.where((x<(0.03**p)) & (x>(0.02**p)), 1, 0), axis=daxis)
-    bin4 = np.sum(np.where((x<(0.02**p)) & (x>(0.0125**p)), 1, 0), axis=daxis)
-    bin5 = np.sum(np.where((x<(0.0125**p)) & (x>(0.008**p)), 1, 0), axis=daxis)
-    bin6 = np.sum(np.where((x<(0.008**p)) & (x>(0.003**p)), 1, 0), axis=daxis)
-    bin7 = np.sum(np.where((x<(0.003**p)) & (x>0.), 1, 0), axis=daxis)
-    bin8 = np.sum(np.where(x==0, 1, 0), axis=daxis)
-    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
-    bins[np.where(bins==0)]=1
-    return bins
+from keras.layers import Dense
+from loss_utils import dnn_out
 
 
 def forward_generator(generator,
@@ -66,8 +46,6 @@ def forward_generator(generator,
     elif loss_fn == 'logistic':
         gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
         
-    elif loss_fn == 'anglegan':
-        add_loss_batch = np.expand_dims(hist_count(image_batch, xpower), axis=-1)
 
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
@@ -125,7 +103,11 @@ def forward_discriminator(generator,
                                            param=leakiness, size=network_size, ), [interpolates])[0]
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=(1, 2, 3, 4)))
 
+    # wasserstein gan
     if loss_fn == 'wgan':
+        # A sigmoid neuron predicts the typical GAN real/fake probability 
+        fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
+        
         gradient_penalty = (slopes - 1) ** 2
         gp_loss = gp_weight * gradient_penalty
         disc_loss = disc_fake_d - disc_real
@@ -133,15 +115,13 @@ def forward_discriminator(generator,
         disc_loss = tf.reduce_mean(disc_loss + gp_loss + drift_loss)
 
     elif loss_fn == 'logistic':
+        # has the real/fake activation layer built in, as a critic that rates. Allows you to move far away and still get a good gradient
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
             tf.nn.softplus(-disc_real))
         disc_loss += gp_loss
     
-    elif loss_fn == 'anglegan':
-        add_loss_batch = np.expand_dims(hist_count(image_batch, xpower), axis=-1)
-
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
 
@@ -201,8 +181,11 @@ def forward_simultaneous(generator,
     # Generator training.
     disc_fake_g = discriminator(gen_sample, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
                                 activation=activation, param=leakiness, size=network_size, is_reuse=True, conditioning=conditioning)
-
+    # wasserstein gan
     if loss_fn == 'wgan':
+         # A sigmoid neuron predicts the typical GAN real/fake probability 
+        fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
+        
         gradient_penalty = (slopes - 1) ** 2
         gp_loss = gp_weight * gradient_penalty
         disc_loss = disc_fake_d - disc_real
@@ -211,6 +194,7 @@ def forward_simultaneous(generator,
         gen_loss = -tf.reduce_mean(disc_fake_g)
 
     elif loss_fn == 'logistic':
+        # has the real/fake activation layer built in, as a critic that rates. Allows you to move far away and still get a good gradient
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
@@ -218,8 +202,7 @@ def forward_simultaneous(generator,
         disc_loss += gp_loss
         gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
         
-    elif loss_fn == 'anglegan':
-        add_loss_batch = np.expand_dims(hist_count(image_batch, xpower), axis=-1)
+      
 
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
