@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from keras.layers import Dense
-from loss_utils import dnn_out
+from loss_utils import prep_dnn
 
 
 def forward_generator(generator,
@@ -114,6 +114,7 @@ def forward_discriminator(generator,
 
     elif loss_fn == 'logistic':
         # A sigmoid neuron predicts the typical GAN real/fake probability 
+        dnn_out = prep_dnn(image)
         fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
         
         gradient_penalty = tf.reduce_mean(slopes ** 2)

@@ -13,13 +13,14 @@ else:
     daxis=(2,3,4)
     dshape=(1, 51, 51, 25)
 
-image = Input(shape=dshape) 
-
-# this is used for the dense activation real/fake variable in logistic loss function -- probably need to change/move this
-dnn = Model(image, h)   # h is flattened x from line 150 in anglegan discriminator = anglearch3dgan.py
-dnn.summary()
-# Output
-dnn_out = dnn(image)
+def prep_dnn(image, dshape=dshape):
+    image = Input(shape=dshape) 
+    h = Flatten()(image)
+    dnn = Model(image, h) # h is flattened x from line 150 in anglegan discriminator = anglearch3dgan.py
+    dnn.summary()
+    # Output
+    dnn_out = dnn(image)
+    return dnn_out
 
 # Summming cell energies
 def ecal_sum(image, power):
