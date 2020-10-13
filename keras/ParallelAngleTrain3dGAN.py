@@ -34,15 +34,15 @@ import analysis.utils.GANutils as gan
 import TfRecordConverter as tfconvert
 
 
-if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
-    tlab = True
-else:
-    tlab= False
+# if '.cern.ch' in os.environ.get('HOSTNAME'): # Here a check for host can be used to set defaults accordingly
+#     tlab = True
+# else:
+#     tlab= False
     
-try:
-    import setGPU #if Caltech
-except:
-    pass
+# try:
+#     import setGPU #if Caltech
+# except:
+#     pass
 
 #from memory_profiler import profile # used for memory profiling
 import tensorflow.keras.backend as K
@@ -125,7 +125,7 @@ def main():
 
     #setting up parallel strategy
     #strategy = tf.distribute.MirroredStrategy() #initialize parallel strategy
-    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0"])#, "/gpu:1"]) #if there are more than one person using the cluster change to this
+    strategy = tf.distribute.MirroredStrategy()#devices=["/gpu:0"])#, "/gpu:1"]) #if there are more than one person using the cluster change to this
 
     print ('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     # global_batch_size = batch_size * strategy.num_replicas_in_sync
@@ -323,8 +323,38 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             print('Discriminator initialized from {}'.format(prev_dweights))
 
     # Getting All available Data sorted in test train fraction
-    Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
+    #Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
     discriminator.trainable = True # to allow updates to moving averages for BatchNormalization     
+    
+    Trainfiles = ['gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_000.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_001.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_002.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_003.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_004.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_005.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_006.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_007.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_008.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_009.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_010.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_011.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_012.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_013.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_014.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_015.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_016.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_017.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_018.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_019.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_020.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_021.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_022.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_023.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_024.tfrecords']
+    Testfiles = ['gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_025.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_026.tfrecords',\
+                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_027.tfrecords']
+    
     print(Trainfiles)
     print(Testfiles)
 
@@ -395,22 +425,38 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         index = 0
         file_index=0
 
+        file_time = time.time()
+
         while nb_file < len(Trainfiles):
             #if index % 100 == 0:
             print('processed {} batches'.format(index + 1))
             print ('Loading Data from .....', Trainfiles[nb_file])
+
+            time_start_file = time.time()
             
             # Get the dataset from the trainfile
             dataset = tfconvert.RetrieveTFRecord(Trainfiles[nb_file])
             #dataset = h5py.File(Trainfiles[0],'r') #to read h5py
             #dataset = Trainfiles[nb_file]
 
+            time_elapsed = time.time() - time_start_file
+            print("Get Dataset: " + str(time_elapsed))
+            time_start_file = time.time()
+
             # Get the train values from the dataset
             dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
             nb_file+=1
 
+            time_elapsed = time.time() - time_start_file
+            print("Preprocess: " + str(time_elapsed))
+            time_start_file = time.time()
+
             #create the dataset with tensors from the train values, and batch it using the global batch size
             dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
+
+            time_elapsed = time.time() - time_start_file
+            print("Slice and Batch: " + str(time_elapsed))
+            time_start_file = time.time()
 
             #tf.print(dataset)
             # for element in dataset:
@@ -446,6 +492,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             #Training
             #add Trainfiles, nb_train_batches, progress_bar, daxis, daxis2, loss_ftn, combined
             for batch in dataset:
+                file_time = time.time()
 
                 #print(tf.shape(batch.get('Y')).numpy()[0])
                 #gets the size of the batch as it will be diferent for the last batch
@@ -480,6 +527,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
                 epoch_gen_loss.append(generator_loss)
                 index +=1
+                print('Time taken by file was {} seconds.'.format(time.time()-file_time))
+                file_time = time.time()
 
                 #break
 
@@ -631,6 +680,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 #---------------------------------------------------------------------------------------------------------------
 
 def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    print('Discriminator')
+    start = time.time()
     # Get a single batch    
     image_batch = dataset.get('X')#.numpy()
     energy_batch = dataset.get('Y')#.numpy()
@@ -660,17 +711,26 @@ def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, Weight
     #print(generated_images)
     #tf.print(generated_images)
 
+    print(time.time()-start)
+    time1 = time.time()
+
     # Train discriminator first on real batch and then the fake batch
     real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
     #print(real_batch_loss)
+    print(time.time()-time1)
+    time2=time.time()
     
     fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
     #print(fake_batch_loss)
+    print(time.time()-time2)
+    print('begin 3')
 
     return real_batch_loss, fake_batch_loss
 
 
 def Generator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, loss_ftn, combined, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    print('Generator') 
+    start = time.time()
     # Get a single batch    
     image_batch = dataset.get('X')#.numpy()
     energy_batch = dataset.get('Y')#.numpy()
@@ -681,13 +741,23 @@ def Generator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir
     
     trick = np.ones(batch_size).astype(np.float32)
     gen_losses = []
+    time1 = time.time() - start
+    print(time1)
+    start=time.time()
+
     # Train generator twice using combined model
     for _ in range(2):
+        start=time.time()
         noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
         generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1) # sampled angle same as g4 theta
+        time1 = time.time() - start
+        print(time1)
+        start=time.time()
         gen_losses.append(combined.train_on_batch(
             [generator_ip],
             [trick, tf.reshape(energy_batch, (-1,1)), ang_batch, ecal_batch, add_loss_batch]))
+        time1 = time.time() - start
+        print(time1)
     generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
 
