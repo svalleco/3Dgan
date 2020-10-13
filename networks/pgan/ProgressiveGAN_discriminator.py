@@ -28,11 +28,7 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
     with tf.variable_scope(f'discriminator_out'):
         # x = minibatch_stddev_layer(x)
         shape = x.get_shape().as_list()[2:]
-        kernel = [k(s) for s in shape]
-        
-        # compute lambda loss terms for the incident angle measurement and the total deposited energy
-        ang, ecal = lambda_loss(image, power)
-        
+        kernel = [k(s) for s in shape]        
         x = conv3d(x, filters_out, kernel, activation=activation, param=param)
         x = apply_bias(x)
         x = act(x, activation, param=param)
@@ -44,7 +40,7 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
             x = dense(x, 1, activation='linear')
             x = apply_bias(x)
 
-        return x, ang, ecal
+        return x
 
 
 def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim, activation, param=None, is_reuse=False, size='medium', conditioning=None):
@@ -79,6 +75,9 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
                 x = alpha * fromrgb_prev + (1 - alpha) * x
 
         x = discriminator_out(x, base_dim, latent_dim, filters_out, activation, param)
+        
+        # compute lambda loss terms for the incident angle measurement and the total deposited energy
+        ang, ecal = lambda_loss(image, power)
         return x
 
 
