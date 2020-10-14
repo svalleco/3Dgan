@@ -1,12 +1,13 @@
 from networks.ops import *
 from loss_utils import ecal_angle, ecal_sum
+import tensorflow as tf 
+from keras.layers import Lambda
 
-    
 def lambda_loss(image, power=1.0):
     inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image -- Emma added this bc Gulrukh said that the image is preprocessed to be inverted
     ang = Lambda(ecal_angle, arguments={'power':power})(inv_image)
     ecal = Lambda(ecal_sum, arguments={'power':power})(inv_image)
-    
+    return ang, ecal
     
 def discriminator_block(x, filters_in, filters_out, activation, param=None):
     with tf.variable_scope('conv_1'):
@@ -54,6 +55,9 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
         if is_reuse:
             scope.reuse_variables()
 
+        # compute lambda loss terms for the incident angle measurement and the total deposited energy
+        ang, ecal = lambda_loss(x, power)
+        
         x_downscale = x
 
         with tf.variable_scope(f'from_rgb_{phase}'):
@@ -77,8 +81,6 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
 
         x = discriminator_out(x, base_dim, latent_dim, filters_out, activation, param)
         
-        # compute lambda loss terms for the incident angle measurement and the total deposited energy
-        ang, ecal = lambda_loss(x, power)
         return x, ang, ecal
 
 

@@ -17,7 +17,7 @@ from networks.loss import forward_simultaneous, forward_generator, forward_discr
 import psutil
 from networks.ops import num_filters
 from tensorflow.data.experimental import AUTOTUNE
-import nvgpu
+#import nvgpu
 import logging
 
 # For TensorBoard Debugger:
@@ -576,11 +576,11 @@ def main(args, config):
                 elif large_summary_bool:
                     _, _, summary_s, d_loss, g_loss = sess.run(
                          [train_gen, train_disc, summary_small,
-                          disc_loss, gen_loss], feed_dict={real_image_input: batch})
+                          disc_loss, gen_loss], feed_dict={real_image_input: batch, e_p: batch_en, ang: batch_ang})
                 else:
                     _, _, d_loss, g_loss = sess.run(
                          [train_gen, train_disc, disc_loss, gen_loss],
-                         feed_dict={real_image_input: batch})
+                         feed_dict={real_image_input: batch, e_p: batch_en, ang: batch_ang})
                 #print("Completed step")
                 global_step += batch_size * global_size
                 local_step += 1
@@ -941,7 +941,7 @@ if __name__ == '__main__':
     parser.add_argument('--d_lr_rise_niter', type=int, default=0, help='If a learning rate schedule with a gradual increase in the beginning of a phase is defined for the discriminator, this number defines within how many iterations the maximum is reached.')
     parser.add_argument('--d_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the discriminator, this defines within how many iterations the minimum is reached.')
     parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan'])
-    parser.add_argument('--lossweights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
+    parser.add_argument('--loss_weights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     parser.add_argument('--gp_weight', type=float, default=1)
     parser.add_argument('--activation', type=str, default='leaky_relu')
     parser.add_argument('--leakiness', type=float, default=0.2)
