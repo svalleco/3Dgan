@@ -41,6 +41,9 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
         with tf.variable_scope('dense_2'):
             x = dense(x, 1, activation='linear')
             x = apply_bias(x)
+            # A sigmoid neuron predicts the typical GAN real/fake probability 
+            #fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
+        
 
         return x
 

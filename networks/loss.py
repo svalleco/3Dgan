@@ -184,9 +184,7 @@ def forward_simultaneous(generator,
                                 activation=activation, param=leakiness, size=network_size, is_reuse=True, conditioning=conditioning)
     # wasserstein gan
     if loss_fn == 'wgan':
-         # A sigmoid neuron predicts the typical GAN real/fake probability 
-        fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-        
+        # has the real/fake activation layer built in, as a critic that rates. Allows you to move far away and still get a good gradient
         gradient_penalty = (slopes - 1) ** 2
         gp_loss = gp_weight * gradient_penalty
         disc_loss = disc_fake_d - disc_real
@@ -195,7 +193,6 @@ def forward_simultaneous(generator,
         gen_loss = -tf.reduce_mean(disc_fake_g)
 
     elif loss_fn == 'logistic':
-        # has the real/fake activation layer built in, as a critic that rates. Allows you to move far away and still get a good gradient
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
