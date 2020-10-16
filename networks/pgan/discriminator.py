@@ -59,7 +59,7 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
             scope.reuse_variables()
 
         # compute lambda loss terms for the incident angle measurement and the total deposited energy
-        ang, ecal = lambda_loss(x, power)
+        #ang, ecal = lambda_loss(x, power)
         
         x_downscale = x
 
@@ -84,7 +84,7 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
 
         x = discriminator_out(x, base_dim, latent_dim, filters_out, activation, param)
         
-        return x, ang, ecal
+        return x#, ang, ecal
 
 
 if __name__ == '__main__':
