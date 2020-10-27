@@ -114,8 +114,8 @@ def forward_discriminator(generator,
 
     elif loss_fn == 'logistic':
         # A sigmoid neuron predicts the typical GAN real/fake probability 
-        dnn_out = prep_dnn(image)
-        fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
+        #dnn_out = prep_dnn(real_image_input)
+        #fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
         
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
@@ -193,6 +193,8 @@ def forward_simultaneous(generator,
         gen_loss = -tf.reduce_mean(disc_fake_g)
 
     elif loss_fn == 'logistic':
+        #dnn_out = prep_dnn(real_image_input)
+        #fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
