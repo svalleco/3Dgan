@@ -148,7 +148,7 @@ def act(x, activation, param=None):
 #     return filters
 
 
-def num_filters(phase, num_phases, base_dim=None, size=None):
+def num_filters(phase, num_phases, base_shape, base_dim=None, size=None):
     if size == 'xxs':
         filter_list = [256, 256, 64, 32, 16, 8, 4, 2]
     elif size == 'xs':
@@ -157,6 +157,7 @@ def num_filters(phase, num_phases, base_dim=None, size=None):
         filter_list = [512, 512, 128, 128, 64, 32, 16, 8]
     elif size == 'm':
         filter_list = [1024, 1024, 256, 256, 128, 64, 32, 16]
+#        filter_list = [256, 256, 128, 64, 32, 16]
     elif size == 'l':
         filter_list = [2048, 2048, 512, 512, 256, 128, 64, 32]
     elif size == 'xl':
@@ -165,9 +166,23 @@ def num_filters(phase, num_phases, base_dim=None, size=None):
         filter_list = [8192, 8192, 2048, 1024, 1024, 512, 256, 128]
     else:
         raise ValueError(f"Unknown size: {size}")
-    # filter_list = filter_list[-num_phases:]
     assert len(filter_list) == 8, "Filter lists are built for LIDC-IDRI dataset."
-    filters = filter_list[phase - 1]
+    # filter_list = filter_list[-num_phases:]
+    # Take base_shape[1:] to cut of the number of input channels:
+    # We want to determine number of filters based on spatial number of voxels; channels are irrelevant
+    current_dim = [2 ** (phase - 1) * dim for dim in base_shape[1:]]
+    print(f"DEBUG: base_shape={base_shape}, phase={phase}, current_dim={current_dim}")
+    log_product = np.log2(np.product(current_dim))
+    # Filter lists were designed for dimensions where the 2-log is [4, 7, 10, ...]
+    reference_log = [4 + n * 3 for n in range(0,7)]
+    # Map the index to the nearest reference log
+    # E.g. for dimension [16, 16, 5] the product is 1280, log2(1280) = 10.32 which is closest
+    # to 10, thus I get the third element from filter_list as the number of filters.
+    index = np.argmin(np.abs(np.array(reference_log)-log_product))
+    filters = filter_list[index]
+    print(f"DEBUG: log_product={log_product}, index={index}, filters={filters}")
+    # filters = filter_list[phase - 1]
+# print(f"DEBUG: returning num_filters: {filters}")
     return filters
 
 

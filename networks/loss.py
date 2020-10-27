@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
-from keras.layers import Dense
-from loss_utils import prep_dnn
+from tensorflow.keras.layers import Dense
+from networks.pgan.loss_utils import prep_dnn
 
 
 def forward_generator(generator,
