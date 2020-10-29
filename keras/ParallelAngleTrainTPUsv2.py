@@ -460,7 +460,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     time_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
 
-    def Discriminator_Train_steps(discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    def Discriminator_Train_steps(dataset, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1]):
         print('Discriminator')
         start = time.time()
         # Get a single batch    
@@ -540,19 +540,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
 
     @tf.function
-    def distributed_discriminator_train_step(strategy, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
+    def distributed_discriminator_train_step(dataset, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1]):
         #X_train, epoch_disc_loss, epoch_gen_loss = 
 
         #print('check100')
 
         #fake, energy, ang, ecal
         real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
-        fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4 = strategy.run(Discriminator_Train_steps, args=(\
-                        discriminator, generator, dataset, nEvents, WeightsDir, pklfile, \
-                        Trainfiles, nb_train_batches, daxis, daxis2, combined, \
-                        nb_epochs, batch_size, global_batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-                        angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-                        warm, prev_gweights, prev_dweights))
+        fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4 = strategy.run(Discriminator_Train_steps, args=(dataset, global_batch_size, latent_size, loss_weights))
 
         
         real_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_1, axis=None)
@@ -637,12 +632,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 
 
                 #Discriminator Training
-                real_batch_loss, fake_batch_loss = distributed_discriminator_train_step( \
-                    strategy, discriminator, generator, batch, nEvents, WeightsDir, pklfile, \
-                    Trainfiles, nb_train_batches, daxis, daxis2, combined, \
-                    nb_epochs, this_batch_size, batch_size ,latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-                    angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-                    warm, prev_gweights, prev_dweights)
+                real_batch_loss, fake_batch_loss = distributed_discriminator_train_step(batch, batch_size ,latent_size, loss_weights)
 
 
                 #Configure the loss so it is equal to the original values
