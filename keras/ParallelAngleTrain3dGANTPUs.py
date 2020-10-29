@@ -109,6 +109,8 @@ def main():
     events_per_file = 5000
     energies = [0, 110, 150, 190]
 
+    print(lr)
+
     # if tlab:
     #    if not warm:
     #      datapath = 'path4'

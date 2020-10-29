@@ -460,7 +460,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     time_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
 
-    def Discriminator_Train_steps(dataset, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1]):
+    def Discriminator_Train_steps(dataset):
         print('Discriminator')
         start = time.time()
         # Get a single batch    
@@ -470,26 +470,27 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         ang_batch = dataset.get('ang')#.numpy()
         #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
 
+        
+
         # filefortests = '/data/redacost/filefortests.pkl'
         # with open(filefortests, 'rb') as f:
         #     x = pickle.load(f) 
         # noise = np.asarray(x['noise'])
         #tf.print(noise)
 
-        batch_size = energy_batch.get_shape().as_list()[0]#.numpy()[0]
-        #print(batch_size)
+        b_size = energy_batch.get_shape().as_list()[0]#.numpy()[0]
+        print(b_size)
+
         
         # Generate Fake events with same energy and angle as data batch
-        noise = tf.random.normal((batch_size, latent_size-2), 0, 1)
+        noise = tf.random.normal((batch_size_per_replica, latent_size-2), 0, 1)
         #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
         generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
         generated_images = generator(generator_ip, training=False)
         #tf.print(generated_images) #same image
 
-        
-
         # Train discriminator first on real batch 
-        fake_batch = gan.BitFlip(np.ones(batch_size).astype(np.float32))
+        fake_batch = gan.BitFlip(np.ones(batch_size_per_replica).astype(np.float32))
         #fake_batch = x['ganflip1']
         fake_batch = [[el] for el in fake_batch]
         labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
@@ -497,18 +498,22 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         print(time.time()-start)
         time1 = time.time()
 
+
         with tf.GradientTape() as tape:
             predictions = discriminator(image_batch, training=True)
-            real_batch_loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
+            real_batch_loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
         
-        # tf.print('Discriminator real')
-        # tf.print(predictions)
-        
+        #print('Discriminator real')
+        #tf.print(predictions)
+
+    
         gradients = tape.gradient(real_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
         optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
     
         print(time.time()-time1)
         time2=time.time()
+
+        return
 
         #tf.print(real_batch_loss)
         #return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3]
@@ -541,15 +546,17 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
 
     @tf.function
-    def distributed_discriminator_train_step(dataset, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1]):
+    def distributed_discriminator_train_step(dataset):
         #X_train, epoch_disc_loss, epoch_gen_loss = 
 
         #print('check100')
 
         #fake, energy, ang, ecal
-        real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
-        fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4 = strategy.run(Discriminator_Train_steps, args=(dataset, global_batch_size, latent_size, loss_weights))
+        #real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
+        #fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4 = 
+        strategy.run(Discriminator_Train_steps, args=(dataset,))
 
+        return
         
         real_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_1, axis=None)
         real_batch_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_2, axis=None)
@@ -610,7 +617,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             time_start_file = time.time()
 
             #create the dataset with tensors from the train values, and batch it using the global batch size
-            dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
+            dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
 
             time_elapsed = time.time() - time_start_file
             print("Slice and Batch: " + str(time_elapsed))
@@ -629,12 +636,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             for batch in dist_dataset:
                 file_time = time.time()
 
-                this_batch_size = 128 #not necessary can be removed
+                this_batch_size =128 #not necessary can be removed
                 
 
                 #Discriminator Training
-                real_batch_loss, fake_batch_loss = distributed_discriminator_train_step(batch, batch_size ,latent_size, loss_weights)
+                #real_batch_loss, fake_batch_loss =
+                distributed_discriminator_train_step(batch)
 
+                return
 
                 #Configure the loss so it is equal to the original values
                 real_batch_loss = [el.numpy() for el in real_batch_loss]
