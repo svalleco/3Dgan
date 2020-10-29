@@ -480,7 +480,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #print(batch_size)
         
         # Generate Fake events with same energy and angle as data batch
-        noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+        noise = tf.random.normal((batch_size, latent_size-2), 0, 1)
+        #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
         generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
         generated_images = generator(generator_ip, training=False)
         #tf.print(generated_images) #same image
