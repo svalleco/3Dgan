@@ -581,7 +581,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 generated_images = generator(generator_ip ,training= True)
                 #tf.print(generated_images)
                 predictions = discriminator(generated_images , training=False)
-                loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
+                loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
             
             # tf.print('--Generator------------')
             # tf.print(predictions)
@@ -606,6 +606,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #X_train, epoch_disc_loss, epoch_gen_loss = 
 
         #print('check100')
+        gen_losses = []
 
         #fake, energy, ang, ecal
         real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
@@ -777,14 +778,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 print('Time taken by file was {} seconds.'.format(time.time()-file_time))
 
                 #print(generator_loss)
-                return
+                #return
 
             #break
 
             #break
         #print ('Total batches were {}'.format(index))
 
-            #return
+            return
         
 
         #X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
