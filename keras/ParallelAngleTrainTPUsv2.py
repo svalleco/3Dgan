@@ -513,20 +513,18 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         print(time.time()-time1)
         time2=time.time()
 
-        return
-
         #tf.print(real_batch_loss)
         #return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3]
 
         #Train discriminato on the fake batch
-        fake_batch = gan.BitFlip(np.zeros(batch_size).astype(np.float32))
+        fake_batch = gan.BitFlip(np.zeros(batch_size_per_replica).astype(np.float32))
         #fake_batch = x['ganflip2']
         fake_batch = [[el] for el in fake_batch]
         labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
 
         with tf.GradientTape() as tape:
             predictions = discriminator(generated_images, training=True)
-            fake_batch_loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
+            fake_batch_loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
         gradients = tape.gradient(fake_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
         optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
 
@@ -541,7 +539,65 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         # tf.print(fake_batch_loss)
 
         #return losses separatly for reduce op
-        return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], fake_batch_loss[0], fake_batch_loss[1], fake_batch_loss[2], fake_batch_loss[3]
+
+        print('Generator') 
+        start = time.time()
+        
+
+        # filefortests = '/data/redacost/filefortests.pkl'
+        # with open(filefortests, 'rb') as f:
+        #     x = pickle.load(f) 
+        # noise = np.asarray(x['noise'])
+
+        # generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
+        # generated_images = generator(generator_ip, training=False)
+        # tf.print(generated_images)
+
+        trick = np.ones(batch_size_per_replica).astype(np.float32)
+        #trick = x['trick']
+
+        fake_batch = [[el] for el in trick]
+        labels = [fake_batch, tf.reshape(energy_batch, (-1,1)), ang_batch, ecal_batch]
+        #labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
+
+        time1 = time.time() - start
+        print(time1)
+        start=time.time()
+
+        gen_losses = []
+        # Train generator twice using combined model
+        for _ in range(2):
+            start=time.time()
+            #noise = x['noise']
+            #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+            noise = tf.random.normal((batch_size_per_replica, latent_size-2), 0, 1)
+            generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1) # sampled angle same as g4 theta
+            time1 = time.time() - start
+            print(time1)
+            start=time.time()        
+
+            with tf.GradientTape() as tape:
+                #predictions = combined(generator_ip, training= True)
+                generated_images = generator(generator_ip ,training= True)
+                #tf.print(generated_images)
+                predictions = discriminator(generated_images , training=False)
+                loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
+            
+            # tf.print('--Generator------------')
+            # tf.print(predictions)
+            # tf.print('---------------------------')
+
+            gradients = tape.gradient(loss, generator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+            optimizer_generator.apply_gradients(zip(gradients, generator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
+
+            time1 = time.time() - start
+            print(time1)
+
+            for el in loss:
+                gen_losses.append(el)
+
+        return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], fake_batch_loss[0], fake_batch_loss[1], fake_batch_loss[2], fake_batch_loss[3], \
+                gen_losses[0], gen_losses[1], gen_losses[2], gen_losses[3], gen_losses[4], gen_losses[5], gen_losses[6], gen_losses[7]   
 
 
 
@@ -552,11 +608,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #print('check100')
 
         #fake, energy, ang, ecal
-        #real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
-        #fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4 = 
-        strategy.run(Discriminator_Train_steps, args=(dataset,))
-
-        return
+        real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
+        fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4, \
+        gen_batch_loss_1, gen_batch_loss_2, gen_batch_loss_3, gen_batch_loss_4, \
+        gen_batch_loss_5, gen_batch_loss_6, gen_batch_loss_7, gen_batch_loss_8  = strategy.run(Discriminator_Train_steps, args=(dataset,))
         
         real_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_1, axis=None)
         real_batch_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_2, axis=None)
@@ -570,7 +625,24 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         fake_batch_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, fake_batch_loss_4, axis=None)
         fake_batch_loss = [fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4]
 
-        return real_batch_loss, fake_batch_loss 
+    
+        gen_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_1, axis=None)
+        gen_batch_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_2, axis=None)
+        gen_batch_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_3, axis=None)
+        gen_batch_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_4, axis=None)
+        gen_batch_loss = [gen_batch_loss_1, gen_batch_loss_2, gen_batch_loss_3, gen_batch_loss_4]
+
+        gen_losses.append(gen_batch_loss)
+
+        gen_batch_loss_5 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_5, axis=None)
+        gen_batch_loss_6 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_6, axis=None)
+        gen_batch_loss_7 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_7, axis=None)
+        gen_batch_loss_8 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_8, axis=None)
+        gen_batch_loss = [gen_batch_loss_5, gen_batch_loss_6, gen_batch_loss_7, gen_batch_loss_8]
+
+        gen_losses.append(gen_batch_loss)
+
+        return real_batch_loss, fake_batch_loss, gen_losses
 
 
 
@@ -640,10 +712,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 
 
                 #Discriminator Training
-                #real_batch_loss, fake_batch_loss =
-                distributed_discriminator_train_step(batch)
-
-                return
+                real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(batch)
 
                 #Configure the loss so it is equal to the original values
                 real_batch_loss = [el.numpy() for el in real_batch_loss]
@@ -678,19 +747,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                     print ('real_batch_loss', real_batch_loss)
                     print ('fake_batch_loss', fake_batch_loss)
                     sys.exit()
+
                 # append mean of discriminator loss for real and fake events 
                 epoch_disc_loss.append([
                     (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
                 ])
 
                 #return
-
-                gen_losses = distributed_generator_train_step(optimizer_discriminator, optimizer_generator, \
-                    strategy, discriminator, generator, batch, nEvents, WeightsDir, pklfile, \
-                    Trainfiles, nb_train_batches, daxis, daxis2, combined, \
-                    nb_epochs, this_batch_size, batch_size ,latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-                    angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-                    warm, prev_gweights, prev_dweights)
 
                 gen_losses[0] = [el.numpy() for el in gen_losses[0]]
                 gen_losses_total_loss = np.sum(gen_losses[0])
@@ -714,7 +777,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 print('Time taken by file was {} seconds.'.format(time.time()-file_time))
 
                 #print(generator_loss)
-                #return
+                return
 
             #break
 
