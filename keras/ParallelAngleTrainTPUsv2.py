@@ -888,11 +888,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             nb_file+=1
 
             #create the dataset with tensors from the Test values, and batch it using the global batch size
-            dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
+            #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
+            dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
+
+            dist_dataset = strategy.experimental_distribute_dataset(dataset)
 
             # Testing
             #add Testfiles, nb_test_batches, daxis, daxis2, X_train(??), loss_ftn, combined
-            for batch in dataset:
+            for batch in dist_dataset:
 
                 this_batch_size = 128 #can be removed (should)
 
