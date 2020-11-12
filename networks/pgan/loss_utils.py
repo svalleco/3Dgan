@@ -1,24 +1,31 @@
-import keras.backend as K
-from keras.layers import (Input, Dense, Reshape, Flatten, Lambda, merge,
-                          Dropout, BatchNormalization, Activation, Embedding)
-from keras.models import Model
+
 import tensorflow as tf
 import math
 import numpy as np
 
+# BINARY CROSS ENTROPY
+def bce(output, target, from_logits=False):
+    output = tf.convert_to_tensor(output)
+    target = tf.convert_to_tensor(target)
+    sigmoid_loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=target, logits=output)
+    loss= tf.reduce_mean(sigmoid_loss)
+    return loss
+
+# MAE = MEAN ABSOLUTE ERROR
+def mae(output, target):
+    output = tf.convert_to_tensor(output)
+    target = tf.convert_to_tensor(target)
+    return tf.math.reduce_mean(tf.math.abs(target - output), axis=-1) / len(target)
+
+# MAPE = MEAN ABSOLUTE PERCENTAGE ERROR
+def mape(output, target):
+    target = tf.convert_to_tensor(target)
+    output = tf.convert_to_tensor(output)
+    output_without0 = tf.where(tf.equal(output, 0.), tf.ones_like(output), output)  # to avoid -inf losses when y_true is in denominator
+    loss = (tf.math.reduce_sum(tf.math.abs(output-target)/output_without0) * 100) / len(target)
+    return loss
 
 # dimensions of real_images_input = [z_batch_size, 1=channel, z, x, y]
-
-# !!!NEEDS WORK!!! prep the images for the fake layer in logistic loss function
-def prep_dnn(real_image_input):
-    image = Input(shape=dshape) 
-    h = Flatten()(image)
-    dnn = Model(image, h) # h is flattened x from line 150 in anglegan discriminator = anglearch3dgan.py
-    dnn.summary()
-    # Output
-    dnn_out = dnn(image)
-    return dnn_out
-
 
 # prepares the pgan images for the physics calculations (un-inverts, removes channel, reorders axes)
 def prep_image(images, power=1.0, channel_included=True, inverted=False):

@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras.layers import Dense
-from networks.pgan.loss_utils import prep_dnn
+#from networks.pgan.loss_utils import bce, mae, mape  # loss functions used for loss_fn='anglegan'
+#from networks.pgan.loss_utils import ecal_sum, ecal_anglem # physics functions used for training the discriminator (should be in conditional lambda layer)
 
 
 def forward_generator(generator,
@@ -113,15 +114,25 @@ def forward_discriminator(generator,
         disc_loss = tf.reduce_mean(disc_loss + gp_loss + drift_loss)
 
     elif loss_fn == 'logistic':
-        # A sigmoid neuron predicts the typical GAN real/fake probability 
-        #dnn_out = prep_dnn(real_image_input)
-        #fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-        
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
             tf.nn.softplus(-disc_real))
         disc_loss += gp_loss
+    
+    #elif loss_fn == 'anglegan':   #IN PROGRESS!
+        #fake_loss = bce(disc_fake_d, disc_real)#fake_output, fake_target) -- NOT SURE!! CHECK!
+        # need to use ecal_angle() in conditional lambda layer (in d) to find ang_output/ang_target
+        #ang_loss = mae(ang_output, ang_target)
+        # need to use ecal_sum() in conditional lambda layer (in d) to find ecal_output/ecal_target
+        #ecal_loss = mape(ecal_output, ecal_target)
+        
+        #losses = np.array([fake_loss, ang_loss, ecal_loss])   # calculate the losses and store in an array
+        #loss_weights = loss_weights.numpy() # make sure pgan weight vector is a np.array
+        #disc_loss = np.dot(loss_weights, losses)  # weight and sum the losses
+        
+        #gp_loss = gp_weight * gradient_penalty   #HOW TO IMPLEMENT THIS???
+        #disc_loss += gp_loss    #HOW TO IMPLEMENT THIS???
     
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
@@ -193,8 +204,6 @@ def forward_simultaneous(generator,
         gen_loss = -tf.reduce_mean(disc_fake_g)
 
     elif loss_fn == 'logistic':
-        #dnn_out = prep_dnn(real_image_input)
-        #fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
@@ -202,7 +211,20 @@ def forward_simultaneous(generator,
         disc_loss += gp_loss
         gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
         
-      
+    #elif loss_fn == 'anglegan':   #IN PROGRESS!
+        #fake_loss = bce(disc_fake_d, disc_real)#fake_output, fake_target) -- NOT SURE!! CHECK!
+        # need to use ecal_angle() in conditional lambda layer (in d) to find ang_output/ang_target
+        #ang_loss = mae(ang_output, ang_target)
+        # need to use ecal_sum() in conditional lambda layer (in d) to find ecal_output/ecal_target
+        #ecal_loss = mape(ecal_output, ecal_target)
+        
+        #losses = np.array([fake_loss, ang_loss, ecal_loss])   # calculate the losses and store in an array
+        #loss_weights = loss_weights.numpy() # make sure pgan weight vector is a np.array
+        #disc_loss = np.dot(loss_weights, losses)  # weight and sum the losses
+        
+        #gp_loss = gp_weight * gradient_penalty   #HOW TO IMPLEMENT THIS???
+        #disc_loss += gp_loss    #HOW TO IMPLEMENT THIS???
+        #gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
 
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
