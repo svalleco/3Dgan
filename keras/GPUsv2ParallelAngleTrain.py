@@ -124,7 +124,7 @@ def main():
 
     #setting up parallel strategy
     #strategy = tf.distribute.MirroredStrategy() #initialize parallel strategy
-    strategy = tf.distribute.MirroredStrategy(devices=["/gpu:0"])#, "/gpu:1"]) #if there are more than one person using the cluster change to this
+    strategy = tf.distribute.MirroredStrategy()#devices=["/gpu:0"])#, "/gpu:1"]) #if there are more than one person using the cluster change to this
 
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     # global_batch_size = batch_size * strategy.num_replicas_in_sync
@@ -503,6 +503,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
     
         gradients = tape.gradient(real_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+        
+        #------------Minimize------------
+        #aggregate_grads_outside_optimizer = (optimizer._HAS_AGGREGATE_GRAD and not isinstance(strategy.extended, parameter_server_strategy.))
+        gradients = optimizer_discriminator._clip_gradients(gradients)
+
+        #--------------------------------
+        
         optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
     
         print(time.time()-time1)
@@ -521,6 +528,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             predictions = discriminator(generated_images, training=True)
             fake_batch_loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
         gradients = tape.gradient(fake_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+        gradients = optimizer_discriminator._clip_gradients(gradients)
         optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
 
         print(time.time()-time2)
@@ -583,6 +591,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             # tf.print('---------------------------')
 
             gradients = tape.gradient(loss, generator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+            gradients = optimizer_generator._clip_gradients(gradients)
             optimizer_generator.apply_gradients(zip(gradients, generator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
 
             time1 = time.time() - start
