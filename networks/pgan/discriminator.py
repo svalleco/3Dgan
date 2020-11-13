@@ -1,13 +1,6 @@
 from networks.ops import *
-from loss_utils import ecal_angle, ecal_sum
 import tensorflow as tf 
-from keras.layers import Lambda
 
-def lambda_loss(image, power=1.0):
-    inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image -- Emma added this bc Gulrukh said that the image is preprocessed to be inverted
-    ang = Lambda(ecal_angle, arguments={'power':power})(inv_image)
-    ecal = Lambda(ecal_sum, arguments={'power':power})(inv_image)
-    return ang, ecal
     
 def discriminator_block(x, filters_in, filters_out, activation, param=None):
     with tf.variable_scope('conv_1'):
@@ -41,10 +34,7 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
         with tf.variable_scope('dense_2'):
             x = dense(x, 1, activation='linear')
             x = apply_bias(x)
-            # A sigmoid neuron predicts the typical GAN real/fake probability 
-            #fake = Dense(1, activation='sigmoid', name='generation')(dnn_out)
-        
-
+            
         return x
 
 

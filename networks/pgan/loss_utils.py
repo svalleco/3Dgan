@@ -28,7 +28,9 @@ def mape(output, target):
 # dimensions of real_images_input = [z_batch_size, 1=channel, z, x, y]
 
 # prepares the pgan images for the physics calculations (un-inverts, removes channel, reorders axes)
-def prep_image(images, power=1.0, channel_included=True, inverted=False):
+def prep_image(images, power=1.0):
+    channel_included=True
+    inverted=False
     # pgan images shape will be either (z=shape/2, x=shape, y=shape) or (channel=1, z=shape/2, x=shape, y=shape)
     if channel_included:    
         images = tf.squeeze(images) # get rid of channel dimension
@@ -44,8 +46,8 @@ def prep_image(images, power=1.0, channel_included=True, inverted=False):
 
 
 # Summming cell energies -- called in conditional lambda layer for the discriminator
-def ecal_sum(images, size, power=1.0, channel_included=True, inverted=False):   
-    images = prep_image(images, power=1.0, channel_included=True, inverted=False)
+def ecal_sum(images, size, power=1.0):   
+    images = prep_image(images, power=1.0)
     daxis = (1,2,3)   # (x,y,z)
     # sum the values along the daxis
     sum = tf.math.reduce_sum(images, daxis)   
@@ -53,8 +55,8 @@ def ecal_sum(images, size, power=1.0, channel_included=True, inverted=False):
 
 
 # Calculating angles from images -- called in conditional lambda layer for the discriminator
-def ecal_angle(images, size, power=1.0, channel_included=True, inverted=False):
-    images = prep_image(images, power=1.0, channel_included=True, inverted=False)
+def ecal_angle(images, size, power=1.0):
+    images = prep_image(images, power=1.0)
      
     # size of ecal
     x_shape, y_shape, z_shape = int(size), int(size), int(size/2)
