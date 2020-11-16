@@ -455,6 +455,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     time_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
 
+    generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
+    discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
+
     def Discriminator_Train_steps(dataset):
         print('Discriminator')
         start = time.time()
@@ -467,10 +470,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
         
 
-        # filefortests = '/data/redacost/filefortests.pkl'
-        # with open(filefortests, 'rb') as f:
-        #     x = pickle.load(f) 
-        # noise = np.asarray(x['noise'])
+        filefortests = '/data/redacost/filefortests.pkl'
+        #with open(filefortests, 'rb') as f:
+        #    x = pickle.load(f) 
+        #noise = np.asarray(x['noise'])
         #tf.print(noise)
 
         b_size = energy_batch.get_shape().as_list()[0]#.numpy()[0]
@@ -479,16 +482,17 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         
         # Generate Fake events with same energy and angle as data batch
         noise = tf.random.normal((batch_size_per_replica, latent_size-2), 0, 1)
+        #pickle.dump({'noise': noise}, open(filefortests, 'wb'))
         #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
         generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
         generated_images = generator(generator_ip, training=False)
         #tf.print(generated_images) #same image
 
         # Train discriminator first on real batch 
-        fake_batch = gan.BitFlip(np.ones(batch_size_per_replica).astype(np.float32))
+        real_batch = gan.BitFlip(np.ones(batch_size_per_replica).astype(np.float32))
         #fake_batch = x['ganflip1']
-        fake_batch = [[el] for el in fake_batch]
-        labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
+        real_batch = [[el] for el in real_batch]
+        labels = [real_batch, energy_batch, ang_batch, ecal_batch]
 
         print(time.time()-start)
         time1 = time.time()
@@ -542,6 +546,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         # tf.print(fake_batch_loss)
 
         #return losses separatly for reduce op
+        pickle.dump({'noise': noise, 'real_batch': real_batch, 'fake_batch': fake_batch}, open(filefortests, 'wb'))
+        return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], fake_batch_loss[0], fake_batch_loss[1], fake_batch_loss[2], fake_batch_loss[3], \
+                real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], fake_batch_loss[0], fake_batch_loss[1], fake_batch_loss[2], fake_batch_loss[3]
+
+        #---------------------------------------------------------------------------------------------
+        #---------------------------------------------------------------------------------------------
+        #---------------------------------------------------------------------------------------------
 
         print('Generator') 
         start = time.time()
