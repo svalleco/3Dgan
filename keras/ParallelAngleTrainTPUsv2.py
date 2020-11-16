@@ -51,6 +51,10 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adadelta, Adam, RMSprop
 from tensorflow.keras.utils import Progbar
 
+#minimize function
+from tensorflow.python.keras.mixed_precision.experimental import loss_scale_optimizer as lso
+from tensorflow.python.distribute import parameter_server_strategy
+
 #Config
 config = tf.compat.v1.ConfigProto(log_device_placement=True)
 # config.gpu_options.allow_growth = True
@@ -460,6 +464,32 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     time_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
 
+    def minimize(tape, optimizer, loss, trainable_variables):
+        with tape:
+            if isinstance(optimizer, lso.LossScaleOptimizer):
+                loss = optimizer.get_scaled_loss(loss)
+
+        gradients = tape.gradient(loss, trainable_variables)
+
+        aggregate_grads_outside_optimizer = (optimizer._HAS_AGGREGATE_GRAD and not isinstance(strategy.extended, parameter_server_strategy.ParameterServerStrategyExtended))
+
+        if aggregate_grads_outside_optimizer:
+            gradients = optimizer._aggregate_gradients(zip(gradients,trainable_variables))
+
+        if isinstance(optimizer, lso.LossScaleOptimizer):
+            gradients = optimizer.get_unscaled_gradients(gradients)
+        
+        gradients = optimizer._clip_gradients(gradients)  # pylint: disable=protected-access
+        
+        if trainable_variables:
+            if aggregate_grads_outside_optimizer:
+                optimizer.apply_gradients(zip(gradients, trainable_variables), experimental_aggregate_gradients=False)
+            else:
+                optimizer.apply_gradients(zip(gradients, trainable_variables))
+
+
+
+
     def Discriminator_Train_steps(dataset):
         print('Discriminator')
         start = time.time()
@@ -505,10 +535,12 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         
         #print('Discriminator real')
         #tf.print(predictions)
+        
+        minimize(tape, optimizer_discriminator, real_batch_loss, discriminator.trainable_variables)
 
     
-        gradients = tape.gradient(real_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
-        optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
+        #gradients = tape.gradient(real_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+        #optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
     
         print(time.time()-time1)
         time2=time.time()
@@ -525,8 +557,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         with tf.GradientTape() as tape:
             predictions = discriminator(generated_images, training=True)
             fake_batch_loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
-        gradients = tape.gradient(fake_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
-        optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
+        
+        minimize(tape, optimizer_discriminator, fake_batch_loss, discriminator.trainable_variables)
+        #gradients = tape.gradient(fake_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+        #optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
 
         print(time.time()-time2)
         print('begin 3')
@@ -586,9 +620,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             # tf.print('--Generator------------')
             # tf.print(predictions)
             # tf.print('---------------------------')
-
-            gradients = tape.gradient(loss, generator.trainable_variables) # model.trainable_variables or  model.trainable_weights
-            optimizer_generator.apply_gradients(zip(gradients, generator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
+            minimize(tape, optimizer_generator, loss, generator.trainable_variables)
+            #gradients = tape.gradient(loss, generator.trainable_variables) # model.trainable_variables or  model.trainable_weights
+            #optimizer_generator.apply_gradients(zip(gradients, generator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
 
             time1 = time.time() - start
             print(time1)
