@@ -36,7 +36,7 @@ def prep_image(images, power=1.0):
         images = tf.squeeze(images) # get rid of channel dimension
         
     # switch dimensions ordering from pgan (z,x,y) back to anglegan (x,y,z)
-    images = np.moveaxis(images, 1, -1)   # move z back
+    images = tf.transpose(images, [1, 2, 0])    # move z back -- np.moveaxis(images, 1, -1)
     # the tensor is now [num_images,x,y,z]
     
     if not inverted:

@@ -1,5 +1,6 @@
 from networks.ops import *
 import tensorflow as tf 
+from networks.pgan.loss_utils import ecal_sum, ecal_angle
 
     
 def discriminator_block(x, filters_in, filters_out, activation, param=None):
@@ -34,8 +35,12 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
         with tf.variable_scope('dense_2'):
             x = dense(x, 1, activation='linear')
             x = apply_bias(x)
-            
-        return x
+        
+        # lambda layers (physics functions) used for calculating discriminator loss 
+        ecal = ecal_sum(x, base_dim)
+        ang = ecal_angle(x, base_dim)
+        
+        return x, ecal, ang
 
 
 def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim, activation, param=None, is_reuse=False, size='medium', conditioning=None):
@@ -47,9 +52,6 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
 
         if is_reuse:
             scope.reuse_variables()
-
-        # compute lambda loss terms for the incident angle measurement and the total deposited energy
-        #ang, ecal = lambda_loss(x, power)
         
         x_downscale = x
 
@@ -72,9 +74,9 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
 
                 x = alpha * fromrgb_prev + (1 - alpha) * x
 
-        x = discriminator_out(x, base_dim, latent_dim, filters_out, activation, param)
+        x, ecal, ang = discriminator_out(x, base_dim, latent_dim, filters_out, activation, param)
         
-        return x#, ang, ecal
+        return x, ecal, ang
 
 
 if __name__ == '__main__':
