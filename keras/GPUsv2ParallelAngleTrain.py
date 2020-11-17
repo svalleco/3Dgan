@@ -470,7 +470,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
         
 
-        filefortests = '/data/redacost/filefortests.pkl'
+        filefortests = './filefortests.pkl'
         #with open(filefortests, 'rb') as f:
         #    x = pickle.load(f) 
         #noise = np.asarray(x['noise'])
@@ -594,7 +594,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 #predictions = combined(generator_ip, training= True)
                 generated_images = generator(generator_ip ,training= True)
                 #tf.print(generated_images)
-                predictions = discriminator(generated_images , training=False)
+                predictions = discriminator(generated_images , training=True)
                 loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
             
             # tf.print('--Generator------------')
