@@ -8,6 +8,8 @@ import h5py
 
 import glob
 
+import analysis.utils.GANutils as gan
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description='TFRecord dataset Params' )
@@ -52,12 +54,111 @@ def retrieve_ECAL(ecalarray, xscale=1, originalarraydim=[5000,51,51,25]):
     #sizes: 5000, 51, 51, 25
     return tf.reshape(ecalarray, originalarraydim)
 
+def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
+    #print ('Loading Data from .....', dataset)
+    
+    X=np.array(dataset.get('ECAL'))* xscale
+    Y=np.array(dataset.get('energy'))/yscale
+    X[X < thresh] = 0
+    X = X.astype(np.float32)
+    Y = Y.astype(np.float32)
+    ecal = np.sum(X, axis=(1, 2, 3))
+    indexes = np.where(ecal > 10.0)
+    X=X[indexes]
+    Y=Y[indexes]
+    if angtype in dataset:
+      ang = np.array(dataset.get(angtype))[indexes]
+    else:
+      ang = gan.measPython(X)
+    X = np.expand_dims(X, axis=daxis)
+    ecal=ecal[indexes]
+    ecal=np.expand_dims(ecal, axis=daxis)
+    if xpower !=1.:
+        X = np.power(X, xpower)
+
+    # Y = [[el] for el in Y]
+    # ang = [[el] for el in ang]
+    # ecal = [[el] for el in ecal]
+
+    final_dataset = {'X': X,'Y': Y, 'ang': ang, 'ecal': ecal}
+
+    return final_dataset
+
+#convert dataset with preprocessing
+def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
+    # read file
+    print('Loading Data from .....', datafile)
+    f=h5py.File(datafile,'r')
+    
+    dataset = GetDataAngleParallel(f)
+
+    # for k in f.keys():
+    #     print(f.get(k))
+
+    # print(f.get('ECAL'))
+
+    # return
+
+    #should I save only the necessary labes?
+    #features 'ECAL', 'bins', 'energy', 'eta', 'mtheta', 'sum', 'theta'
+    finaldata = tf.train.Example(
+        features=tf.train.Features( 
+            feature={
+                'X': convert_ECAL(dataset.get('ECAL')), #float32
+                'ecalsize': convert_int_feature(list(dataset.get('ECAL').shape)), #needs size of ecal so it can reconstruct the array
+                'Y': convert_floats(dataset.get('energy'), 'energy'), #float32
+                'ang': convert_floats(dataset.get('eta'), 'eta'), #float32
+                'ecal': convert_floats(dataset.get('mtheta'), 'mtheta'), #float64
+            }
+        )
+    )
+
+    filename = datadirectory + '/Ele_VarAngleMeas_100_200_{0:03}.tfrecords'.format(filenumber)
+    print('Writing data in .....', filename)
+    writer = tf.io.TFRecordWriter(str(filename))
+    writer.write(finaldata.SerializeToString())
+
+    return finaldata.SerializeToString()
+
+def RetrieveTFRecordpreprocessing(recorddatapaths):
+    recorddata = tf.data.TFRecordDataset(recorddatapaths)
+
+    #print(type(recorddata))
+
+    
+    retrieveddata = {
+        'X': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
+        'ecalsize': tf.io.FixedLenSequenceFeature((), dtype=tf.int64, allow_missing=True), #needs size of ecal so it can reconstruct the narray
+        'Y': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
+        'ang': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
+        'ecal': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
+    }
+
+    def _parse_function(example_proto):
+        # Parse the input `tf.Example` proto using the dictionary above.
+        return tf.io.parse_single_example(example_proto, retrieveddata)
+
+    parsed_dataset = recorddata.map(_parse_function)
+
+    #return parsed_dataset
+
+    #print(type(parsed_dataset))
+
+    for parsed_record in parsed_dataset:
+        dataset = parsed_record
+
+    dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
+
+    dataset.pop('ecalsize')
+
+    return dataset
 
 #main convert function
 def ConvertH5toTFRecord(datafile,filenumber,datadirectory):
     # read file
     print('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
+    
 
     # for k in f.keys():
     #     print(f.get(k))
@@ -106,6 +207,39 @@ def RetrieveTFRecord(recorddatapaths):
         'mtheta': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
         'sum': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
         'theta': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
+    }
+
+    def _parse_function(example_proto):
+        # Parse the input `tf.Example` proto using the dictionary above.
+        return tf.io.parse_single_example(example_proto, retrieveddata)
+
+    parsed_dataset = recorddata.map(_parse_function)
+
+    #return parsed_dataset
+
+    #print(type(parsed_dataset))
+
+    for parsed_record in parsed_dataset:
+        dataset = parsed_record
+
+    dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
+
+    dataset.pop('ecalsize')
+
+    return dataset
+
+def RetrieveTFRecordpreprocessing(recorddatapaths):
+    recorddata = tf.data.TFRecordDataset(recorddatapaths)
+
+    #print(type(recorddata))
+
+    
+    retrieveddata = {
+        'X': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
+        'ecalsize': tf.io.FixedLenSequenceFeature((), dtype=tf.int64, allow_missing=True), #needs size of ecal so it can reconstruct the narray
+        'Y': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
+        'ang': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
+        'ecal': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
     }
 
     def _parse_function(example_proto):
