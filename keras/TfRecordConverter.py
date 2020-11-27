@@ -223,39 +223,6 @@ def RetrieveTFRecord(recorddatapaths):
 
     return dataset
 
-def RetrieveTFRecordpreprocessing(recorddatapaths):
-    recorddata = tf.data.TFRecordDataset(recorddatapaths)
-
-    #print(type(recorddata))
-
-    
-    retrieveddata = {
-        'X': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
-        'ecalsize': tf.io.FixedLenSequenceFeature((), dtype=tf.int64, allow_missing=True), #needs size of ecal so it can reconstruct the narray
-        'Y': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
-        'ang': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
-        'ecal': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
-    }
-
-    def _parse_function(example_proto):
-        # Parse the input `tf.Example` proto using the dictionary above.
-        return tf.io.parse_single_example(example_proto, retrieveddata)
-
-    parsed_dataset = recorddata.map(_parse_function)
-
-    #return parsed_dataset
-
-    #print(type(parsed_dataset))
-
-    for parsed_record in parsed_dataset:
-        dataset = parsed_record
-
-    dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
-
-    dataset.pop('ecalsize')
-
-    return dataset
-
 
 if __name__ == '__main__':
     parser = get_parser()
