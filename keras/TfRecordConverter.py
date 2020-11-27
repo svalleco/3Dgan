@@ -120,7 +120,7 @@ def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
 
     return finaldata.SerializeToString()
 
-def RetrieveTFRecordpreprocessing(recorddatapaths):
+def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     recorddata = tf.data.TFRecordDataset(recorddatapaths)
 
     #print(type(recorddata))
@@ -136,22 +136,17 @@ def RetrieveTFRecordpreprocessing(recorddatapaths):
 
     def _parse_function(example_proto):
         # Parse the input `tf.Example` proto using the dictionary above.
-        return tf.io.parse_single_example(example_proto, retrieveddata)
+        dataset = tf.io.parse_single_example(example_proto, retrieveddata)
+        dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
+        dataset['Y'] = tf.reshape(dataset['Y'], [5000,1])
+        dataset['ang'] = tf.reshape(dataset['ang'], [5000,1])
+        dataset['ecal'] = tf.reshape(dataset['ecal'], [5000,1])
+        return dataset
 
-    parsed_dataset = recorddata.map(_parse_function)
+    parsed_dataset = recorddata.map(_parse_function).batch(batch_size, drop_remainder=True)
 
-    #return parsed_dataset
 
-    #print(type(parsed_dataset))
-
-    for parsed_record in parsed_dataset:
-        dataset = parsed_record
-
-    dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
-
-    dataset.pop('ecalsize')
-
-    return dataset
+    return parsed_dataset
 
 #main convert function
 def ConvertH5toTFRecord(datafile,filenumber,datadirectory):
