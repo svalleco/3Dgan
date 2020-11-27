@@ -137,7 +137,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     def _parse_function(example_proto):
         # Parse the input `tf.Example` proto using the dictionary above.
         dataset = tf.io.parse_single_example(example_proto, retrieveddata)
-        dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
+        dataset['X'] = tf.reshape(dataset['X'], dataset['ecalsize'])
         dataset['Y'] = tf.reshape(dataset['Y'], [5000,1])
         dataset['ang'] = tf.reshape(dataset['ang'], [5000,1])
         dataset['ecal'] = tf.reshape(dataset['ecal'], [5000,1])
