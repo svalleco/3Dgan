@@ -166,7 +166,7 @@ def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
 
     return serialized_dataset
 
-def RetrieveTFRecordpreprocessing(recorddatapaths):
+def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     recorddata = tf.data.TFRecordDataset(recorddatapaths)
 
     #print(type(recorddata))
@@ -188,32 +188,23 @@ def RetrieveTFRecordpreprocessing(recorddatapaths):
         data['X'] = tf.reshape(data['X'],[51,51,25])
         return data
 
-    parsed_dataset = recorddata.map(_parse_function).batch(128)
-    print(parsed_dataset)
+    parsed_dataset = recorddata.map(_parse_function).batch(batch_size, drop_remainder=True)
+    #print(parsed_dataset)
    
-    b = 0
-    for batch in parsed_dataset:
-        b += 1
-        print(b)
-        print(batch.get('X'))
+    #b = 0
+    #for batch in parsed_dataset:
+    #    b += 1
+    #    print(b)
+    #    print(batch.get('X'))
 
     #for par in parsed_dataset.take(10):
     #    print(repr(par))
-
-    return
 
     #return parsed_dataset
 
     #print(type(parsed_dataset))
 
-    for parsed_record in parsed_dataset:
-        dataset = parsed_record
-
-    dataset['X'] = tf.reshape(dataset['X'], dataset['ecalsize'])
-
-    dataset.pop('ecalsize')
-
-    return dataset
+    return parsed_dataset
 
 #main convert function
 def ConvertH5toTFRecord(datafile,filenumber,datadirectory):
@@ -289,7 +280,6 @@ def RetrieveTFRecord(recorddatapaths):
     dataset.pop('ecalsize')
 
     return dataset
-
 
 
 

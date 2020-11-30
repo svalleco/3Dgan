@@ -767,14 +767,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             
             time_start_file = time.time()
             # Get the dataset from the trainfile
-            dataset = tfconvert.RetrieveTFRecord(Trainfiles[nb_file])
+            dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles[nb_file], batch_size)
 
             time_elapsed = time.time() - time_start_file
             print("Get Dataset: " + str(time_elapsed))
             time_start_file = time.time()
 
             # Get the train values from the dataset
-            dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+            #dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
             nb_file+=1
 
             time_elapsed = time.time() - time_start_file
@@ -782,7 +782,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             time_start_file = time.time()
 
             #create the dataset with tensors from the train values, and batch it using the global batch size
-            dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
+            #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
 
             time_elapsed = time.time() - time_start_file
             print("Slice and Batch: " + str(time_elapsed))
