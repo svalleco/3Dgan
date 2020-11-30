@@ -41,20 +41,20 @@ def convert_byte_feature(val):
 def convert_ECAL(ecalarray, xscale=1):
     featurelist = np.array(ecalarray)
     flat = featurelist.flatten()
-    print('finished ECAL')
+    #print('finished ECAL')
     return tf.train.Feature(float_list=tf.train.FloatList(value=flat))
 
 def convert_floats(featdataset, feature):
-    featarray = np.array(featdataset)
-    print('finished ', feature)
-    return tf.train.Feature(float_list=tf.train.FloatList(value=featarray))
+    #featarray = np.array(featdataset)
+    #print('finished ', feature)
+    return tf.train.Feature(float_list=tf.train.FloatList(value=[featdataset]))
 
 #receives a tensor and reshapes it
 def retrieve_ECAL(ecalarray, xscale=1, originalarraydim=[5000,51,51,25]):
     #sizes: 5000, 51, 51, 25
     return tf.reshape(ecalarray, originalarraydim)
 
-def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
+def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=1):
     #print ('Loading Data from .....', dataset)
     
     X=np.array(dataset.get('ECAL'))* xscale
@@ -76,9 +76,10 @@ def GetDataAngleParallel(dataset, xscale =1, xpower=1, yscale = 100, angscale=1,
     if xpower !=1.:
         X = np.power(X, xpower)
 
-    # Y = [[el] for el in Y]
-    # ang = [[el] for el in ang]
-    # ecal = [[el] for el in ecal]
+    #Y = [[el] for el in Y]
+    #ang = [[el] for el in ang]
+    #ecal = [[el] for el in ecal]
+    ecal = ecal.flatten()
 
     final_dataset = {'X': X,'Y': Y, 'ang': ang, 'ecal': ecal}
 
@@ -92,53 +93,114 @@ def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
     
     dataset = GetDataAngleParallel(f)
 
+    dataset = tf.data.Dataset.from_tensor_slices((dataset.get('X'),dataset.get('Y'),dataset.get('ang'),dataset.get('ecal')))#.batch(128)
+
+    tf.print(dataset)
+
+    #for f0, f1, f2, f3 in dataset.take(1):
+    #    print(f0)
+    #    print(f1)
+    #    print(f2)
+    #    print(f3)
+
+    #return
+
+    #b = 0
+    #for batch in dataset:
+    #    print(b)         
+    #    b += 1
+
     # for k in f.keys():
     #     print(f.get(k))
 
     # print(f.get('ECAL'))
 
     # return
+    #print(dataset)
+    #print(dataset.get('X'))
+    #return
 
     #should I save only the necessary labes?
     #features 'ECAL', 'bins', 'energy', 'eta', 'mtheta', 'sum', 'theta'
-    finaldata = tf.train.Example(
-        features=tf.train.Features( 
-            feature={
-                'X': convert_ECAL(dataset.get('ECAL')), #float32
-                'ecalsize': convert_int_feature(list(dataset.get('ECAL').shape)), #needs size of ecal so it can reconstruct the array
-                'Y': convert_floats(dataset.get('energy'), 'energy'), #float32
-                'ang': convert_floats(dataset.get('eta'), 'eta'), #float32
-                'ecal': convert_floats(dataset.get('mtheta'), 'mtheta'), #float64
-            }
+    #seri = 0
+    print('Start')
+    def serialize(feature1,feature2,feature3,feature4):
+        finaldata = tf.train.Example(
+            features=tf.train.Features( 
+                feature={
+                    'X': convert_ECAL(feature1), #float32
+                    #'ecalsize': convert_int_feature(list(dataset.get('X').shape)), #needs size of ecal so it can reconstruct the array
+                    'Y': convert_floats(feature2, 'Y'), #float32
+                    'ang': convert_floats(feature3, 'ang'), #float32
+                    'ecal': convert_floats(feature4, 'ecal'), #float64
+                }
+            )
         )
-    )
+        #seri += 1
+        #print(seri)
+        return finaldata.SerializeToString()
+
+    def serialize_example(f0,f1,f2,f3):
+        tf_string = tf.py_function(serialize,(f0,f1,f2,f3),tf.string)
+        return tf.reshape(tf_string, ())
+
+    #for f0, f1, f2, f3 in dataset.take(1):
+    #    print(serialize(f0,f1,f2,f3))
+
+    serialized_dataset = dataset.map(serialize_example)
+    print(serialized_dataset) 
+        
+
+    #def generator():
+    #    for features in dataset:
+    #        yield dataset(*features)
+
+    #serialized_dataset = tf.data.Dataset.from_generator(generator, output_types=tf.string, output_shapes=())
+
+    #print(finaldata)
 
     filename = datadirectory + '/Ele_VarAngleMeas_100_200_{0:03}.tfrecords'.format(filenumber)
     print('Writing data in .....', filename)
-    writer = tf.io.TFRecordWriter(str(filename))
-    writer.write(finaldata.SerializeToString())
+    writer = tf.data.experimental.TFRecordWriter(str(filename))
+    writer.write(serialized_dataset)
 
-    return finaldata.SerializeToString()
+    return serialized_dataset
 
 def RetrieveTFRecordpreprocessing(recorddatapaths):
     recorddata = tf.data.TFRecordDataset(recorddatapaths)
 
     #print(type(recorddata))
 
-    
+    #for rec in recorddata.take(10):
+    #    print(repr(rec))
+
     retrieveddata = {
         'X': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
-        'ecalsize': tf.io.FixedLenSequenceFeature((), dtype=tf.int64, allow_missing=True), #needs size of ecal so it can reconstruct the narray
-        'Y': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
-        'ang': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
-        'ecal': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
+        #'ecalsize': tf.io.FixedLenSequencFeature((), dtype=tf.int64, allow_missing=True), #needs size of ecal so it can reconstruct the narray
+        'Y': tf.io.FixedLenFeature((), dtype=tf.float32, default_value=0.0), #float32
+        'ang': tf.io.FixedLenFeature((), dtype=tf.float32, default_value=0.0),
+        'ecal': tf.io.FixedLenFeature((), dtype=tf.float32, default_value=0.0),
     }
 
     def _parse_function(example_proto):
         # Parse the input `tf.Example` proto using the dictionary above.
-        return tf.io.parse_single_example(example_proto, retrieveddata)
+        data = tf.io.parse_single_example(example_proto, retrieveddata)
+        data['X'] = tf.reshape(data['X'],[51,51,25])
+        return data
 
-    parsed_dataset = recorddata.map(_parse_function)
+    parsed_dataset = recorddata.map(_parse_function).batch(128)
+    print(parsed_dataset)
+   
+    b = 0
+    for batch in parsed_dataset:
+        b += 1
+        print(b)
+        print(batch.get('X'))
+
+    #for par in parsed_dataset.take(10):
+    #    print(repr(par))
+
+    return
 
     #return parsed_dataset
 
@@ -147,7 +209,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths):
     for parsed_record in parsed_dataset:
         dataset = parsed_record
 
-    dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
+    dataset['X'] = tf.reshape(dataset['X'], dataset['ecalsize'])
 
     dataset.pop('ecalsize')
 
@@ -228,38 +290,7 @@ def RetrieveTFRecord(recorddatapaths):
 
     return dataset
 
-def RetrieveTFRecordpreprocessing(recorddatapaths):
-    recorddata = tf.data.TFRecordDataset(recorddatapaths)
 
-    #print(type(recorddata))
-
-    
-    retrieveddata = {
-        'X': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
-        'ecalsize': tf.io.FixedLenSequenceFeature((), dtype=tf.int64, allow_missing=True), #needs size of ecal so it can reconstruct the narray
-        'Y': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True), #float32
-        'ang': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
-        'ecal': tf.io.FixedLenSequenceFeature((), dtype=tf.float32, allow_missing=True),
-    }
-
-    def _parse_function(example_proto):
-        # Parse the input `tf.Example` proto using the dictionary above.
-        return tf.io.parse_single_example(example_proto, retrieveddata)
-
-    parsed_dataset = recorddata.map(_parse_function)
-
-    #return parsed_dataset
-
-    #print(type(parsed_dataset))
-
-    for parsed_record in parsed_dataset:
-        dataset = parsed_record
-
-    dataset['ECAL'] = tf.reshape(dataset['ECAL'], dataset['ecalsize'])
-
-    dataset.pop('ecalsize')
-
-    return dataset
 
 
 if __name__ == '__main__':
@@ -274,9 +305,11 @@ if __name__ == '__main__':
 
     for f in Files:
         print(filenumber)
-        ConvertH5toTFRecord(f,filenumber,outpath)
+        finaldata = ConvertH5toTFRecordPreprocessing(f,filenumber,outpath)
+        #print(finaldata)
         filenumber += 1
-
+        #feat = RetrieveTFRecordpreprocessing(outpath)
+        #print(feat.get('X'))
        
 
     #finaldata = ConvertH5toTFRecord("../data/Ele_VarAngleMeas_100_200_000.h5",0,"datadirectory")
