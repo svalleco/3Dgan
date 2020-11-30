@@ -173,7 +173,7 @@ def get_parser():
     parser.add_argument('--gen_weight', action='store', type=float, default=3, help='loss weight for generation real/fake loss')
     parser.add_argument('--aux_weight', action='store', type=float, default=0.1, help='loss weight for auxilliary energy regression loss')
     parser.add_argument('--ang_weight', action='store', type=float, default=25, help='loss weight for angle loss')
-    parser.add_argument('--ecal_weight', action='store', type=float, default=0.1, help='loss weight for ecal sum loss')
+    parser.add_argument('--ecal_weight', action='store', type=float, default=0.5, help='loss weight for ecal sum loss')
     parser.add_argument('--hist_weight', action='store', type=float, default=0.1, help='loss weight for additional bin count loss')
     parser.add_argument('--thresh', action='store', type=int, default=0., help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
@@ -384,34 +384,34 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #Trainfiles, Testfiles = gan.DivideFiles(datapath, f, datasetnames=["ECAL"], Particles =[particle])
     discriminator.trainable = True # to allow updates to moving averages for BatchNormalization     
     
-    Trainfiles = ['gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_000.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_001.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_002.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_003.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_004.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_005.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_006.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_007.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_008.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_009.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_010.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_011.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_012.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_013.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_014.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_015.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_016.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_017.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_018.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_019.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_020.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_021.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_022.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_023.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_024.tfrecords']
-    Testfiles = ['gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_025.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_026.tfrecords',\
-                'gs://renato-tpu-bucket/Ele_VarAngleMeas_100_200_027.tfrecords']
+    Trainfiles = ['gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_000.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_001.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_002.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_003.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_004.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_005.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_006.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_007.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_008.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_009.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_010.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_011.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_012.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_013.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_014.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_015.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_016.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_017.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_018.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_019.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_020.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_021.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_022.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_023.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_024.tfrecords']
+    Testfiles = ['gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_025.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_026.tfrecords',\
+                'gs://renato-tpu-bucket/tfrecordsprepoc/Ele_VarAngleMeas_100_200_027.tfrecords']
     
     print(Trainfiles)
     print(Testfiles)
@@ -769,6 +769,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             # Get the dataset from the trainfile
             dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles[nb_file], batch_size)
 
+            #print(dataset)
+
+            #return
+
             time_elapsed = time.time() - time_start_file
             print("Get Dataset: " + str(time_elapsed))
             time_start_file = time.time()
@@ -906,6 +910,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         print('\nTesting for epoch {}:'.format(epoch))
         test_start = time.time()
 
+        #continue
+
 
         # repeat till data is available
         while nb_file < len(Testfiles):
@@ -914,16 +920,16 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             print ('Loading Data from .....', Testfiles[nb_file])
             
             # Get the dataset from the Testfile
-            dataset = tfconvert.RetrieveTFRecord(Testfiles[nb_file])
+            dataset = tfconvert.RetrieveTFRecordpreprocessing(Testfiles[nb_file], batch_size)
             #dataset = h5py.File(Testfiles[0],'r') #to read h5py
 
             # Get the Test values from the dataset
-            dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
+            #dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
             nb_file+=1
 
             #create the dataset with tensors from the Test values, and batch it using the global batch size
             #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
-            dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
+            #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
 
             dist_dataset = strategy.experimental_distribute_dataset(dataset)
 
