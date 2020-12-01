@@ -741,6 +741,26 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         return disc_test_loss, gen_test_loss
 
 
+    # Dataet preparation
+
+    #if index % 100 == 0:
+    print ('Loading Data from .....')
+    
+    time_start_file = time.time()
+    # Get the dataset from the trainfile
+    dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+
+    time_elapsed = time.time() - time_start_file
+    print("Get Dataset: " + str(time_elapsed))
+    time_start_file = time.time()
+    
+    #distribute the dataset
+    dist_dataset = strategy.experimental_distribute_dataset(dataset)
+
+    time_elapsed = time.time() - time_start_file
+    print("Distribute dataset: " + str(time_elapsed))
+    time_start_file = time.time()
+
     
     # Start training
     for epoch in range(nb_epochs):
@@ -760,121 +780,82 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         index = 0
         file_index=0
 
-        while nb_file < len(Trainfiles):
-            #if index % 100 == 0:
-            print('processed {} batches'.format(index + 1))
-            print ('Loading Data from .....', Trainfiles[nb_file])
-            
-            time_start_file = time.time()
-            # Get the dataset from the trainfile
-            dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles[nb_file], batch_size)
 
-            #print(dataset)
+        #Training
+        #add Trainfiles, nb_train_batches, progress_bar, daxis, daxis2, loss_ftn, combined
+        for batch in dist_dataset:
+            file_time = time.time()
+
+            this_batch_size =128 #not necessary can be removed
+            
+
+            #Discriminator Training
+            real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(batch)
+
+            #Configure the loss so it is equal to the original values
+            real_batch_loss = [el.numpy() for el in real_batch_loss]
+            real_batch_loss_total_loss = np.sum(real_batch_loss)
+            new_real_batch_loss = [real_batch_loss_total_loss]
+            for i_weights in range(len(real_batch_loss)):
+                new_real_batch_loss.append(real_batch_loss[i_weights] / loss_weights[i_weights])
+            real_batch_loss = new_real_batch_loss
+
+            fake_batch_loss = [el.numpy() for el in fake_batch_loss]
+            fake_batch_loss_total_loss = np.sum(fake_batch_loss)
+            new_fake_batch_loss = [fake_batch_loss_total_loss]
+            for i_weights in range(len(fake_batch_loss)):
+                new_fake_batch_loss.append(fake_batch_loss[i_weights] / loss_weights[i_weights])
+            fake_batch_loss = new_fake_batch_loss
+
+            #real_batch_loss = [el * w for el in real_batch_loss]
+            # print(real_batch_loss)
+            # print(fake_batch_loss)
+
+            # if index == 9:
+            #     return
+
+            # index +=1
+            # continue
+
+            #if ecal sum has 100% loss(generating empty events) then end the training 
+            if fake_batch_loss[3] == 100.0 and index >10:
+                print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
+                generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
+                discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
+                print ('real_batch_loss', real_batch_loss)
+                print ('fake_batch_loss', fake_batch_loss)
+                sys.exit()
+
+            # append mean of discriminator loss for real and fake events 
+            epoch_disc_loss.append([
+                (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
+            ])
 
             #return
 
-            time_elapsed = time.time() - time_start_file
-            print("Get Dataset: " + str(time_elapsed))
-            time_start_file = time.time()
+            gen_losses[0] = [el.numpy() for el in gen_losses[0]]
+            gen_losses_total_loss = np.sum(gen_losses[0])
+            new_gen_losses = [gen_losses_total_loss]
+            for i_weights in range(len(gen_losses[0])):
+                new_gen_losses.append(gen_losses[0][i_weights] / loss_weights[i_weights])
+            gen_losses[0] = new_gen_losses
 
-            # Get the train values from the dataset
-            #dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
-            nb_file+=1
+            gen_losses[1] = [el.numpy() for el in gen_losses[1]]
+            gen_losses_total_loss = np.sum(gen_losses[1])
+            new_gen_losses = [gen_losses_total_loss]
+            for i_weights in range(len(gen_losses[1])):
+                new_gen_losses.append(gen_losses[1][i_weights] / loss_weights[i_weights])
+            gen_losses[1] = new_gen_losses
 
-            time_elapsed = time.time() - time_start_file
-            print("Preprocess: " + str(time_elapsed))
-            time_start_file = time.time()
+            generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
-            #create the dataset with tensors from the train values, and batch it using the global batch size
-            #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
+            epoch_gen_loss.append(generator_loss)
+            #index +=1
 
-            time_elapsed = time.time() - time_start_file
-            print("Slice and Batch: " + str(time_elapsed))
-            time_start_file = time.time()
-            
-            #distribute the dataset
-            dist_dataset = strategy.experimental_distribute_dataset(dataset)
+            print('Time taken by batch was {} seconds.'.format(time.time()-file_time))
 
-            time_elapsed = time.time() - time_start_file
-            print("Distribute dataset: " + str(time_elapsed))
-            time_start_file = time.time()
-
-
-            #Training
-            #add Trainfiles, nb_train_batches, progress_bar, daxis, daxis2, loss_ftn, combined
-            for batch in dist_dataset:
-                file_time = time.time()
-
-                this_batch_size =128 #not necessary can be removed
-                
-
-                #Discriminator Training
-                real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(batch)
-
-                #Configure the loss so it is equal to the original values
-                real_batch_loss = [el.numpy() for el in real_batch_loss]
-                real_batch_loss_total_loss = np.sum(real_batch_loss)
-                new_real_batch_loss = [real_batch_loss_total_loss]
-                for i_weights in range(len(real_batch_loss)):
-                    new_real_batch_loss.append(real_batch_loss[i_weights] / loss_weights[i_weights])
-                real_batch_loss = new_real_batch_loss
-
-                fake_batch_loss = [el.numpy() for el in fake_batch_loss]
-                fake_batch_loss_total_loss = np.sum(fake_batch_loss)
-                new_fake_batch_loss = [fake_batch_loss_total_loss]
-                for i_weights in range(len(fake_batch_loss)):
-                    new_fake_batch_loss.append(fake_batch_loss[i_weights] / loss_weights[i_weights])
-                fake_batch_loss = new_fake_batch_loss
-
-                #real_batch_loss = [el * w for el in real_batch_loss]
-                # print(real_batch_loss)
-                # print(fake_batch_loss)
-
-                # if index == 9:
-                #     return
-
-                # index +=1
-                # continue
-
-                #if ecal sum has 100% loss(generating empty events) then end the training 
-                if fake_batch_loss[3] == 100.0 and index >10:
-                    print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
-                    generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
-                    discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
-                    print ('real_batch_loss', real_batch_loss)
-                    print ('fake_batch_loss', fake_batch_loss)
-                    sys.exit()
-
-                # append mean of discriminator loss for real and fake events 
-                epoch_disc_loss.append([
-                    (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
-                ])
-
-                #return
-
-                gen_losses[0] = [el.numpy() for el in gen_losses[0]]
-                gen_losses_total_loss = np.sum(gen_losses[0])
-                new_gen_losses = [gen_losses_total_loss]
-                for i_weights in range(len(gen_losses[0])):
-                    new_gen_losses.append(gen_losses[0][i_weights] / loss_weights[i_weights])
-                gen_losses[0] = new_gen_losses
-
-                gen_losses[1] = [el.numpy() for el in gen_losses[1]]
-                gen_losses_total_loss = np.sum(gen_losses[1])
-                new_gen_losses = [gen_losses_total_loss]
-                for i_weights in range(len(gen_losses[1])):
-                    new_gen_losses.append(gen_losses[1][i_weights] / loss_weights[i_weights])
-                gen_losses[1] = new_gen_losses
-
-                generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
-
-                epoch_gen_loss.append(generator_loss)
-                #index +=1
-
-                print('Time taken by file was {} seconds.'.format(time.time()-file_time))
-
-                #print(generator_loss)
-                #return
+            #print(generator_loss)
+            #return
 
             #break
 
