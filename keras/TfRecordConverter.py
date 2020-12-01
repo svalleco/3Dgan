@@ -198,7 +198,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     #for batch in parsed_dataset:
     #    b += 1
     #    print(b)
-    #    print(batch.get('X'))
+    #    print(batch.get('Y')[0])
 
     #for par in parsed_dataset.take(10):
     #    print(repr(par))

@@ -748,18 +748,20 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     
     time_start_file = time.time()
     # Get the dataset from the trainfile
-    dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+    #dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
 
     time_elapsed = time.time() - time_start_file
     print("Get Dataset: " + str(time_elapsed))
     time_start_file = time.time()
     
     #distribute the dataset
-    dist_dataset = strategy.experimental_distribute_dataset(dataset)
+    dist_dataset = strategy.experimental_distribute_datasets_from_function(lambda _: tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, 128))
 
     time_elapsed = time.time() - time_start_file
     print("Distribute dataset: " + str(time_elapsed))
     time_start_file = time.time()
+
+    #return
 
     
     # Start training
@@ -779,12 +781,16 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         epoch_disc_loss = []
         index = 0
         file_index=0
+        nbatch = 0
 
 
         #Training
         #add Trainfiles, nb_train_batches, progress_bar, daxis, daxis2, loss_ftn, combined
         for batch in dist_dataset:
+            #print(nbatch)
+            #nbatch += 1
             file_time = time.time()
+            #print(batch.get('Y').get(0))
 
             this_batch_size =128 #not necessary can be removed
             
@@ -852,7 +858,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             epoch_gen_loss.append(generator_loss)
             #index +=1
 
-            print('Time taken by batch was {} seconds.'.format(time.time()-file_time))
+            print('Time taken by batch', str(nbatch) ,' was', str(time.time()-file_time) , 'seconds.')
+            nbatch += 1
 
             #print(generator_loss)
             #return
@@ -868,6 +875,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #X_train, Y_train, ang_train, ecal_train = GetDataAngle(Trainfiles[0], xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         train_time = time.time() - epoch_start
+
+        continue
 
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
