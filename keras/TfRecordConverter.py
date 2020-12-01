@@ -168,6 +168,9 @@ def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
 
 def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     recorddata = tf.data.TFRecordDataset(recorddatapaths)
+    
+    options = tf.data.Options()
+    options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA
 
     #print(type(recorddata))
 
@@ -186,19 +189,21 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
         # Parse the input `tf.Example` proto using the dictionary above.
         data = tf.io.parse_single_example(example_proto, retrieveddata)
         data['X'] = tf.reshape(data['X'],[1,51,51,25])
+        #print(tf.shape(data['Y']))
         data['Y'] = tf.reshape(data['Y'],[1])
         data['ang'] = tf.reshape(data['ang'],[1])
         data['ecal'] = tf.reshape(data['ecal'],[1])
+        #print(tf.shape(data['Y']))
         return data
 
-    parsed_dataset = recorddata.map(_parse_function).batch(batch_size, drop_remainder=True)
+    parsed_dataset = recorddata.map(_parse_function).batch(batch_size, drop_remainder=True).with_options(options)
     #print(parsed_dataset)
    
     #b = 0
     #for batch in parsed_dataset:
     #    b += 1
     #    print(b)
-    #    print(batch.get('Y')[0])
+    #    print(batch.get('Y'))
 
     #for par in parsed_dataset.take(10):
     #    print(repr(par))

@@ -748,19 +748,25 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     
     time_start_file = time.time()
     # Get the dataset from the trainfile
-    #dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+    dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
 
     time_elapsed = time.time() - time_start_file
     print("Get Dataset: " + str(time_elapsed))
     time_start_file = time.time()
     
     #distribute the dataset
-    dist_dataset = strategy.experimental_distribute_datasets_from_function(lambda _: tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, 128))
+    #dist_dataset = strategy.experimental_distribute_datasets_from_function(lambda _: tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, 128))
+    dist_dataset = strategy.experimental_distribute_dataset(dataset)
+
 
     time_elapsed = time.time() - time_start_file
     print("Distribute dataset: " + str(time_elapsed))
     time_start_file = time.time()
 
+    #nb = 0
+    #for b in dist_dataset:
+    #    nb += 1
+    #    print(nb)
     #return
 
     
@@ -790,7 +796,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             #print(nbatch)
             #nbatch += 1
             file_time = time.time()
-            #print(batch.get('Y').get(0))
+            #print(batch.get('Y'))
+            #print(nbatch)
 
             this_batch_size =128 #not necessary can be removed
             
