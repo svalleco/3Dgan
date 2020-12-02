@@ -1,2 +1,2 @@
-# 3Dgan
+# AnglePGAN
 ## Progressive growing of GAN
