@@ -1,12 +1,12 @@
 # pylint: disable=import-error
 import argparse
+import scipy
 import numpy as np
 import tensorflow as tf
 import horovod.tensorflow as hvd
 import time
 import random
-from metrics import (calculate_fid_given_batch_volumes, get_swd_for_volumes,
-                     get_normalized_root_mse, get_mean_squared_error, get_psnr, get_ssim)
+from metrics import (calculate_fid_given_batch_volumes, get_swd_for_volumes,get_normalized_root_mse, get_mean_squared_error, get_psnr, get_ssim)
 from dataset import NumpyPathDataset
 from utils import count_parameters, image_grid, parse_tuple, MPMap, log0, lr_update
 # from mpi4py import MPI
@@ -19,7 +19,6 @@ from networks.ops import num_filters
 from tensorflow.data.experimental import AUTOTUNE
 #import nvgpu
 import logging
-
 # For TensorBoard Debugger:
 from tensorflow.python import debug as tf_debug
 
@@ -40,7 +39,9 @@ def main(args, config):
         local_rank = 0
 
     if args.logdir is not None:
-        logdir = args.logdir
+        #logdir = args.logdir
+        timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
+        logdir = os.path.join(args.logdir, 'runs', args.architecture, timestamp)
     else:
         timestamp = time.strftime("%Y-%m-%d_%H:%M:%S", time.gmtime())
         logdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'runs', args.architecture, timestamp)
@@ -123,6 +124,7 @@ def main(args, config):
         batch_size = max(1, args.base_batch_size // (2 ** (phase - 1)))
 
         if phase >= args.starting_phase:
+            print("###assert debut :", batch_size, global_size, args.max_global_batch_size)
             assert batch_size * global_size <= args.max_global_batch_size
             if verbose:
                 print(f"Using local batch size of {batch_size} and global batch size of {batch_size * global_size}")
@@ -716,7 +718,7 @@ def main(args, config):
                 end = time.time()
                 local_img_s = batch_size / (end - start)
                 img_s = global_size * local_img_s
-
+                print("#### DEBUG - IMG_S : ", img_s)
                 sess.run(ema_op)
                 in_phase_step = sess.run(update_intra_phase_step)
 
@@ -946,7 +948,7 @@ if __name__ == '__main__':
     parser.add_argument('--activation', type=str, default='leaky_relu')
     parser.add_argument('--leakiness', type=float, default=0.2)
     parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--horovod', default=False, action='store_true')
+    parser.add_argument('--horovod', default=True, action='store_true')
     parser.add_argument('--calc_metrics', default=False, action='store_true')
     parser.add_argument('--g_annealing', default=1,
                         type=float, help='generator annealing rate, 1 -> no annealing.')
@@ -965,7 +967,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', default=False, action='store_true')
     parser.add_argument('--use_adasum', default=False, action='store_true')
     parser.add_argument('--optim_strategy', default='simultaneous', choices=['simultaneous', 'alternate'])
-    parser.add_argument('--num_inter_ops', default=4, type=int)
+    parser.add_argument('--num_inter_ops', default=2, type=int)
     parser.add_argument('--num_labels', default=None, type=int)
     parser.add_argument('--g_clipping', default=False, type=bool)
     parser.add_argument('--d_clipping', default=False, type=bool)
