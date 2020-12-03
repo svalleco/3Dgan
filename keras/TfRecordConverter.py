@@ -169,7 +169,12 @@ def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
 def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     recorddata = tf.data.TFRecordDataset(recorddatapaths)
 
+    print('Start')
+    recorddata.cardinality()
+    print(recorddata)
+
     ds_size = sum(1 for _ in recorddata)
+
     
     options = tf.data.Options()
     options.experimental_distribute.auto_shard_policy = tf.data.experimental.AutoShardPolicy.DATA

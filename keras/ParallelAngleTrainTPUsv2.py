@@ -751,6 +751,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     dataset, datasetsize = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
     datasettest, datasetsizetest = tfconvert.RetrieveTFRecordpreprocessing(Testfiles, batch_size)
 
+    print(datasetsize)
+    print(datasetsizetest)
+
     time_elapsed = time.time() - time_start_file
     print("Get Dataset: " + str(time_elapsed))
     time_start_file = time.time()
@@ -924,6 +927,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
         # Test process will also be accomplished in batches to reduce memory consumption
         print('\nTesting for epoch {}:'.format(epoch))
+        print('Number of Batches: ', steps_per_epoch_test)
         test_start = time.time()
 
         #continue
