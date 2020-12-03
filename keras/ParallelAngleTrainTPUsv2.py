@@ -723,7 +723,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     @tf.function
     def distributed_test_step(dataset):
         disc_test_loss_1, disc_test_loss_2, disc_test_loss_3, disc_test_loss_4, \
-        gen_test_loss_1, gen_test_loss_2, gen_test_loss_3, gen_test_loss_4 = strategy.run(Test_steps, args=(dataset,))
+        gen_test_loss_1, gen_test_loss_2, gen_test_loss_3, gen_test_loss_4 = strategy.run(Test_steps, args=(next(dataset),))
 
         disc_test_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss_1, axis=None)
         disc_test_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss_2, axis=None)
@@ -741,14 +741,15 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         return disc_test_loss, gen_test_loss
 
 
-    # Dataet preparation
+    # Dataset preparation
 
     #if index % 100 == 0:
     print ('Loading Data from .....')
     
     time_start_file = time.time()
     # Get the dataset from the trainfile
-    dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+    dataset, datasetsize = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+    datasettest, datasetsizetest = tfconvert.RetrieveTFRecordpreprocessing(Testfiles, batch_size)
 
     time_elapsed = time.time() - time_start_file
     print("Get Dataset: " + str(time_elapsed))
@@ -757,6 +758,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #distribute the dataset
     #dist_dataset = strategy.experimental_distribute_datasets_from_function(lambda _: tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, 128))
     dist_dataset = strategy.experimental_distribute_dataset(dataset)
+    dist_dataset_test = strategy.experimental_distribute_dataset(datasettest)
 
 
     time_elapsed = time.time() - time_start_file
@@ -764,6 +766,12 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     time_start_file = time.time()
 
     dist_dataset_iter = iter(dist_dataset)
+    steps_per_epoch =int( datasetsize // (batch_size))
+
+    dist_dataset_iter_test = iter(dist_dataset_test)
+    steps_per_epoch_test =int( datasetsizetest // (batch_size))
+
+    
 
     #print(next(dist_dataset_iter))
 
@@ -808,8 +816,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #print(batch.get('Y'))
         #print(nbatch)
 
-        this_batch_size =128 #not necessary can be removed
-        steps_per_epoch =int( (5000 * 25) // (batch_size))
+        #this_batch_size =128 #not necessary can be removed
         print('Number of Batches: ', steps_per_epoch)
         
         for _ in range(steps_per_epoch):
@@ -895,7 +902,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         print('Time taken by epoch{} was {} seconds.'.format(epoch, time.time()-epoch_start))
         train_time = time.time() - epoch_start
 
-        continue
+        #continue
 
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)
         generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
@@ -923,53 +930,30 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
 
         # repeat till data is available
-        while nb_file < len(Testfiles):
+        for _ in range(steps_per_epoch_test):
 
-            print('processed {} batches'.format(index + 1))
-            print ('Loading Data from .....', Testfiles[nb_file])
-            
-            # Get the dataset from the Testfile
-            dataset = tfconvert.RetrieveTFRecordpreprocessing(Testfiles[nb_file], batch_size)
-            #dataset = h5py.File(Testfiles[0],'r') #to read h5py
+            disc_eval_loss, gen_eval_loss = distributed_test_step(dist_dataset_iter_test)
 
-            # Get the Test values from the dataset
-            #dataset = GetDataAngleParallel(dataset, xscale=xscale, xpower=xpower, angscale=angscale, angtype=angtype, thresh=thresh, daxis=daxis)
-            nb_file+=1
+            #Configure the loss so it is equal to the original values
+            disc_eval_loss = [el.numpy() for el in disc_eval_loss]
+            disc_eval_loss_total_loss = np.sum(disc_eval_loss)
+            new_disc_eval_loss = [disc_eval_loss_total_loss]
+            for i_weights in range(len(disc_eval_loss)):
+                new_disc_eval_loss.append(disc_eval_loss[i_weights] / loss_weights[i_weights])
+            disc_eval_loss = new_disc_eval_loss
 
-            #create the dataset with tensors from the Test values, and batch it using the global batch size
-            #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size)
-            #dataset = tf.data.Dataset.from_tensor_slices(dataset).batch(batch_size, drop_remainder=True)
+            gen_eval_loss = [el.numpy() for el in gen_eval_loss]
+            gen_eval_loss_total_loss = np.sum(gen_eval_loss)
+            new_gen_eval_loss = [gen_eval_loss_total_loss]
+            for i_weights in range(len(gen_eval_loss)):
+                new_gen_eval_loss.append(gen_eval_loss[i_weights] / loss_weights[i_weights])
+            gen_eval_loss = new_gen_eval_loss
 
-            dist_dataset = strategy.experimental_distribute_dataset(dataset)
-
-            # Testing
-            #add Testfiles, nb_test_batches, daxis, daxis2, X_train(??), loss_ftn, combined
-            for batch in dist_dataset:
-
-                this_batch_size = 128 #can be removed (should)
-
-                disc_eval_loss, gen_eval_loss = distributed_test_step(batch)
-
-                #Configure the loss so it is equal to the original values
-                disc_eval_loss = [el.numpy() for el in disc_eval_loss]
-                disc_eval_loss_total_loss = np.sum(disc_eval_loss)
-                new_disc_eval_loss = [disc_eval_loss_total_loss]
-                for i_weights in range(len(disc_eval_loss)):
-                    new_disc_eval_loss.append(disc_eval_loss[i_weights] / loss_weights[i_weights])
-                disc_eval_loss = new_disc_eval_loss
-
-                gen_eval_loss = [el.numpy() for el in gen_eval_loss]
-                gen_eval_loss_total_loss = np.sum(gen_eval_loss)
-                new_gen_eval_loss = [gen_eval_loss_total_loss]
-                for i_weights in range(len(gen_eval_loss)):
-                    new_gen_eval_loss.append(gen_eval_loss[i_weights] / loss_weights[i_weights])
-                gen_eval_loss = new_gen_eval_loss
-
-                index +=1
-                # evaluate discriminator loss           
-                disc_test_loss.append(disc_eval_loss)
-                # evaluate generator loss
-                gen_test_loss.append(gen_eval_loss)
+            index +=1
+            # evaluate discriminator loss           
+            disc_test_loss.append(disc_eval_loss)
+            # evaluate generator loss
+            gen_test_loss.append(gen_eval_loss)
 
             #break
 
