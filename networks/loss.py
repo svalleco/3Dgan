@@ -38,7 +38,7 @@ def forward_generator(generator,
     gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
 
     # Generator training.
-    disc_fake_g = discriminator(gen_sample, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
+    disc_fake_g, fake_ecal, fake_ang = discriminator(gen_sample, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
                                 activation=activation, param=leakiness, size=network_size, is_reuse=is_reuse)
     if loss_fn == 'wgan':
         gen_loss = -tf.reduce_mean(disc_fake_g)
@@ -46,7 +46,8 @@ def forward_generator(generator,
     elif loss_fn == 'logistic':
         gen_loss = tf.reduce_mean(tf.nn.softplus(-disc_fake_g))
         
-
+    elif loss_fn == 'anglegan':
+        gen_loss = tf.reduce_mean(-disc_fake_g) # TODO
     else:
         raise ValueError(f"Unknown loss function: {loss_fn}")
 
@@ -97,10 +98,11 @@ def forward_discriminator(generator,
 
     gamma = tf.random_uniform(shape=[tf.shape(real_image_input)[0], 1, 1, 1, 1], minval=0., maxval=1.)
     interpolates = gamma * real_image_input + (1 - gamma) * tf.stop_gradient(gen_sample)
-    gradients = tf.gradients(discriminator(interpolates, alpha, phase,
+    disc_fake_d2, fake_ecal2, fake_ang2 = discriminator(interpolates, alpha, phase,
                                            num_phases, base_shape, base_dim, latent_dim,
                                            is_reuse=True, activation=activation,
-                                           param=leakiness, size=network_size, ), [interpolates])[0]
+                                           param=leakiness, size=network_size, )
+    gradients = tf.gradients(disc_fake_d2, [interpolates])[0]
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=(1, 2, 3, 4)))
 
     # wasserstein gan
@@ -116,7 +118,7 @@ def forward_discriminator(generator,
         gradient_penalty = tf.reduce_mean(slopes ** 2)
         gp_loss = gp_weight * gradient_penalty
         disc_loss = tf.reduce_mean(tf.nn.softplus(disc_fake_d)) + tf.reduce_mean(
-            tf.nn.softplus(-disc_real))
+            tf.nn.softplus(-disc_real)) ## TODO - To check 
         disc_loss += gp_loss
     
     elif loss_fn == 'anglegan':   # NEEDS TO BE TESTED + DEBUGGED!!
