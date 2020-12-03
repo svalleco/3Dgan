@@ -185,14 +185,16 @@ def forward_simultaneous(generator,
     gamma = tf.random_uniform(shape=[tf.shape(real_image_input)[0], 1, 1, 1, 1], minval=0., maxval=1.)
     interpolates = gamma * real_image_input + (1 - gamma) * tf.stop_gradient(gen_sample)
 
-    gradients = tf.gradients(discriminator(interpolates, alpha, phase,
+    
+    disc_fake_d3, fake_ecal3, fake_ang3 = discriminator(interpolates, alpha, phase,
                                            num_phases, base_shape, base_dim, latent_dim,
                                            is_reuse=True, activation=activation,
-                                           param=leakiness, size=network_size, conditioning=conditioning), [interpolates])[0]
+                                           param=leakiness, size=network_size, conditioning=conditioning) # ToDO Renaming 
+    gradients = tf.gradients(disc_fake_d3, [interpolates])[0]
     slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), reduction_indices=(1, 2, 3)))
 
     # Generator training.
-    disc_fake_g = discriminator(gen_sample, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
+    disc_fake_g, fake_ecal_g, fake_ang_g = discriminator(gen_sample, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
                                 activation=activation, param=leakiness, size=network_size, is_reuse=True, conditioning=conditioning)
     # wasserstein gan
     if loss_fn == 'wgan':
