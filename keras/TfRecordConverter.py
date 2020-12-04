@@ -173,7 +173,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
     #size = recorddata.cardinality().numpy()
     #print(size)
 
-    ds_size = sum(1 for _ in recorddata)
+    #ds_size = sum(1 for _ in recorddata)
 
     
     options = tf.data.Options()
@@ -219,7 +219,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
 
     #print(type(parsed_dataset))
 
-    return parsed_dataset, ds_size
+    return parsed_dataset#, ds_size
 
 #main convert function
 def ConvertH5toTFRecord(datafile,filenumber,datadirectory):

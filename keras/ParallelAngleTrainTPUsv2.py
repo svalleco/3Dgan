@@ -748,11 +748,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     
     time_start_file = time.time()
     # Get the dataset from the trainfile
-    dataset, datasetsize = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
-    datasettest, datasetsizetest = tfconvert.RetrieveTFRecordpreprocessing(Testfiles, batch_size)
+    #dataset, datasetsize = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+    dataset = tfconvert.RetrieveTFRecordpreprocessing(Trainfiles, batch_size)
+    #datasettest, datasetsizetest = tfconvert.RetrieveTFRecordpreprocessing(Testfiles, batch_size)
+    datasettest = tfconvert.RetrieveTFRecordpreprocessing(Testfiles, batch_size)
 
-    print(datasetsize)
-    print(datasetsizetest)
+    #print(datasetsize)
+    #print(datasetsizetest)
 
     time_elapsed = time.time() - time_start_file
     print("Get Dataset: " + str(time_elapsed))
@@ -769,10 +771,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     time_start_file = time.time()
 
     dist_dataset_iter = iter(dist_dataset)
-    steps_per_epoch =int( datasetsize // (batch_size))
 
     dist_dataset_iter_test = iter(dist_dataset_test)
-    steps_per_epoch_test =int( datasetsizetest // (batch_size))
+
+    #steps_per_epoch =int( datasetsize // (batch_size))
+    steps_per_epoch =int( 124987 // (batch_size))
+    #test_steps_per_epoch =int( datasetsizetest // (batch_size))
+    test_steps_per_epoch =int( 12340 // (batch_size))
 
     
 
