@@ -167,7 +167,7 @@ def ConvertH5toTFRecordPreprocessing(datafile,filenumber,datadirectory):
     return serialized_dataset
 
 def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
-    recorddata = tf.data.TFRecordDataset(recorddatapaths)
+    recorddata = tf.data.TFRecordDataset(recorddatapaths, num_parallel_reads=tf.data.experimental.AUTOTUNE)
 
     #print('Start')
     #size = recorddata.cardinality().numpy()
@@ -203,7 +203,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
         #print(tf.shape(data['Y']))
         return data
 
-    parsed_dataset = recorddata.map(_parse_function, tf.data.experimental.AUTOTUNE).batch(batch_size, drop_remainder=True).repeat().with_options(options)
+    parsed_dataset = recorddata.map(_parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE).cache().batch(batch_size, drop_remainder=True).repeat().with_options(options)
     #print(parsed_dataset)
    
     #b = 0
