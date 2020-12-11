@@ -798,7 +798,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #return
 
     #Start Profiling
-    tf.profiler.experimental.start(outpath)
+    tf.profiler.experimental.start('./')
 
 
     # Start training
@@ -1061,7 +1061,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             # write analysis history to a pickel file
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
         
-        tf.profiler.experimental.stop()
+    tf.profiler.experimental.stop()
 
 
 #---------------------------------------------------------------------------------------------------------------
