@@ -797,6 +797,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #print(dist_dataset_iter)
     #return
 
+    #Start Profiling
+    tf.profiler.experimental.start(outpath)
+
+
     # Start training
     for epoch in range(nb_epochs):
         #dist_dataset_iter.initializer
@@ -829,74 +833,76 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
         #this_batch_size =128 #not necessary can be removed
         print('Number of Batches: ', steps_per_epoch)
-        
-        for _ in range(steps_per_epoch):
-            #Discriminator Training
-            file_time = time.time()
-            real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(dist_dataset_iter)
 
-            #Configure the loss so it is equal to the original values
-            real_batch_loss = [el.numpy() for el in real_batch_loss]
-            real_batch_loss_total_loss = np.sum(real_batch_loss)
-            new_real_batch_loss = [real_batch_loss_total_loss]
-            for i_weights in range(len(real_batch_loss)):
-                new_real_batch_loss.append(real_batch_loss[i_weights] / loss_weights[i_weights])
-            real_batch_loss = new_real_batch_loss
+        with tf.profiler.experimental.Trace("Train", step_num=epoch):
 
-            fake_batch_loss = [el.numpy() for el in fake_batch_loss]
-            fake_batch_loss_total_loss = np.sum(fake_batch_loss)
-            new_fake_batch_loss = [fake_batch_loss_total_loss]
-            for i_weights in range(len(fake_batch_loss)):
-                new_fake_batch_loss.append(fake_batch_loss[i_weights] / loss_weights[i_weights])
-            fake_batch_loss = new_fake_batch_loss
+            for _ in range(steps_per_epoch):
+                #Discriminator Training
+                file_time = time.time()
+                real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(dist_dataset_iter)
 
-            #real_batch_loss = [el * w for el in real_batch_loss]
-            # print(real_batch_loss)
-            # print(fake_batch_loss)
+                #Configure the loss so it is equal to the original values
+                real_batch_loss = [el.numpy() for el in real_batch_loss]
+                real_batch_loss_total_loss = np.sum(real_batch_loss)
+                new_real_batch_loss = [real_batch_loss_total_loss]
+                for i_weights in range(len(real_batch_loss)):
+                    new_real_batch_loss.append(real_batch_loss[i_weights] / loss_weights[i_weights])
+                real_batch_loss = new_real_batch_loss
 
-            # if index == 9:
-            #     return
+                fake_batch_loss = [el.numpy() for el in fake_batch_loss]
+                fake_batch_loss_total_loss = np.sum(fake_batch_loss)
+                new_fake_batch_loss = [fake_batch_loss_total_loss]
+                for i_weights in range(len(fake_batch_loss)):
+                    new_fake_batch_loss.append(fake_batch_loss[i_weights] / loss_weights[i_weights])
+                fake_batch_loss = new_fake_batch_loss
 
-            # index +=1
-            # continue
+                #real_batch_loss = [el * w for el in real_batch_loss]
+                # print(real_batch_loss)
+                # print(fake_batch_loss)
 
-            #if ecal sum has 100% loss(generating empty events) then end the training 
-            if fake_batch_loss[3] == 100.0 and index >10:
-                print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
-                generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
-                discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
-                print ('real_batch_loss', real_batch_loss)
-                print ('fake_batch_loss', fake_batch_loss)
-                sys.exit()
+                # if index == 9:
+                #     return
 
-            # append mean of discriminator loss for real and fake events 
-            epoch_disc_loss.append([
-                (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
-            ])
+                # index +=1
+                # continue
 
-            #return
+                #if ecal sum has 100% loss(generating empty events) then end the training 
+                if fake_batch_loss[3] == 100.0 and index >10:
+                    print("Empty image with Ecal loss equal to 100.0 for {} batch".format(index))
+                    generator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(g_weights), overwrite=True)
+                    discriminator.save_weights(WeightsDir + '/{0}eee.hdf5'.format(d_weights), overwrite=True)
+                    print ('real_batch_loss', real_batch_loss)
+                    print ('fake_batch_loss', fake_batch_loss)
+                    sys.exit()
 
-            gen_losses[0] = [el.numpy() for el in gen_losses[0]]
-            gen_losses_total_loss = np.sum(gen_losses[0])
-            new_gen_losses = [gen_losses_total_loss]
-            for i_weights in range(len(gen_losses[0])):
-                new_gen_losses.append(gen_losses[0][i_weights] / loss_weights[i_weights])
-            gen_losses[0] = new_gen_losses
+                # append mean of discriminator loss for real and fake events 
+                epoch_disc_loss.append([
+                    (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
+                ])
 
-            gen_losses[1] = [el.numpy() for el in gen_losses[1]]
-            gen_losses_total_loss = np.sum(gen_losses[1])
-            new_gen_losses = [gen_losses_total_loss]
-            for i_weights in range(len(gen_losses[1])):
-                new_gen_losses.append(gen_losses[1][i_weights] / loss_weights[i_weights])
-            gen_losses[1] = new_gen_losses
+                #return
 
-            generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
+                gen_losses[0] = [el.numpy() for el in gen_losses[0]]
+                gen_losses_total_loss = np.sum(gen_losses[0])
+                new_gen_losses = [gen_losses_total_loss]
+                for i_weights in range(len(gen_losses[0])):
+                    new_gen_losses.append(gen_losses[0][i_weights] / loss_weights[i_weights])
+                gen_losses[0] = new_gen_losses
 
-            epoch_gen_loss.append(generator_loss)
-            #index +=1
+                gen_losses[1] = [el.numpy() for el in gen_losses[1]]
+                gen_losses_total_loss = np.sum(gen_losses[1])
+                new_gen_losses = [gen_losses_total_loss]
+                for i_weights in range(len(gen_losses[1])):
+                    new_gen_losses.append(gen_losses[1][i_weights] / loss_weights[i_weights])
+                gen_losses[1] = new_gen_losses
 
-            print('Time taken by batch', str(nbatch) ,' was', str(time.time()-file_time) , 'seconds.')
-            nbatch += 1
+                generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
+
+                epoch_gen_loss.append(generator_loss)
+                #index +=1
+
+                print('Time taken by batch', str(nbatch) ,' was', str(time.time()-file_time) , 'seconds.')
+                nbatch += 1
 
         #print(generator_loss)
         #return
@@ -1054,6 +1060,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             print('Result = ', result)
             # write analysis history to a pickel file
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
+        
+        tf.profiler.experimental.stop()
+
 
 #---------------------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------------------
