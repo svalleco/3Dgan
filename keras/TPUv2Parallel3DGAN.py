@@ -275,44 +275,7 @@ def get_numpy_values(value_tensor):
     #tf.make_ndarray(tensor)
     return value_tensor
 
-def compute_global_loss(labels, predictions, global_batch_size, loss_weights=[3, 0.1, 25, 0.1]):
-    #print(predictions)
 
-    #can be initialized outside 
-    binary_crossentropy_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction=tf.keras.losses.Reduction.NONE)
-    mean_absolute_percentage_error_object = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.NONE)
-    mae_object = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.NONE) 
-    
-    #tf.print(predictions[0])
-    #predictions[0].numpy()
-
-    #pred = tf.py_function(get_numpy_values, [predictions[0]], Tout=tf.float32)
-    #print(pred)
-
-
-    #print(predictions[0])
-
-    # y_true = [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 0., 1., 1., 1., 0., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 0., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
-    # labels[0] = [[el] for el in y_true]
-    # y_pred = [1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.]
-    # predictions[0] = [[el] for el in y_pred]
-
-    binary_example_loss = binary_crossentropy_object(labels[0], predictions[0], sample_weight=loss_weights[0])
-    mean_example_loss_1 = mean_absolute_percentage_error_object(labels[1], predictions[1], sample_weight=loss_weights[1])
-    #tf.print(mean_example_loss_1)
-    # for el in binary_example_loss:
-    #     tf.print(el)
-    mae_example_loss = mae_object(labels[2], predictions[2], sample_weight=loss_weights[2])
-    mean_example_loss_2 = mean_absolute_percentage_error_object(labels[3], predictions[3], sample_weight=loss_weights[3])
-    
-    binary_loss = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[0])
-    mean_loss_1 = tf.nn.compute_average_loss(mean_example_loss_1, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[1])
-    mae_loss = tf.nn.compute_average_loss(mae_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[2])
-    mean_loss_2 = tf.nn.compute_average_loss(mean_example_loss_2, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[3])
-    
-    #print(binary_loss)
-    
-    return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
 
 def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, WeightsDir, pklfile, timefile, nb_epochs=30, batch_size=128, batch_size_per_replica=64 ,latent_size=200, loss_weights=[3, 0.1, 25, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     
@@ -466,6 +429,27 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     analysis_history = defaultdict(list)
     time_history = defaultdict(list)
     print('Initialization time is {} seconds'.format(init_time))
+
+    with strategy.scope():
+        binary_crossentropy_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction=tf.keras.losses.Reduction.NONE)
+        mean_absolute_percentage_error_object = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.NONE)
+        mae_object = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.NONE)
+        mean_absolute_percentage_error_object2 = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.NONE)
+
+    def compute_global_loss(labels, predictions, global_batch_size, loss_weights=[3, 0.1, 25, 0.1]): 
+        binary_example_loss = binary_crossentropy_object(labels[0], predictions[0], sample_weight=loss_weights[0])
+        mean_example_loss_1 = mean_absolute_percentage_error_object(labels[1], predictions[1], sample_weight=loss_weights[1])
+        mae_example_loss = mae_object(labels[2], predictions[2], sample_weight=loss_weights[2])
+        mean_example_loss_2 = mean_absolute_percentage_error_object2(labels[3], predictions[3], sample_weight=loss_weights[3])
+        
+        binary_loss = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[0])
+        mean_loss_1 = tf.nn.compute_average_loss(mean_example_loss_1, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[1])
+        mae_loss = tf.nn.compute_average_loss(mae_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[2])
+        mean_loss_2 = tf.nn.compute_average_loss(mean_example_loss_2, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[3])
+        
+        #print(binary_loss)
+        
+        return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
 
     def minimize(tape, optimizer, loss, trainable_variables):
         with tape:
