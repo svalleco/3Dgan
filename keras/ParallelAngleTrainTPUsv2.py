@@ -173,7 +173,7 @@ def get_parser():
     parser.add_argument('--gen_weight', action='store', type=float, default=3, help='loss weight for generation real/fake loss')
     parser.add_argument('--aux_weight', action='store', type=float, default=0.1, help='loss weight for auxilliary energy regression loss')
     parser.add_argument('--ang_weight', action='store', type=float, default=25, help='loss weight for angle loss')
-    parser.add_argument('--ecal_weight', action='store', type=float, default=0.5, help='loss weight for ecal sum loss')
+    parser.add_argument('--ecal_weight', action='store', type=float, default=0.1, help='loss weight for ecal sum loss')
     parser.add_argument('--hist_weight', action='store', type=float, default=0.1, help='loss weight for additional bin count loss')
     parser.add_argument('--thresh', action='store', type=int, default=0., help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')

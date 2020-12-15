@@ -203,7 +203,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
         #print(tf.shape(data['Y']))
         return data
 
-    parsed_dataset = recorddata.map(_parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE).cache().repeat().batch(batch_size, drop_remainder=True).with_options(options)
+    parsed_dataset = recorddata.map(_parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE).cache().shuffle(124987).repeat().batch(batch_size, drop_remainder=True).with_options(options)
     #print(parsed_dataset)
    
     #b = 0
