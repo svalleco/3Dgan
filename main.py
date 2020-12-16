@@ -944,7 +944,7 @@ if __name__ == '__main__':
     parser.add_argument('--d_lr_rise_niter', type=int, default=0, help='If a learning rate schedule with a gradual increase in the beginning of a phase is defined for the discriminator, this number defines within how many iterations the maximum is reached.')
     parser.add_argument('--d_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the discriminator, this defines within how many iterations the minimum is reached.')
     parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan'])
-    parser.add_argument('--loss_weights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
+    parser.add_argument('--loss_weights', action='store', type=int, default=[7.2, 6, 0.1], help='loss weights =[gen_weight, ang_weight, ecal_weight]')
     parser.add_argument('--gp_weight', type=float, default=1)
     #parser.add_argument('--activation', type=str, default='leaky_relu')
     parser.add_argument('--gen_activation', type=str, default='relu')
