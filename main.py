@@ -68,11 +68,14 @@ def main(args, config):
     num_phases = int(np.log2(final_resolution/start_resolution))
 
     # Define the shape at the base of the network
+    
     base_shape = (image_channels, start_shape[1], start_shape[2], start_shape[3])
 
+    
     # Number of filters at the base of the progressive network
     # In other words: at the starting resolution, this is the amount of filters that will be used
     # In subsequent phases, the number of filters will go down as the resolution goes up.
+    
     base_dim = num_filters(1, num_phases, base_shape = base_shape, size=args.network_size)
 
     if verbose:
@@ -173,7 +176,6 @@ def main(args, config):
         # anglepgan
         e_p_shape = [batch_size, 1]
         ang_shape = [batch_size, 1]
-        print("e_p_shape ::::", e_p_shape)
         e_p = tf.placeholder(shape=e_p_shape, dtype=tf.float32)
         ang = tf.placeholder(shape=ang_shape, dtype=tf.float32)
 
@@ -401,7 +403,8 @@ def main(args, config):
             # We want to store large / heavy summaries like images less frequently
             summary_small = []
             summary_large = []
-            # Summaries
+            # Summarie
+            print("DEBUG ### ", disc_loss.shape)
             summary_small.append(tf.summary.scalar('d_loss', disc_loss))
             summary_small.append(tf.summary.scalar('g_loss', gen_loss))
             summary_small.append(tf.summary.scalar('gp', tf.reduce_mean(gp_loss)))
@@ -523,7 +526,8 @@ def main(args, config):
 
             while True:
                 start = time.time()
-
+                
+                
                 # Update learning rate
                 d_lr_val = sess.run(update_d_lr)
                 g_lr_val = sess.run(update_g_lr)
@@ -563,8 +567,6 @@ def main(args, config):
                 batch_ecal = np.stack([np.load(path) for path in batch_paths_ecal])
                 batch_ecal = batch_ecal[:, np.newaxis, ...].astype(np.float32) / 1024 - 1
 
-                print("image batches ", batch.shape)
-                print("noy en shape))))))) : ", batch_en.shape)
                 # anglepgan end
 
                 #sess = tf_debug.LocalCLIDebugWrapperSession(sess, ui_type="readline")
@@ -640,6 +642,7 @@ def main(args, config):
                 #     # for stat in top_stats[:10]:
                 #     #     print(stat)
                 #     # snapshot_prev = snapshot
+                
 
                 if global_step >= ((phase - args.starting_phase)
                                    * (args.mixing_nimg + args.stabilizing_nimg)
@@ -689,8 +692,6 @@ def main(args, config):
                 batch_ecal = np.stack([np.load(path) for path in batch_paths_ecal])
                 batch_ecal = batch_ecal[:, np.newaxis, ...].astype(np.float32) / 1024 - 1
 
-                print("image batches ", batch.shape)
-                print("noy en shape))))))) : ", batch_en.shape)
                 # anglepgan end
 
                 small_summary_bool = (local_step % args.summary_small_every_nsteps == 0)
@@ -942,8 +943,9 @@ if __name__ == '__main__':
     parser.add_argument('--g_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the generator, this defines within how many iterations the minimum is reached.')
     parser.add_argument('--d_lr_rise_niter', type=int, default=0, help='If a learning rate schedule with a gradual increase in the beginning of a phase is defined for the discriminator, this number defines within how many iterations the maximum is reached.')
     parser.add_argument('--d_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the discriminator, this defines within how many iterations the minimum is reached.')
-    parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan'])
-    parser.add_argument('--loss_weights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
+    parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan', 'anglegan2'])
+    parser.add_argument('--loss_weights', action='store', type=int, default=[3, 25, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
+    #parser.add_argument('--loss_weights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     parser.add_argument('--gp_weight', type=float, default=1)
     parser.add_argument('--activation', type=str, default='leaky_relu')
     parser.add_argument('--leakiness', type=float, default=0.2)
