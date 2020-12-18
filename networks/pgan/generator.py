@@ -83,7 +83,7 @@ if __name__ == '__main__':
     for phase in range(8, 9):
         shape = [1, latent_dim]
         x = tf.random.normal(shape=shape)
-        y = generator(x, 0.5, phase, num_phases, base_dim, base_shape, activation='leaky_relu',
+        y = generator(x, 0.5, phase, num_phases, base_dim, base_shape, activation='relu',
                       param=0.3)
 
         loss = tf.reduce_sum(y)

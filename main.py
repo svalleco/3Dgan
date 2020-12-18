@@ -284,7 +284,8 @@ def main(args, config):
                 num_phases,
                 base_dim,
                 base_shape,
-                args.activation,
+                args.gen_activation,
+                args.disc_activation,
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
@@ -338,7 +339,7 @@ def main(args, config):
                 num_phases,
                 args.base_dim,
                 base_shape,
-                args.activation,
+                args.disc_activation,
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
@@ -367,7 +368,7 @@ def main(args, config):
                     num_phases,
                     base_dim,
                     base_shape,
-                    args.activation,
+                    args.gen_activation,
                     args.leakiness,
                     args.network_size,
                     args.loss_fn,
@@ -943,11 +944,18 @@ if __name__ == '__main__':
     parser.add_argument('--g_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the generator, this defines within how many iterations the minimum is reached.')
     parser.add_argument('--d_lr_rise_niter', type=int, default=0, help='If a learning rate schedule with a gradual increase in the beginning of a phase is defined for the discriminator, this number defines within how many iterations the maximum is reached.')
     parser.add_argument('--d_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the discriminator, this defines within how many iterations the minimum is reached.')
+<<<<<<< HEAD
     parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan', 'anglegan2'])
     parser.add_argument('--loss_weights', action='store', type=int, default=[3, 25, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     #parser.add_argument('--loss_weights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
+=======
+    parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan'])
+    parser.add_argument('--loss_weights', action='store', type=int, default=[7.2, 6, 0.1], help='loss weights =[gen_weight, ang_weight, ecal_weight]')
+>>>>>>> 8ea93ee4a7f978a130c171cb155a16048f272c4c
     parser.add_argument('--gp_weight', type=float, default=1)
-    parser.add_argument('--activation', type=str, default='leaky_relu')
+    #parser.add_argument('--activation', type=str, default='leaky_relu')
+    parser.add_argument('--gen_activation', type=str, default='relu')
+    parser.add_argument('--disc_activation', type=str, default='leaky_relu')
     parser.add_argument('--leakiness', type=float, default=0.2)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--horovod', default=True, action='store_true')
