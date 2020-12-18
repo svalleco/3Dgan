@@ -1,0 +1,46 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+base_dim	discriminator.py	/^    base_dim = 1024$/;"	v
+base_dim	generator.py	/^    base_dim = 1024$/;"	v
+base_shape	discriminator.py	/^    base_shape = [1, 1, 4, 4]$/;"	v
+base_shape	generator.py	/^    base_shape = [1, 1, 4, 4]$/;"	v
+bce	loss_utils.py	/^def bce(output, target, from_logits=False):$/;"	f
+discriminator	discriminator.py	/^def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim, activation, param=None, is_reuse=False, size='medium', conditioning=None):$/;"	f
+discriminator_block	discriminator.py	/^def discriminator_block(x, filters_in, filters_out, activation, param=None):$/;"	f
+discriminator_out	discriminator.py	/^def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):$/;"	f
+ecal_angle	discriminator.py	/^from networks.pgan.loss_utils import ecal_sum, ecal_angle$/;"	i
+ecal_angle	loss_utils.py	/^def ecal_angle(images, size, power=1.0):$/;"	f
+ecal_sum	discriminator.py	/^from networks.pgan.loss_utils import ecal_sum, ecal_angle$/;"	i
+ecal_sum	loss_utils.py	/^def ecal_sum(images, size, power=1.0):   $/;"	f
+generator	generator.py	/^def generator(x, alpha, phase, num_phases, base_dim, base_shape, activation, param=None, size='medium', is_reuse=False, conditioning=None):$/;"	f
+generator_block	generator.py	/^def generator_block(x, filters_out, activation, param=None):$/;"	f
+generator_in	generator.py	/^def generator_in(x, filters, shape, activation, param=None):$/;"	f
+latent_dim	discriminator.py	/^    latent_dim = 1024$/;"	v
+latent_dim	generator.py	/^    latent_dim = 1024$/;"	v
+loss	discriminator.py	/^        loss = tf.reduce_sum(y)$/;"	v
+loss	generator.py	/^        loss = tf.reduce_sum(y)$/;"	v
+mae	loss_utils.py	/^def mae(output, target):$/;"	f
+mape	loss_utils.py	/^def mape(output, target):$/;"	f
+math	loss_utils.py	/^import math$/;"	i
+np	loss_utils.py	/^import numpy as np$/;"	i
+num_phases	discriminator.py	/^    num_phases = 8$/;"	v
+num_phases	generator.py	/^    num_phases = 8$/;"	v
+optim	discriminator.py	/^        optim = tf.train.GradientDescentOptimizer(1e-5)$/;"	v
+optim	generator.py	/^        optim = tf.train.GradientDescentOptimizer(1e-5)$/;"	v
+param	generator.py	/^                      param=0.3)$/;"	v
+prep_image	loss_utils.py	/^def prep_image(images, power=1.0):$/;"	f
+shape	discriminator.py	/^        shape = [1, 1] + list(np.array(base_shape)[1:] * 2 ** (phase - 1))$/;"	v
+shape	generator.py	/^        shape = [1, latent_dim]$/;"	v
+tf	discriminator.py	/^import tensorflow as tf $/;"	i
+tf	loss_utils.py	/^import tensorflow as tf$/;"	i
+time	generator.py	/^import time$/;"	i
+train	discriminator.py	/^        train = optim.minimize(loss)$/;"	v
+train	generator.py	/^        train = optim.minimize(loss)$/;"	v
+x	discriminator.py	/^        x = tf.random.normal(shape=shape)$/;"	v
+x	generator.py	/^        x = tf.random.normal(shape=shape)$/;"	v
+y	discriminator.py	/^        y = discriminator(x, 0.5, phase, num_phases, base_dim, latent_dim, activation='leaky_relu', param=0.3)$/;"	v
+y	generator.py	/^        y = generator(x, 0.5, phase, num_phases, base_dim, base_shape, activation='leaky_relu',$/;"	v

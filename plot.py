@@ -136,12 +136,19 @@ def main():
    saver.restore(sess, tf.train.latest_checkpoint("/home/achaibi/scratch/applications/cern/runs10/runs/pgan/weights/"))
    angle = angle
    generator = importlib.import_module(f'networks.pgan.generator').generator
-
+    
+   print("X SHAPE ####### ", X.shape) 
+   print("Y SHAPE ####### ", Y.shape) 
    X=X[:32]
    Y=Y[:32]
    angle=angle[:32]
    images.append(generate2(generator, 32, [Y/100., angle], latent=latent, concat=2))
    images[0] = np.power(images[0], 1./xpower)
+   
+   
+   print(f"ANGLEPGAN DEBUG ### : images={images}")
+   #images = tf.transpose(images, [0, 1, 5, 4, 3, 2])
+   
    numpy_images = []
    for i, imgs in enumerate(images):
 
@@ -149,7 +156,7 @@ def main():
         sess.run(tf.global_variables_initializer())
         #test = gsf.eval()
         #imgs = tf.squeeze(imgs,[1])
-        #imgs = tf.transpose(imgs, [0,2,3,1])
+        #imgs = tf.transpose(imgs, [0,4,2,3,1])
         imgs = sess.run(imgs)
         imgs = restore_pic(imgs, 64)
         numpy_images.append(imgs)

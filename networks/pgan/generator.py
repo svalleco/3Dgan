@@ -47,7 +47,6 @@ def generator(x, alpha, phase, num_phases, base_dim, base_shape, activation, par
 
     if conditioning is not None:
         raise NotImplementedError()
-
     with tf.variable_scope('generator') as scope:
 
         if is_reuse:
@@ -62,7 +61,7 @@ def generator(x, alpha, phase, num_phases, base_dim, base_shape, activation, par
             if i == phase:
                 with tf.variable_scope(f'to_rgb_{phase - 1}'):
                     x_upsample = upscale3d(to_rgb(x, channels=base_shape[0]))
-            filters_out = num_filters(i, num_phases, base_dim, size=size)
+            filters_out = num_filters(i, num_phases, base_shape, base_dim, size=size)
             with tf.variable_scope(f'generator_block_{i}'):
                 x = generator_block(x, filters_out, activation=activation, param=param)
 
@@ -83,7 +82,7 @@ if __name__ == '__main__':
     for phase in range(8, 9):
         shape = [1, latent_dim]
         x = tf.random.normal(shape=shape)
-        y = generator(x, 0.5, phase, num_phases, base_dim, base_shape, activation='relu',
+        y = generator(x, 0.5, phase, num_phases, base_dim, base_shape, activation='leaky_relu',
                       param=0.3)
 
         loss = tf.reduce_sum(y)

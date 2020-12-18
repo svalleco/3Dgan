@@ -13,16 +13,20 @@ def bce(output, target, from_logits=False):
 
 # MAE = MEAN ABSOLUTE ERROR
 def mae(output, target):
+    
+    print(f"ANGLEPGAN DEBUG ### : output={output}, target={target}")
     output = tf.convert_to_tensor(output)
     target = tf.convert_to_tensor(target)
-    return tf.math.reduce_mean(tf.math.abs(target - output), axis=-1) / len(target)
+    return tf.math.reduce_mean(tf.math.abs(target - output), axis=-1) / tf.size(target, out_type=tf.dtypes.float32)
+    #return tf.math.reduce_mean(tf.math.abs(target - output), axis=-1) / len(target)
 
 # MAPE = MEAN ABSOLUTE PERCENTAGE ERROR
 def mape(output, target):
+    print(f"ANGLEPGAN DEBUG ### : output={output}, target={target}")
     target = tf.convert_to_tensor(target)
     output = tf.convert_to_tensor(output)
     output_without0 = tf.where(tf.equal(output, 0.), tf.ones_like(output), output)  # to avoid -inf losses when y_true is in denominator
-    loss = (tf.math.reduce_sum(tf.math.abs(output-target)/output_without0) * 100) / len(target)
+    loss = (tf.math.reduce_sum(tf.math.abs(output-target)/output_without0, axis=-1) * 100) / tf.size(target, out_type=tf.dtypes.float32)
     return loss
 
 # dimensions of real_images_input = [z_batch_size, 1=channel, z, x, y]
@@ -35,8 +39,8 @@ def prep_image(images, power=1.0):
     if channel_included:    
         images = tf.squeeze(images) # get rid of channel dimension
         
-    # switch dimensions ordering from pgan (z,x,y) back to anglegan (x,y,z)
-    images = tf.transpose(images, [1, 2, 0])    # move z back -- np.moveaxis(images, 1, -1)
+    # switch dimensions ordering from pgan (num_images,z,x,y) back to anglegan (num_images,x,y,z)
+    images = tf.transpose(images, perm=[0,2,3,1])    # move z back -- np.moveaxis(images, 1, -1)
     # the tensor is now [num_images,x,y,z]
     
     if not inverted:
@@ -51,18 +55,21 @@ def ecal_sum(images, size, power=1.0):
     daxis = (1,2,3)   # (x,y,z)
     # sum the values along the daxis
     sum = tf.math.reduce_sum(images, daxis)   
+    print(f"ANGLEPGAN DEBUG before expand ### : sum={sum}")
+    sum = tf.expand_dims(sum, 1)
+    print(f"ANGLEPGAN DEBUG after expand ### : sum={sum}")
     return sum
 
 
 # Calculating angles from images -- called in conditional lambda layer for the discriminator
-def ecal_angle(images, size, power=1.0):
+def ecal_angle(images, power=1.0):
     images = prep_image(images, power=1.0)
      
     # size of ecal
-    x_shape, y_shape, z_shape = int(size), int(size), int(size/2)
-    print('shapes ----- ', x_shape, y_shape, z_shape )
+    x_shape = images.shape[1]
+    y_shape = images.shape[2]
+    z_shape = images.shape[3]
     sumtot = tf.math.reduce_sum(images, (1,2,3))# sum of events
-    print('sumtot: ', sumtot)
     
     # get 1. where event sum is 0 and 0 elsewhere
     amask = tf.where(tf.math.equal(sumtot, 0.0), tf.ones_like(sumtot) , tf.zeros_like(sumtot))
