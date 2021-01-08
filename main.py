@@ -68,14 +68,14 @@ def main(args, config):
     num_phases = int(np.log2(final_resolution/start_resolution))
 
     # Define the shape at the base of the network
-    
+
     base_shape = (image_channels, start_shape[1], start_shape[2], start_shape[3])
 
-    
+
     # Number of filters at the base of the progressive network
     # In other words: at the starting resolution, this is the amount of filters that will be used
     # In subsequent phases, the number of filters will go down as the resolution goes up.
-    
+
     base_dim = num_filters(1, num_phases, base_shape = base_shape, size=args.network_size)
 
     if verbose:
@@ -171,7 +171,8 @@ def main(args, config):
         # real_image_input = tf.squeeze(real_image_input, axis=0)
         # real_image_input = tf.ensure_shape(real_image_input, [batch_size, image_channels, *[size * 2 ** (phase - 1) for size in base_shape[1:]]])
 
-        real_image_input = real_image_input + tf.random.normal(tf.shape(real_image_input)) * .01
+        #anglepgan -- commenting the normalization
+        #real_image_input = real_image_input + tf.random.normal(tf.shape(real_image_input)) * .01
 
         # anglepgan
         e_p_shape = [batch_size, 1]
@@ -284,8 +285,7 @@ def main(args, config):
                 num_phases,
                 base_dim,
                 base_shape,
-                args.gen_activation,
-                args.disc_activation,
+                args.activation,
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
@@ -339,7 +339,7 @@ def main(args, config):
                 num_phases,
                 args.base_dim,
                 base_shape,
-                args.disc_activation,
+                args.activation,
                 args.leakiness,
                 args.network_size,
                 args.loss_fn,
@@ -368,7 +368,7 @@ def main(args, config):
                     num_phases,
                     base_dim,
                     base_shape,
-                    args.gen_activation,
+                    args.activation,
                     args.leakiness,
                     args.network_size,
                     args.loss_fn,
@@ -448,7 +448,7 @@ def main(args, config):
             fake_image_grid = image_grid(fake_image_grid, grid_shape, image_shape=shape[1:3],
                                          num_channels=shape[-1])
 
-            fake_image_grid = tf.clip_by_value(fake_image_grid, -1, 2)
+            #fake_image_grid = tf.clip_by_value(fake_image_grid, -1, 2)
 
             summary_large.append(tf.summary.image('real_image', real_image_grid))
             summary_large.append(tf.summary.image('fake_image', fake_image_grid))
@@ -527,8 +527,8 @@ def main(args, config):
 
             while True:
                 start = time.time()
-                
-                
+
+
                 # Update learning rate
                 d_lr_val = sess.run(update_d_lr)
                 g_lr_val = sess.run(update_g_lr)
@@ -550,7 +550,7 @@ def main(args, config):
                 batch_paths = npy_data[batch_loc: batch_loc + batch_size]
                 batch = np.stack([np.load(path) for path in batch_paths])
                 batch = batch[:, np.newaxis, ...].astype(np.float32) / 1024 - 1
-                #print("Got a batch!")
+                print("Got a batch!")
 
                 # anglepgan begin
                 batch_loc_en = np.random.randint(0, len(npy_en) - batch_size)
@@ -643,7 +643,7 @@ def main(args, config):
                 #     # for stat in top_stats[:10]:
                 #     #     print(stat)
                 #     # snapshot_prev = snapshot
-                
+
 
                 if global_step >= ((phase - args.starting_phase)
                                    * (args.mixing_nimg + args.stabilizing_nimg)
@@ -944,18 +944,11 @@ if __name__ == '__main__':
     parser.add_argument('--g_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the generator, this defines within how many iterations the minimum is reached.')
     parser.add_argument('--d_lr_rise_niter', type=int, default=0, help='If a learning rate schedule with a gradual increase in the beginning of a phase is defined for the discriminator, this number defines within how many iterations the maximum is reached.')
     parser.add_argument('--d_lr_decay_niter', type=int, default=0, help='If a learning rate schedule with a gradual decrease at the end of a phase is defined for the discriminator, this defines within how many iterations the minimum is reached.')
-<<<<<<< HEAD
     parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan', 'anglegan2'])
     parser.add_argument('--loss_weights', action='store', type=int, default=[3, 25, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
     #parser.add_argument('--loss_weights', action='store', type=int, default=[3, 0.1, 25, 0.1, 0.1], help='loss weights =[gen_weight, aux_weight, ang_weight, ecal_weight, add loss weight]')
-=======
-    parser.add_argument('--loss_fn', default='logistic', choices=['logistic', 'wgan', 'anglegan'])
-    parser.add_argument('--loss_weights', action='store', type=int, default=[7.2, 6, 0.1], help='loss weights =[gen_weight, ang_weight, ecal_weight]')
->>>>>>> 8ea93ee4a7f978a130c171cb155a16048f272c4c
     parser.add_argument('--gp_weight', type=float, default=1)
-    #parser.add_argument('--activation', type=str, default='leaky_relu')
-    parser.add_argument('--gen_activation', type=str, default='relu')
-    parser.add_argument('--disc_activation', type=str, default='leaky_relu')
+    parser.add_argument('--activation', type=str, default='leaky_relu')
     parser.add_argument('--leakiness', type=float, default=0.2)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--horovod', default=True, action='store_true')

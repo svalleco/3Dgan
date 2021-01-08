@@ -35,7 +35,8 @@ def forward_generator(generator,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, is_reuse=is_reuse)
 
-    gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
+    #anglepgan - commenting the normalization
+    #gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
 
     # Generator training.
     disc_fake_g, fake_ecal, fake_ang = discriminator(gen_sample, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
@@ -86,7 +87,8 @@ def forward_discriminator(generator,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, is_reuse=is_reuse)
 
-    gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
+    #anglepgan commenting the normalization
+    #gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
 
     # Discriminator Training
     disc_fake_d, fake_ecal, fake_ang = discriminator(tf.stop_gradient(gen_sample), alpha, phase, num_phases, base_shape, 
@@ -181,7 +183,8 @@ def forward_simultaneous(generator,
                            base_dim, base_shape, activation=activation,
                            param=leakiness, size=network_size, conditioning=conditioning)
 
-    gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
+    #anglepgan - commenting the normalization
+    #gen_sample = gen_sample + tf.random.normal(shape=tf.shape(gen_sample)) * 0.01
     # Discriminator Training
     disc_fake_d, fake_ecal, fake_ang = discriminator(tf.stop_gradient(gen_sample), alpha, phase, num_phases, base_shape, 
                                 base_dim, latent_dim, activation=activation, param=leakiness,
