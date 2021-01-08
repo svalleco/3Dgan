@@ -1,8 +1,8 @@
 from networks.ops import *
-import tensorflow as tf 
+import tensorflow as tf
 from networks.pgan.loss_utils import ecal_sum, ecal_angle
 
-    
+
 def discriminator_block(x, filters_in, filters_out, activation, param=None):
     with tf.variable_scope('conv_1'):
         shape = x.get_shape().as_list()[2:]
@@ -24,7 +24,7 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
     with tf.variable_scope(f'discriminator_out'):
         # x = minibatch_stddev_layer(x)
         shape = x.get_shape().as_list()[2:]
-        kernel = [k(s) for s in shape]        
+        kernel = [k(s) for s in shape]
         x = conv3d(x, filters_out, kernel, activation=activation, param=param)
         x = apply_bias(x)
         x = act(x, activation, param=param)
@@ -35,11 +35,11 @@ def discriminator_out(x, base_dim, latent_dim, filters_out, activation, param):
         with tf.variable_scope('dense_2'):
             x = dense(x, 1, activation='linear')
             x = apply_bias(x)
-        
-        # lambda layers (physics functions) used for calculating discriminator loss 
+
+        # lambda layers (physics functions) used for calculating discriminator loss
         #ecal = ecal_sum(x, base_dim)
         #ang = ecal_angle(x, base_dim)
-        
+
         return x#, ecal, ang
 
 
@@ -55,7 +55,7 @@ def discriminator(x, alpha, phase, num_phases, base_shape, base_dim, latent_dim,
 
         if is_reuse:
             scope.reuse_variables()
-        
+
         x_downscale = x
 
         with tf.variable_scope(f'from_rgb_{phase}'):
