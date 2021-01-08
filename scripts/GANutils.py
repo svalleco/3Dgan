@@ -22,7 +22,7 @@ def GetEcalFit(sampled_energies, particle='Ele', mod=0, xscale=1):
          ratio = np.polyval(root_fit, sampled_energies)
          return np.multiply(ratio, sampled_energies) * xscale
 
-#Divide files in train and test lists     
+#Divide files in train and test lists
 def DivideFiles(FileSearch="/data/LCD/*/*.h5",
                 Fractions=[.9,.1],datasetnames=["ECAL","HCAL"],Particles=[],MaxFiles=-1):
     print ("Searching in :",FileSearch)
@@ -61,7 +61,7 @@ def BitFlip(x, prob=0.05):
     selection = np.random.uniform(0, 1, x.shape) < prob
     x[selection] = 1 * np.logical_not(x[selection])
     return x
-                    
+
 
 # Get all files Without Dividing into Test and Train
 def GetDataFiles(FileSearch,
@@ -127,7 +127,7 @@ def sort(data, bins, flag=False, num_events=1000, tolerance=5):
                 srt["z" + str(b)] = Z[indexes][:num_events]
     return srt
 
-# sort data by energy when input = [events, primary energy and angle (for angle version)] 
+# sort data by energy when input = [events, primary energy and angle (for angle version)]
 def sortEnergy(data, ecal, energies, ang=1):
     var={}
     tolerance =5
@@ -174,7 +174,7 @@ def metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
         var["eprofilex_error"+ str(energy)] = np.divide((sumxact - sumxgan), sumxact)
         var["eprofiley_error"+ str(energy)] = np.divide((sumyact - sumygan), sumyact)
         var["eprofilez_error"+ str(energy)] = np.divide((sumzact - sumzgan), sumzact)
-        #Take absolute of error and mean for all events                                                           
+        #Take absolute of error and mean for all events
         var["pos_error"+ str(energy)]= (np.absolute(var["posx_error"+ str(energy)]) + np.absolute(var["posy_error"+ str(energy)]) + np.absolute(var["posz_error"+ str(energy)]))/3
         #Summing over moments and dividing for number of moments
         var["pos_total"+ str(energy)]= np.sum(var["pos_error"+ str(energy)])/m
@@ -264,10 +264,10 @@ def measPython(image): # Working version:p1 and p2 are not used. 3D angle with b
     ang[indexes] = 100.
     return ang
 
-# short version of analysis                                                                                                                      
+# short version of analysis
 def OptAnalysisShort(var, generated_images, energies, ang=1):
     m=2
-    
+
     x = generated_images.shape[1]
     y = generated_images.shape[2]
     z = generated_images.shape[3]
@@ -283,7 +283,7 @@ def OptAnalysisShort(var, generated_images, energies, ang=1):
       var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m, x=x, y=y, z=z)
       if ang: var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
     return metric(var, energies, m, angtype='angle', x=x, y=y, z=z, ang=ang)
-                                                                                                     
+
 def OptAnalysisAngle(var, g, energies, ascale=None, xscale=None, yscale=100, xpower=None, latent=256, concat=1):
     m=2
     for energy in energies:
@@ -298,7 +298,7 @@ def OptAnalysisAngle(var, g, energies, ascale=None, xscale=None, yscale=100, xpo
         var["events_gan" + str(energy)] = np.squeeze(var["events_gan" + str(energy)])
         if xpower: var["events_gan" + str(energy)] = np.power(var["events_gan" + str(energy)], 1.0/xpower)
         if xscale: var["events_gan" + str(energy)] = var["events_gan" + str(energy)]/xscale
-        
+
         var["ecal_act"+ str(energy)] = np.sum(var["events_act" + str(energy)], axis = (1, 2, 3))
         var["ecal_gan"+ str(energy)] = np.sum(var["events_gan" + str(energy)], axis = (1, 2, 3))
         var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)])
@@ -307,7 +307,7 @@ def OptAnalysisAngle(var, g, energies, ascale=None, xscale=None, yscale=100, xpo
         var["momentX_gan" + str(energy)], var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)] = get_moments(var["sumsx_gan"+ str(energy)], var["sumsy_gan"+ str(energy)], var["sumsz_gan"+ str(energy)], var["ecal_gan"+ str(energy)], m, x=x, y=y, z=z)
         var["angle_gan"+ str(energy)]= measPython(var["events_gan" + str(energy)])
     return metric(var, energies, m, angtype='angle', x=x, y=y, z=z, ang=1)
-                                                                                   
+
 # Load data from files in arrays
 def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
     for index, datafile in enumerate(datafiles):
@@ -319,8 +319,8 @@ def GetAllDataAngle(datafiles, numevents, thresh=1e-6, angtype='theta'):
                 x = np.concatenate((x, x_temp), axis=0)
                 y = np.concatenate((y, y_temp), axis=0)
                 theta = np.concatenate((theta, theta_temp), axis=0)
-    return x[:numevents], y[:numevents], theta[:numevents] 
-                                                                                   
+    return x[:numevents], y[:numevents], theta[:numevents]
+
 
 # sort data for fixed angle
 def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2000, tolerance=5, thresh=0):
@@ -367,7 +367,7 @@ def get_sorted(datafiles, energies, flag=False, num_events1=10000, num_events2=2
 
 # get variable angle data
 def GetAngleData(datafile, thresh=0, angtype='eta', offset=0.0, num_events=10000):
-    #get data for training                                                                                        
+    #get data for training
     print ('Loading Data from .....', datafile)
     f=h5py.File(datafile,'r')
     X=np.array(f.get('ECAL')[:num_events])
@@ -387,7 +387,7 @@ def GetAngleData(datafile, thresh=0, angtype='eta', offset=0.0, num_events=10000
     Y=Y[indexes]
     ang=ang[indexes]
     X = np.expand_dims(X, axis=-1)
-    return X, Y, ang, f 
+    return X, Y, ang, f
 
 # Get sorted data for variable angle
 def get_sorted_angle(datafiles, energies, flag=False, num_events1=5000, num_events2=2000, tolerance1=5, tolerance2=0.5, Data=GetAngleData, angtype='theta', thresh=0.0, offset=0.0):
@@ -405,7 +405,7 @@ def get_sorted_angle(datafiles, energies, flag=False, num_events1=5000, num_even
        for energy in energies:
            if index== 0:
               if energy == 0:
-                 srt["events_act" + str(energy)] = X # More events in random bin                                                                                                                                  
+                 srt["events_act" + str(energy)] = X # More events in random bin
                  srt["energy" + str(energy)] = Y
                  srt["angle" + str(energy)] = angle
                  if srt["events_act" + str(energy)].shape[0] > num_events1:
@@ -456,7 +456,7 @@ def save_sorted(srt, energies, srtdir, ang=0):
              outfile.create_dataset('Angle',data=srt["angle" + str(energy)])
        print ("Sorted data saved to {}".format(srtfile))
 
-# save generated images       
+# save generated images
 def save_generated(events, cond, energy, gendir):
     safe_mkdir(gendir)
     filename = os.path.join(gendir,"Gen_{:03d}.hdf5".format(energy))
@@ -489,7 +489,7 @@ def save_discriminated(disc, energy, discdir, angloss=1, addloss=0, ang=0):
           outfile.create_dataset('ADDLOSS_GAN',data=disc["addloss_gan" + str(energy)])
     print ("Discriminated data saved to ", filename)
 
-# read D results    
+# read D results
 def get_disc(energy, discdir, angloss=1, addloss=0, ang=0):
     filename = os.path.join(discdir, "Disc_{:03d}.hdf5".format(energy))
     f=h5py.File(filename,'r')
@@ -515,7 +515,7 @@ def get_disc(energy, discdir, angloss=1, addloss=0, ang=0):
         addloss_gan = np.array(f.get('ADDLOSS_GAN'))
         disc_out.append(addloss_act)
         disc_out.append(addloss_gan)
-                                        
+
     print ("Discriminated file ", filename, " is loaded")
     return disc_out
 
@@ -548,13 +548,13 @@ def generate(g, index, cond, latent=256, concat=1, batch_size=50):
     if len(cond)> 1: # that means we also have angle
       angle_labels = cond[1]
       if concat==1:
-        noise = np.random.normal(0, 1, (index, latent-1))  
+        noise = np.random.normal(0, 1, (index, latent-1))
         noise = energy_labels * noise
         gen_in = np.concatenate((angle_labels.reshape(-1, 1), noise), axis=1)
       elif concat==2:
         noise = np.random.normal(0, 1, (index, latent-2))
         gen_in = np.concatenate((energy_labels, angle_labels.reshape(-1, 1), noise), axis=1)
-      else:  
+      else:
         noise = np.random.normal(0, 1, (index, 2, latent))
         angle_labels=np.expand_dims(angle_labels, axis=1)
         gen_in = np.concatenate((energy_labels, angle_labels), axis=1)
@@ -575,7 +575,7 @@ def generate2(g, index, cond, latent=256, concat=1, batch_size=50):
     if len(cond)> 1: # that means we also have angle
       angle_labels = cond[1]
       if concat==1:
-        noise = np.random.normal(0, 1, (index, latent-1))  
+        noise = np.random.normal(0, 1, (index, latent-1))
         noise = energy_labels * noise
         gen_in = np.concatenate((angle_labels.reshape(-1, 1), noise), axis=1)
       elif concat==2:
@@ -584,7 +584,7 @@ def generate2(g, index, cond, latent=256, concat=1, batch_size=50):
         print("energy lable ::", energy_labels.shape)
         print("angle shape ::", angle_labels.shape)
         gen_in = np.concatenate((energy_labels, angle_labels.reshape(-1, 1), noise), axis=1)
-      else:  
+      else:
         noise = np.random.normal(0, 1, (index, 2, latent))
         angle_labels=np.expand_dims(angle_labels, axis=1)
         gen_in = np.concatenate((energy_labels, angle_labels), axis=1)
@@ -594,7 +594,7 @@ def generate2(g, index, cond, latent=256, concat=1, batch_size=50):
       noise = np.random.normal(0, 1, (index, latent))
       #energy_labels=np.expand_dims(energy_labels, axis=1)
       gen_in = energy_labels * noise
-   
+
     phase = 5
     num_phases = 5
     base_dim = 256
@@ -607,7 +607,7 @@ def generate2(g, index, cond, latent=256, concat=1, batch_size=50):
     print("gen_in ::::", (gen_tensor.get_shape()))
     test = tf.data.Dataset.from_tensors(gen_tensor)
     print("gen_in after reshape::::", type(test))
-    generated_images = g(gen_tensor, 0.5, phase, num_phases, base_dim, base_shape, activation='leaky_relu', param=leakiness, size=network_size, is_reuse=is_reuse) 
+    generated_images = g(gen_tensor, 0.5, phase, num_phases, base_dim, base_shape, activation='leaky_relu', param=leakiness, size=network_size, is_reuse=is_reuse)
     return generated_images
 
 
@@ -692,7 +692,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
     print( flags)
     # assign values to flags that decide if data is to be read from dataset or pre binned data
     # Also if saved generated and discriminated data is to be used
-    
+
     Test = flags[0]
     save_data = flags[1]
     read_data = flags[2]
@@ -706,12 +706,12 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
     ang =1
 
     # Read from sorted dir with binned data
-    if read_data: 
+    if read_data:
        start = time.time()
        var = load_sorted(sortedpath, energies, ang) # returning a dict with sorted data
        print( "Events were loaded in {} seconds".format(time.time()- start))
 
-    # If reading from unsorted data. The data will be read and sorted in bins   
+    # If reading from unsorted data. The data will be read and sorted in bins
     else:
        Filesused = int(math.ceil(num_data/events_per_file)) # num_data is number of events to be used from unsorted data/ events in each file
        Trainfiles, Testfiles = DivideFiles(datapath, datasetnames=["ECAL"], Particles =[particle]) # get test and train files
@@ -724,9 +724,9 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
        else:
           data_files = Trainfiles  # else train data will be used
        start = time.time()
-       var = get_sorted_angle(data_files, energies, True, num_events1, num_events2, Data=Data, angtype=angtype, thresh=thresh*dscale, offset=offset) # returning a dict with sorted data. 
+       var = get_sorted_angle(data_files, energies, True, num_events1, num_events2, Data=Data, angtype=angtype, thresh=thresh*dscale, offset=offset) # returning a dict with sorted data.
        print ("{} events were loaded in {} seconds".format(num_data, time.time() - start))
-       
+
        # If saving the binned data. This will only run if reading from data directly
        if save_data:
           save_sorted(var, energies, sortdir, ang) # saving sorted data in a directory
@@ -735,7 +735,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
 
     # For each energy bin
     for energy in energies:
-      # Getting dimensions of ecal images  
+      # Getting dimensions of ecal images
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
       z =var["events_act"+ str(energy)].shape[3]
@@ -744,7 +744,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
       if not dscale==1: var["events_act"+ str(energy)]= var["events_act"+ str(energy)]/dscale
       #calculations for data events
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0] # number of events in bin
-      total += var["index" + str(energy)] # total events 
+      total += var["index" + str(energy)] # total events
       ecal =np.sum(var["events_act"+ str(energy)], axis=(1, 2, 3))# sum actual events for moment calculations
       var["max_pos_act" + str(energy)] = get_max(var["events_act" + str(energy)]) # get position of maximum deposition
       var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)] = get_sums(var["events_act" + str(energy)]) # get sums along different axis
@@ -762,18 +762,18 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
          var["momentX_act"+ str(energy) + "ang_" + str(a)] = var["momentX_act"+ str(energy)][indexes]
          var["momentY_act"+ str(energy) + "ang_" + str(a)] = var["momentY_act"+ str(energy)][indexes]
          var["momentZ_act"+ str(energy) + "ang_" + str(a)] = var["momentZ_act"+ str(energy)][indexes]
-                           
+
          print ('{} for angle bin {} total events were {}'.format(index, a, var["events_act" + str(energy) + "ang_" + str(a)].shape[0]))
 
     print ("{} events were put in {} bins".format(total, len(energies)))
-    #### Generate Data table to screen                                                                                                                                                                             
+    #### Generate Data table to screen
     print ("Actual Data")
     print ("Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
     for energy in energies:
        print ("{}\t{}\t{:.4f}\t\t{}\t\t\t{:.2f}\t\t{:.4f}\t\t{:.4f}\t\t{:.4f}" .format(energy, var["index" +str(energy)], np.amax(var["events_act" + str(energy)]), np.mean(var["max_pos_act" + str(energy)], axis=0), np.mean(var["events_act" + str(energy)]), np.mean(var["momentX_act"+ str(energy)][:, 1]), np.mean(var["momentY_act"+ str(energy)][:, 1]), np.mean(var["momentZ_act"+ str(energy)][:, 1])))
 
     for energy in energies:
-       # creating dicts for all GAN quantities 
+       # creating dicts for all GAN quantities
        var["events_gan" + str(energy)]={}
        var["isreal_act" + str(energy)]={}
        var["isreal_gan" + str(energy)]={}
@@ -787,7 +787,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
        if addloss:
           var["addloss_act" + str(energy)]={}
           var["addloss_gan" + str(energy)]={}
-                   
+
        var["ecal_act" + str(energy)]={}
        var["ecal_gan" + str(energy)]={}
        var["max_pos_gan" + str(energy)]={}
@@ -811,7 +811,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
           if addloss:
             var["addloss_act" + str(energy)+ "ang_" + str(a)]={}
             var["addloss_gan" + str(energy)+ "ang_" + str(a)]={}
-                      
+
           var["ecal_act" + str(energy)+ "ang_" + str(a)]={}
           var["ecal_gan" + str(energy)+ "ang_" + str(a)]={}
           var["sumsx_gan"+ str(energy)+ "ang_" + str(a)]={}
@@ -820,12 +820,12 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
           var["momentX_gan"+ str(energy)+ "ang_" + str(a)]={}
           var["momentY_gan"+ str(energy)+ "ang_" + str(a)]={}
           var["momentZ_gan"+ str(energy)+ "ang_" + str(a)]={}
-                              
+
 
        for gen_weights, disc_weights, scale, power, ascale, i in zip(gweights, dweights, xscales, xpowers, angscales, np.arange(len(gweights))):
           gendir = gendirs + '/n_' + str(i)
           discdir = discdirs + '/n_' + str(i)
-                            
+
           if read_gen:
              var["events_gan" + str(energy)]['n_'+ str(i)]= get_gen(energy, gendir)
           else:
@@ -879,7 +879,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
              if addloss:
                  var["addloss_act"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_act[4])
                  var["addloss_gan"+ str(energy)]['n_'+ str(i)] = np.array(disc_out_gan[4])
-                                
+
              disc_time = time.time() - start
              print ("Discriminator took {} seconds for {} data and generated events".format(disc_time, var["index" +str(energy)]))
 
@@ -900,7 +900,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
           if addloss:
               var["addloss_act"+ str(energy)]['n_'+ str(i)]=np.squeeze((var["addloss_act"+ str(energy)]['n_'+ str(i)]))
               var["addloss_gan"+ str(energy)]['n_'+ str(i)]=np.squeeze((var["addloss_gan"+ str(energy)]['n_'+ str(i)]))
-                            
+
           var["max_pos_gan" + str(energy)]['n_'+ str(i)] = get_max(var["events_gan" + str(energy)]['n_'+ str(i)])
           var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)] = get_sums(var["events_gan" + str(energy)]['n_'+ str(i)])
           var["momentX_gan" + str(energy)]['n_'+ str(i)], var["momentY_gan" + str(energy)]['n_'+ str(i)], var["momentZ_gan" + str(energy)]['n_'+ str(i)] = get_moments(var["sumsx_gan"+ str(energy)]['n_'+ str(i)], var["sumsy_gan"+ str(energy)]['n_'+ str(i)], var["sumsz_gan"+ str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)], m, x=x, y=y, z=z)
@@ -921,7 +921,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
              var["momentX_gan"+ str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["momentX_gan"+ str(energy)]['n_'+ str(i)][indexes]
              var["momentY_gan"+ str(energy)+ "ang_" + str(a)]['n_'+ str(i)] =var["momentY_gan"+ str(energy)]['n_'+ str(i)][indexes]
              var["momentZ_gan"+ str(energy)+ "ang_" + str(a)]['n_'+ str(i)] =var["momentZ_gan"+ str(energy)]['n_'+ str(i)][indexes]
-                                       
+
              if angloss==2:
                var["angle2_act" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["angle2_act" + str(energy)]['n_'+ str(i)][indexes]
                var["angle2_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["angle2_gan" + str(energy)]['n_'+ str(i)][indexes]
@@ -930,7 +930,7 @@ def perform_calculations_angle(g, d, gweights, dweights, energies, angles, datap
                var["addloss_gan" + str(energy)+ "ang_" + str(a)]['n_'+ str(i)] = var["addloss_gan" + str(energy)]['n_'+ str(i)][indexes]
        print('For {} iteration:\nWith Generator weights.....{}\nWith Discriminator weights.....{}'.format(i, gen_weights, disc_weights))
     for i in np.arange(len(gweights)):
-      #### Generate GAN table to screen                                                                                                       
+      #### Generate GAN table to screen
       print( "Generated Data for {}".format(i))
       print( "Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
 
@@ -950,13 +950,13 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
     var= {}
     num_events1= 10000
     num_events2 = num_events
-    if read_data: # Read from sorted dir                                                                                                                                                                           
+    if read_data: # Read from sorted dir
        start = time.time()
        var = load_sorted(sortedpath, energies)
        sort_time = time.time()- start
        print ("Events were loaded in {} seconds".format(sort_time))
     else:
-       # Getting Data                                                                                                                                                                                              
+       # Getting Data
        events_per_file = 10000
        Filesused = int(math.ceil(num_data/events_per_file))
        print(Filesused)
@@ -984,7 +984,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
       x = var["events_act"+ str(energy)].shape[1]
       y =var["events_act"+ str(energy)].shape[2]
       z =var["events_act"+ str(energy)].shape[3]
-                          
+
       var["index" + str(energy)]= var["energy" + str(energy)].shape[0]
       total += var["index" + str(energy)]
       var["ecal_act"+ str(energy)]=np.sum(var["events_act"+ str(energy)], axis=(1, 2, 3))
@@ -993,7 +993,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
       var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)]= get_moments(var["sumsx_act"+ str(energy)], var["sumsy_act"+ str(energy)], var["sumsz_act"+ str(energy)], var["ecal_act"+ str(energy)], m, x=x, y=y, z=z)
     data_time = time.time() - start
     print ("{} events were put in {} bins".format(total, len(energies)))
-    #### Generate Data table to screen                                                                                                                                                                             
+    #### Generate Data table to screen
     print ("Actual Data")
     print ("Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
     for energy in energies:
@@ -1003,7 +1003,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
        gendir = gendirs + '/n_' + str(i)
        discdir = discdirs + '/n_' + str(i)
        for energy in energies:
-                               
+
           var["events_gan" + str(energy)]={}
           var["isreal_act" + str(energy)]={}
           var["isreal_gan" + str(energy)]={}
@@ -1028,7 +1028,7 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
              if save_gen:
                 save_generated(var["events_gan" + str(energy)]['n_'+ str(i)], var["energy" + str(energy)], energy, gendir)
              gen_time = time.time() - start
-            
+
              print ("Generator took {} seconds to generate {} events".format(gen_time, var["index" +str(energy)]))
           if read_disc:
              var["isreal_act" + str(energy)]['n_'+ str(i)], var["aux_act" + str(energy)]['n_'+ str(i)], var["ecal_act"+ str(energy)]['n_'+ str(i)], var["isreal_gan" + str(energy)]['n_'+ str(i)], var["aux_gan" + str(energy)]['n_'+ str(i)], var["ecal_gan"+ str(energy)]['n_'+ str(i)]= get_disc(energy, discdir)
@@ -1069,8 +1069,8 @@ def perform_calculations_multi(g, d, gweights, dweights, energies, datapath, sor
 
        print('For {} iteration:\nWith Generator weights.....{}\nWith Discriminator weights.....{}'.format(i, gen_weights, disc_weights))
 
-       #### Generate GAN table to screen                                                                                                                                                                          
- 
+       #### Generate GAN table to screen
+
        print ("Generated Data")
        print ("Energy\tEvents\tMaximum Value\t\t\tMaximum loc\t\t\tMean\t\tMomentx2\tMomenty2\tMomentz2")
 

@@ -1,7 +1,7 @@
-# To make logrimthic bins for a root histogram                                                                    
+# To make logrimthic bins for a root histogram
 import numpy as np
 import ROOT
-                                                                                                  
+
 # creating log bins
 def BinLogX(h):
    axis = h.GetXaxis()
@@ -35,7 +35,7 @@ def normalize(hist, mod=0):
    if mod==0:
       norm = hist.GetEntries()
       hist.Scale(1/norm)
-   elif mod==1:   
+   elif mod==1:
       if hist.Integral()!=0:
          hist.Scale(1/hist.Integral())
    return hist
@@ -49,7 +49,7 @@ def fill_hist_wt(hist, weight):
         hist.Fill(i, weight[j, i])
 
 
-#2D weighted histogram        
+#2D weighted histogram
 def FillHist2D_wt(hist, array):
    array= np.squeeze(array, axis=3)
    dim1 = array.shape[0]
@@ -64,7 +64,7 @@ def FillHist2D_wt(hist, array):
          for i in bin1:
             hist.Fill(j, k, array[i, j, k])
             count+=1
-                                                                            
+
 #Hits above a threshold
 def get_hits(events, thresh=0.0002):
    hit_array = events>thresh
@@ -95,38 +95,38 @@ def ratio3_total(events):
 
 # Position of state box
 def stat_pos(a, pos=0):
-  # Upper left                                                                                                                                                                                                     
+  # Upper left
   if pos==0:
    sb1=a.GetListOfFunctions().FindObject("stats")
    sb1.SetX1NDC(.0)
    sb1.SetX2NDC(.2)
-  # Upper right                                                                                                                                                                                                    
+  # Upper right
   if pos==1:
    sb1=a.GetListOfFunctions().FindObject("stats")
    sb1.SetY1NDC(.3)
    sb1.SetY2NDC(.4)
-  # Lower right                                                                                                                                                                                                    
+  # Lower right
   if pos==2:
    sb1=a.GetListOfFunctions().FindObject("stats")
    sb1.SetX1NDC(.1)
    sb1.SetX2NDC(.3)
    sb1.SetY1NDC(.1)
    sb1.SetY2NDC(.3)
-  # Lower left                                                                                                                                                                                                     
+  # Lower left
   if pos==3:
    sb1=a.GetListOfFunctions().FindObject("stats")
    sb1.SetX1NDC(.7)
    sb1.SetX2NDC(.9)
    sb1.SetY1NDC(.1)
    sb1.SetY2NDC(.3)
-  # Upper Center                                                                                                                                                                                                   
+  # Upper Center
   if pos==4:
    sb1=a.GetListOfFunctions().FindObject("stats")
    sb1.SetX1NDC(.4)
    sb1.SetX2NDC(.6)
    sb1.SetY1NDC(.7)
    sb1.SetY2NDC(.9)
-  #lower Center                                                                                                                                                                                                    
+  #lower Center
   if pos==5:
    sb1=a.GetListOfFunctions().FindObject("stats")
    sb1.SetX1NDC(.4)

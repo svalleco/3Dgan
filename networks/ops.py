@@ -170,9 +170,9 @@ def num_filters(phase, num_phases, base_shape, base_dim=None, size=None):
     # filter_list = filter_list[-num_phases:]
     # Take base_shape[1:] to cut of the number of input channels:
     # We want to determine number of filters based on spatial number of voxels; channels are irrelevant
-    
-    
-    
+
+
+
     current_dim = [2 ** (phase - 1) * dim for dim in base_shape[1:]]
     print(f"DEBUG: base_shape={base_shape}, phase={phase}, current_dim={current_dim}")
     log_product = np.log2(np.product(current_dim))
@@ -306,4 +306,3 @@ def conv3d_depthwise(x, f, strides, padding):
     filters = tf.split(f, f.shape[-2], axis=-2)
     x = tf.concat([tf.nn.conv3d(i, f, strides=strides, padding=padding) for i, f in zip(x, filters)], axis=-1)
     return x
-
