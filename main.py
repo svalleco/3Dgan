@@ -227,7 +227,7 @@ def main(args, config):
 
         # Turn arguments into constant Tensors
         g_lr_max = tf.constant(args.g_lr, tf.float32)
-        d_lr_max = tf.constant(args.g_lr, tf.float32)
+        d_lr_max = tf.constant(args.d_lr, tf.float32) #ach-anglepgan : swithching g_lr to d_lr
         g_lr_rise_niter = tf.constant(args.g_lr_rise_niter)
         d_lr_rise_niter = tf.constant(args.d_lr_rise_niter)
         g_lr_decay_niter = tf.constant(args.g_lr_decay_niter)
