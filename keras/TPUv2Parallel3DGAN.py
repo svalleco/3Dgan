@@ -173,7 +173,7 @@ def get_parser():
     parser.add_argument('--gen_weight', action='store', type=float, default=3, help='loss weight for generation real/fake loss')
     parser.add_argument('--aux_weight', action='store', type=float, default=0.1, help='loss weight for auxilliary energy regression loss')
     parser.add_argument('--ang_weight', action='store', type=float, default=25, help='loss weight for angle loss')
-    parser.add_argument('--ecal_weight', action='store', type=float, default=0.5, help='loss weight for ecal sum loss')
+    parser.add_argument('--ecal_weight', action='store', type=float, default=0.1, help='loss weight for ecal sum loss')
     parser.add_argument('--hist_weight', action='store', type=float, default=0.1, help='loss weight for additional bin count loss')
     parser.add_argument('--thresh', action='store', type=int, default=0., help='Threshold for cell energies')
     parser.add_argument('--angtype', action='store', type=str, default='mtheta', help='Angle to use for Training. It can be theta, mtheta or eta')
@@ -295,8 +295,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #Create loss objects and optimizers
 
     with strategy.scope():
-        optimizer_discriminator = RMSprop(lr)
-        optimizer_generator = RMSprop(lr)
+        optimizer_discriminator = Adam(lr) #RMSprop(lr)
+        optimizer_generator = Adam(lr) #RMSprop(lr)
 
     # with strategy.scope():
     #     # build the discriminator
@@ -431,25 +431,32 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     print('Initialization time is {} seconds'.format(init_time))
 
     with strategy.scope():
-        binary_crossentropy_object = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
+        binary_crossentropy_object = tf.keras.losses.BinaryCrossentropy(from_logits=False, reduction=tf.keras.losses.Reduction.NONE)
         mean_absolute_percentage_error_object = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.NONE)
         mae_object = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.NONE)
         mean_absolute_percentage_error_object2 = tf.keras.losses.MeanAbsolutePercentageError(reduction=tf.keras.losses.Reduction.NONE)
 
-    def compute_global_loss(labels, predictions, global_batch_size, loss_weights=[3, 0.1, 25, 0.1]): 
-        binary_example_loss = binary_crossentropy_object(labels[0], predictions[0], sample_weight=loss_weights[0])
-        mean_example_loss_1 = mean_absolute_percentage_error_object(labels[1], predictions[1], sample_weight=loss_weights[1])
-        mae_example_loss = mae_object(labels[2], predictions[2], sample_weight=loss_weights[2])
-        mean_example_loss_2 = mean_absolute_percentage_error_object2(labels[3], predictions[3], sample_weight=loss_weights[3])
+        def compute_global_loss(labels, predictions, global_batch_size, loss_weights=[3, 0.1, 25, 0.1]): 
+            binary_example_loss = binary_crossentropy_object(labels[0], predictions[0], sample_weight=loss_weights[0])
+            mean_example_loss_1 = mean_absolute_percentage_error_object(labels[1], predictions[1], sample_weight=loss_weights[1])
+            mae_example_loss = mae_object(labels[2], predictions[2], sample_weight=loss_weights[2])
+            mean_example_loss_2 = mean_absolute_percentage_error_object2(labels[3], predictions[3], sample_weight=loss_weights[3])
         
-        binary_loss = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[0])
-        mean_loss_1 = tf.nn.compute_average_loss(mean_example_loss_1, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[1])
-        mae_loss = tf.nn.compute_average_loss(mae_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[2])
-        mean_loss_2 = tf.nn.compute_average_loss(mean_example_loss_2, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[3])
+            binary_loss = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[0])
+            mean_loss_1 = tf.nn.compute_average_loss(mean_example_loss_1, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[1])
+            mae_loss = tf.nn.compute_average_loss(mae_example_loss, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[2])
+            mean_loss_2 = tf.nn.compute_average_loss(mean_example_loss_2, global_batch_size=global_batch_size)#, sample_weight=1/loss_weights[3])
         
-        #print(binary_loss)
-        
-        return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
+            #print(binary_loss)
+
+            #reg_loss = tf.losses.get_regularization_loss()
+
+            #binary_loss += tf.nn.scale_regularization_loss(reg_loss)
+            #mean_loss_1 += tf.nn.scale_regularization_loss(reg_loss)
+            #mae_loss += tf.nn.scale_regularization_loss(reg_loss)
+            #mean_loss_2 += tf.nn.scale_regularization_loss(reg_loss)
+
+            return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
 
     def minimize(tape, optimizer, loss, trainable_variables):
         with tape:
@@ -881,6 +888,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             gen_losses[1] = new_gen_losses
 
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
+
+            if generator_loss[0] < 15 and lr != (0.001 * (batch_size / batch_size_per_replica ) ):
+                lr = lr * 2
+                print('increasing lr to: ' + str(lr))
+                with strategy.scope():
+                    optimizer_discriminator = Adam(lr) #RMSprop(lr)
+                    optimizer_generator = Adam(lr) #RMSprop(lr)
 
             epoch_gen_loss.append(generator_loss)
             #index +=1
