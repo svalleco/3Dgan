@@ -466,7 +466,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             total_loss = tf.math.add_n([binary_loss, mean_loss_1, mae_loss, mean_loss_2])
 
-            print(total_loss)
+            #print(total_loss)
 
             return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
 
@@ -506,6 +506,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         ang_batch = dataset.get('ang')#.numpy()
         #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
 
+        #print(lr)
+        #print(optimizer_discriminator)
         
 
         # filefortests = '/data/redacost/filefortests.pkl'
@@ -750,7 +752,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         
         return disc_test_loss, gen_test_loss
 
-    def update_optimizers(opt, lr):
+    def update_optimizers(opt):
+        print('Updating optimizers')
+        print(lr)
         return opt.assign(RMSprop(lr))
 
     def update_lr(lr):
@@ -917,8 +921,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             if generator_loss[0] < 20 and lr != (0.001 * (batch_size / 64 ) ):
                 lr = strategy.extended.update(lr, update_lr)
                 print('increasing lr to: ' + str(lr))
-                strategy.extended.update(optimizer_discriminator, update_optimizers, args=(lr,))
-                strategy.extended.update(optimizer_generator, update_optimizers, args=(lr,))
+                strategy.extended.update(optimizer_discriminator, update_optimizers)
+                strategy.extended.update(optimizer_generator, update_optimizers)
                 #with strategy.scope():
                 #    optimizer_discriminator = 0 #RMSprop(lr)
                 #    optimizer_generator = 0 #RMSprop(lr)
