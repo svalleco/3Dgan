@@ -456,6 +456,17 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             #mae_loss += tf.nn.scale_regularization_loss(reg_loss)
             #mean_loss_2 += tf.nn.scale_regularization_loss(reg_loss)
 
+            #disc_eval_loss = [el.numpy() for el in disc_eval_loss]
+            #disc_eval_loss_total_loss = np.sum(disc_eval_loss)
+            #new_disc_eval_loss = [disc_eval_loss_total_loss]
+            #for i_weights in range(len(disc_eval_loss)):
+            #    new_disc_eval_loss.append(disc_eval_loss[i_weights] / loss_weights[i_weights])
+            #disc_eval_loss = new_disc_eval_loss
+
+            total_loss = tf.math.add_n([binary_loss, mean_loss_1, mae_loss, mean_loss_2])
+
+            print(total_loss)
+
             return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
 
     def minimize(tape, optimizer, loss, trainable_variables):
