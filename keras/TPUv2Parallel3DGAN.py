@@ -738,6 +738,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         
         return disc_test_loss, gen_test_loss
 
+    def update_optimizers(opt, lr):
+        return opt.assign(RMSprop(lr))
+
+
 
     # Dataset preparation
 
@@ -893,12 +897,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
-            if generator_loss[0] < 15 and lr != (0.001 * (batch_size / batch_size_per_replica ) ):
+            if generator_loss[0] < 20 and lr != (0.001 * (batch_size / 64 ) ):
                 lr = lr * 2
                 print('increasing lr to: ' + str(lr))
-                with strategy.scope():
-                    optimizer_discriminator = RMSprop(lr)
-                    optimizer_generator = RMSprop(lr)
+                strategy.extended.update(optimizer_discriminator, update_optimizers, args=(lr,))
+                strategy.extended.update(optimizer_generator, update_optimizers, args=(lr,))
+                #with strategy.scope():
+                #    optimizer_discriminator = 0 #RMSprop(lr)
+                #    optimizer_generator = 0 #RMSprop(lr)
 
             epoch_gen_loss.append(generator_loss)
             #index +=1
