@@ -465,7 +465,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             total_loss = tf.math.add_n([binary_loss, mean_loss_1, mae_loss, mean_loss_2])
 
-            print(total_loss)
+            tf.print(total_loss)
 
             return [binary_loss, mean_loss_1, mae_loss, mean_loss_2]
 
