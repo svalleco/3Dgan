@@ -295,8 +295,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #Create loss objects and optimizers
 
     with strategy.scope():
-        optimizer_discriminator = Adam(lr) #RMSprop(lr)
-        optimizer_generator = Adam(lr) #RMSprop(lr)
+        optimizer_discriminator = RMSprop(lr)
+        optimizer_generator = RMSprop(lr)
 
     # with strategy.scope():
     #     # build the discriminator
@@ -510,7 +510,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         noise = tf.random.normal((batch_size_per_replica, latent_size-2), 0, 1)
         #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
         generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
-        generated_images = generator(generator_ip, training=False)
+        #generated_images = generator(generator_ip, training=False)
         #tf.print(generated_images) #same image
 
         # Train discriminator first on real batch 
@@ -523,7 +523,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         time1 = time.time()
 
 
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            tape.watch(discriminator.trainable_variables)
             predictions = discriminator(image_batch, training=True)
             real_batch_loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
         
@@ -548,7 +549,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         fake_batch = [[el] for el in fake_batch]
         labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
 
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            tape.watch(discriminator.trainable_variables)
+            generated_images = generator(generator_ip, training=False)
             predictions = discriminator(generated_images, training=True)
             fake_batch_loss = compute_global_loss(labels, predictions, batch_size, loss_weights=loss_weights)
         
@@ -604,7 +607,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             print(time1)
             start=time.time()        
 
-            with tf.GradientTape() as tape:
+            with tf.GradientTape(watch_accessed_variables=False) as tape:
+                tape.watch(generator.trainable_variables)
                 #predictions = combined(generator_ip, training= True)
                 generated_images = generator(generator_ip ,training= True)
                 #tf.print(generated_images)
@@ -893,8 +897,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 lr = lr * 2
                 print('increasing lr to: ' + str(lr))
                 with strategy.scope():
-                    optimizer_discriminator = Adam(lr) #RMSprop(lr)
-                    optimizer_generator = Adam(lr) #RMSprop(lr)
+                    optimizer_discriminator = RMSprop(lr)
+                    optimizer_generator = RMSprop(lr)
 
             epoch_gen_loss.append(generator_loss)
             #index +=1
@@ -1060,296 +1064,6 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             pickle.dump({'results': analysis_history}, open(resultfile, 'wb'))
         
     #tf.profiler.experimental.stop()
-
-
-#---------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------
-
-# def Discriminator_Train_steps(optimizer_discriminator, optimizer_generator, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-#     print('Discriminator')
-#     start = time.time()
-#     # Get a single batch    
-#     image_batch = dataset.get('X')#.numpy()
-#     energy_batch = dataset.get('Y')#.numpy()
-#     ecal_batch = dataset.get('ecal')#.numpy()
-#     ang_batch = dataset.get('ang')#.numpy()
-#     #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
-
-#     # filefortests = '/data/redacost/filefortests.pkl'
-#     # with open(filefortests, 'rb') as f:
-#     #     x = pickle.load(f) 
-#     # noise = np.asarray(x['noise'])
-#     #tf.print(noise)
-
-#     batch_size = energy_batch.get_shape().as_list()[0]#.numpy()[0]
-#     #print(batch_size)
-    
-#     # Generate Fake events with same energy and angle as data batch
-#     noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-#     generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
-#     generated_images = generator(generator_ip, training=False)
-#     #tf.print(generated_images) #same image
-
-    
-
-#     # Train discriminator first on real batch 
-#     fake_batch = gan.BitFlip(np.ones(batch_size).astype(np.float32))
-#     #fake_batch = x['ganflip1']
-#     fake_batch = [[el] for el in fake_batch]
-#     labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
-
-#     print(time.time()-start)
-#     time1 = time.time()
-
-#     with tf.GradientTape() as tape:
-#         predictions = discriminator(image_batch, training=True)
-#         real_batch_loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
-    
-#     # tf.print('Discriminator real')
-#     # tf.print(predictions)
-    
-#     gradients = tape.gradient(real_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
-#     optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
-  
-#     print(time.time()-time1)
-#     time2=time.time()
-
-#     #tf.print(real_batch_loss)
-#     #return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3]
-
-#     #Train discriminato on the fake batch
-#     fake_batch = gan.BitFlip(np.zeros(batch_size).astype(np.float32))
-#     #fake_batch = x['ganflip2']
-#     fake_batch = [[el] for el in fake_batch]
-#     labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
-
-#     with tf.GradientTape() as tape:
-#         predictions = discriminator(generated_images, training=True)
-#         fake_batch_loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
-#     gradients = tape.gradient(fake_batch_loss, discriminator.trainable_variables) # model.trainable_variables or  model.trainable_weights
-#     optimizer_discriminator.apply_gradients(zip(gradients, discriminator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
-
-#     print(time.time()-time2)
-#     print('begin 3')
-
-#     # tf.print('Discriminator false')
-#     # tf.print(predictions)
-
-#     #tf.print(real_batch_loss)
-#     # tf.print(real_batch_loss)
-#     # tf.print(fake_batch_loss)
-
-#     #return losses separatly for reduce op
-#     return real_batch_loss[0], real_batch_loss[1], real_batch_loss[2], real_batch_loss[3], fake_batch_loss[0], fake_batch_loss[1], fake_batch_loss[2], fake_batch_loss[3]
-
-
-def Generator_Train_steps(optimizer_discriminator, optimizer_generator, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-    print('Generator') 
-    start = time.time()
-    # Get a single batch    
-    image_batch = dataset.get('X')#.numpy()
-    energy_batch = dataset.get('Y')#.numpy()
-    ecal_batch = dataset.get('ecal')#.numpy()
-    ang_batch = dataset.get('ang')#.numpy()
-    #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
-
-    batch_size = energy_batch.get_shape().as_list()[0]
-
-    # filefortests = '/data/redacost/filefortests.pkl'
-    # with open(filefortests, 'rb') as f:
-    #     x = pickle.load(f) 
-    # noise = np.asarray(x['noise'])
-
-    # generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
-    # generated_images = generator(generator_ip, training=False)
-    # tf.print(generated_images)
-
-    trick = np.ones(batch_size).astype(np.float32)
-    #trick = x['trick']
-
-    fake_batch = [[el] for el in trick]
-    labels = [fake_batch, tf.reshape(energy_batch, (-1,1)), ang_batch, ecal_batch]
-    #labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
-
-    time1 = time.time() - start
-    print(time1)
-    start=time.time()
-
-    gen_losses = []
-    # Train generator twice using combined model
-    for _ in range(2):
-        start=time.time()
-        #noise = x['noise']
-        noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-        generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1) # sampled angle same as g4 theta
-        time1 = time.time() - start
-        print(time1)
-        start=time.time()        
-
-        with tf.GradientTape() as tape:
-            #predictions = combined(generator_ip, training= True)
-            generated_images = generator(generator_ip ,training= True)
-            #tf.print(generated_images)
-            predictions = discriminator(generated_images , training=False)
-            loss = compute_global_loss(labels, predictions, global_batch_size, loss_weights=loss_weights)
-        
-        # tf.print('--Generator------------')
-        # tf.print(predictions)
-        # tf.print('---------------------------')
-
-        gradients = tape.gradient(loss, generator.trainable_variables) # model.trainable_variables or  model.trainable_weights
-        optimizer_generator.apply_gradients(zip(gradients, generator.trainable_variables)) # model.trainable_variables or  model.trainable_weights
-
-        time1 = time.time() - start
-        print(time1)
-
-        for el in loss:
-            gen_losses.append(el)
-
-
-    return gen_losses[0], gen_losses[1], gen_losses[2], gen_losses[3], gen_losses[4], gen_losses[5], gen_losses[6], gen_losses[7]    
-        
-
-#---------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------
-#---------------------------------------------------------------------------------------------------------------
-
-
-# def Test_steps(optimizer_discriminator, optimizer_generator, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Testfiles, nb_test_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128 ,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):    
-#     # Get a single batch    
-#     image_batch = dataset.get('X')#.numpy()
-#     energy_batch = dataset.get('Y')#.numpy()
-#     ecal_batch = dataset.get('ecal')#.numpy()
-#     ang_batch = dataset.get('ang')#.numpy()
-#     #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
-
-#     batch_size = energy_batch.get_shape().as_list()[0]
-
-#     # Generate Fake events with same energy and angle as data batch
-#     noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-#     generator_ip = tf.concat((tf.reshape(energy_batch, (-1,1)), tf.reshape(ang_batch, (-1, 1)), noise),axis=1)
-#     generated_images = generator(generator_ip, training=False)
-
-#     # concatenate to fake and real batches
-#     X = tf.concat((image_batch, generated_images), axis=0)
-#     y = np.array([1] * batch_size + [0] * batch_size).astype(np.float32)
-#     ang = tf.concat((ang_batch, ang_batch), axis=0)
-#     ecal = tf.concat((ecal_batch, ecal_batch), axis=0)
-#     aux_y = tf.concat((energy_batch, energy_batch), axis=0)
-#     #add_loss= tf.concat((add_loss_batch, add_loss_batch), axis=0)
-
-#     y = [[el] for el in y]
-
-#     labels = [y, aux_y, ang, ecal]
-#     disc_eval = discriminator(X, training=False)
-#     disc_eval_loss = compute_global_loss(labels, disc_eval, global_batch_size, loss_weights=loss_weights)
-    
-#     trick = np.ones(batch_size).astype(np.float32) #original doest have astype
-#     fake_batch = [[el] for el in trick]
-#     labels = [fake_batch, energy_batch, ang_batch, ecal_batch]
-#     gen_eval = combined(generator_ip, training=False)
-    
-#     gen_eval_loss = compute_global_loss(labels, gen_eval, global_batch_size, loss_weights=loss_weights)
-
-
-#     #disc_eval_loss = discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size)
-#     #gen_eval_loss = combined.evaluate(generator_ip, [np.ones(batch_size), energy_batch, ang_batch, ecal_batch, add_loss_batch], verbose=False, batch_size=batch_size)
-
-#     return disc_eval_loss[0], disc_eval_loss[1], disc_eval_loss[2], disc_eval_loss[3], gen_eval_loss[0], gen_eval_loss[1], gen_eval_loss[2], gen_eval_loss[3]
-#     #return disc_eval_loss, gen_eval_loss
-
-# @tf.function
-# def distributed_discriminator_train_step(optimizer_discriminator, optimizer_generator, strategy, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-#     #X_train, epoch_disc_loss, epoch_gen_loss = 
-
-#     #print('check100')
-
-#     #fake, energy, ang, ecal
-#     real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4, \
-#     fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4 = strategy.run(Discriminator_Train_steps, args=(optimizer_discriminator, optimizer_generator, \
-#                     discriminator, generator, dataset, nEvents, WeightsDir, pklfile, \
-#                     Trainfiles, nb_train_batches, daxis, daxis2, combined, \
-#                     nb_epochs, batch_size, global_batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-#                     angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-#                     warm, prev_gweights, prev_dweights))
-
-    
-#     real_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_1, axis=None)
-#     real_batch_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_2, axis=None)
-#     real_batch_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_3, axis=None)
-#     real_batch_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss_4, axis=None)
-#     real_batch_loss = [real_batch_loss_1, real_batch_loss_2, real_batch_loss_3, real_batch_loss_4]
-
-#     fake_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, fake_batch_loss_1, axis=None)
-#     fake_batch_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, fake_batch_loss_2, axis=None)
-#     fake_batch_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, fake_batch_loss_3, axis=None)
-#     fake_batch_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, fake_batch_loss_4, axis=None)
-#     fake_batch_loss = [fake_batch_loss_1, fake_batch_loss_2, fake_batch_loss_3, fake_batch_loss_4]
-
-#     return real_batch_loss, fake_batch_loss 
-    #strategy.reduce(tf.distribute.ReduceOp.SUM, real_batch_loss, axis=None), strategy.reduce(tf.distribute.ReduceOp.SUM, fake_batch_loss, axis=None)
-
-@tf.function
-def distributed_generator_train_step(optimizer_discriminator, optimizer_generator, strategy, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Trainfiles, nb_train_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128,latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-    #X_train, epoch_disc_loss, epoch_gen_loss = 
-
-    #print('check100')
-
-    gen_losses = []
-
-    #fake, energy, ang, ecal
-    gen_batch_loss_1, gen_batch_loss_2, gen_batch_loss_3, gen_batch_loss_4, \
-    gen_batch_loss_5, gen_batch_loss_6, gen_batch_loss_7, gen_batch_loss_8 = strategy.run(Generator_Train_steps, args=(optimizer_discriminator, optimizer_generator, \
-                    discriminator, generator, dataset, nEvents, WeightsDir, pklfile, \
-                    Trainfiles, nb_train_batches, daxis, daxis2, combined, \
-                    nb_epochs, batch_size, global_batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-                    angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-                    warm, prev_gweights, prev_dweights))
-
-    
-    gen_batch_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_1, axis=None)
-    gen_batch_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_2, axis=None)
-    gen_batch_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_3, axis=None)
-    gen_batch_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_4, axis=None)
-    gen_batch_loss = [gen_batch_loss_1, gen_batch_loss_2, gen_batch_loss_3, gen_batch_loss_4]
-
-    gen_losses.append(gen_batch_loss)
-
-    gen_batch_loss_5 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_5, axis=None)
-    gen_batch_loss_6 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_6, axis=None)
-    gen_batch_loss_7 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_7, axis=None)
-    gen_batch_loss_8 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_batch_loss_8, axis=None)
-    gen_batch_loss = [gen_batch_loss_5, gen_batch_loss_6, gen_batch_loss_7, gen_batch_loss_8]
-
-    gen_losses.append(gen_batch_loss)
-
-    return gen_losses
-
-# @tf.function
-# def distributed_test_step(optimizer_discriminator, optimizer_generator, strategy, discriminator, generator, dataset, nEvents, WeightsDir, pklfile, Testfiles, nb_test_batches, daxis, daxis2, combined, nb_epochs=30, batch_size=128, global_batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
-#     disc_test_loss_1, disc_test_loss_2, disc_test_loss_3, disc_test_loss_4, \
-#     gen_test_loss_1, gen_test_loss_2, gen_test_loss_3, gen_test_loss_4 = strategy.run(Test_steps, args=(optimizer_discriminator, optimizer_generator, \
-#         discriminator, generator, dataset, nEvents, WeightsDir, pklfile, \
-#         Testfiles, nb_test_batches, daxis, daxis2, combined, \
-#         nb_epochs, batch_size, global_batch_size, latent_size, loss_weights, lr, rho, decay, g_weights, d_weights, xscale, xpower, \
-#         angscale, angtype, yscale, thresh, analyse, resultfile, energies, dformat, particle, verbose, \
-#         warm, prev_gweights, prev_dweights,))
-
-#     disc_test_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss_1, axis=None)
-#     disc_test_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss_2, axis=None)
-#     disc_test_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss_3, axis=None)
-#     disc_test_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, disc_test_loss_4, axis=None)
-#     disc_test_loss = [disc_test_loss_1, disc_test_loss_2, disc_test_loss_3, disc_test_loss_4]
-
-#     gen_test_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_1, axis=None)
-#     gen_test_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_2, axis=None)
-#     gen_test_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_3, axis=None)
-#     gen_test_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_4, axis=None)
-#     gen_test_loss = [gen_test_loss_1, gen_test_loss_2, gen_test_loss_3, gen_test_loss_4]
-
-    
-#     return disc_test_loss, gen_test_loss
 
 
 if __name__ == '__main__':
