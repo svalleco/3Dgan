@@ -298,12 +298,14 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         lr1 = tf.Variable(True)
         lr8 = tf.Variable(False)
         lr32 = tf.Variable(False)
-        optimizer_discriminator1 = RMSprop(0.001)
-        optimizer_generator1 = RMSprop(0.001)
-        optimizer_discriminator8 = RMSprop(0.008)
-        optimizer_generator8 = RMSprop(0.008)
-        optimizer_discriminator32 = RMSprop(0.032)
-        optimizer_generator32 = RMSprop(0.032)
+        # optimizer_discriminator1 = RMSprop(0.001)
+        # optimizer_generator1 = RMSprop(0.001)
+        # optimizer_discriminator8 = RMSprop(0.008)
+        # optimizer_generator8 = RMSprop(0.008)
+        # optimizer_discriminator32 = RMSprop(0.032)
+        # optimizer_generator32 = RMSprop(0.032)
+        optimizer_discriminator = RMSprop(0.001)
+        optimizer_generator = RMSprop(0.001)
 
     # with strategy.scope():
     #     # build the discriminator
@@ -515,21 +517,21 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #print(lr)
         #print(optimizer_discriminator)
 
-        if lr1:
-            print('lr1')
-            optimizer_discriminator = optimizer_discriminator1
-            optimizer_generator = optimizer_generator1
-            print('opt')
-        elif lr8:
-            print('lr8')
-            optimizer_discriminator = optimizer_discriminator8
-            optimizer_generator = optimizer_generator8
-        elif lr32:
-            print('lr32')
-            optimizer_discriminator = optimizer_discriminator32
-            optimizer_generator = optimizer_generator32
+        # if lr1:
+        #     print('lr1')
+        #     optimizer_discriminator = optimizer_discriminator1
+        #     optimizer_generator = optimizer_generator1
+        #     print('opt')
+        # elif lr8:
+        #     print('lr8')
+        #     optimizer_discriminator = optimizer_discriminator8
+        #     optimizer_generator = optimizer_generator8
+        # elif lr32:
+        #     print('lr32')
+        #     optimizer_discriminator = optimizer_discriminator32
+        #     optimizer_generator = optimizer_generator32
        
-        print('opt2')
+        # print('opt2')
 
         # filefortests = '/data/redacost/filefortests.pkl'
         # with open(filefortests, 'rb') as f:
@@ -773,10 +775,15 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         
         return disc_test_loss, gen_test_loss
 
-    def update_optimizers(opt):
+    def update_optimizers_8(opt):
         print('Updating optimizers')
         print(lr)
-        return opt.assign(RMSprop(lr))
+        return opt.lr.assign(0.008)
+
+    def update_optimizers_32(opt):
+        print('Updating optimizers')
+        print(lr)
+        return opt.lr.assign(0.032)
 
     def update_lr(lr):
         return lr.assign(True)
@@ -941,11 +948,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             if generator_loss[0] < 20 and not lr32:
                 if not lr8:
                     strategy.extended.update(lr8, update_lr)
+                    strategy.extended.update(optimizer_discriminator, update_optimizers_8)
+                    strategy.extended.update(optimizer_generator, update_optimizers_8)
                 else:
                     strategy.extended.update(lr32, update_lr)
+                    strategy.extended.update(optimizer_discriminator, update_optimizers_32)
+                    strategy.extended.update(optimizer_generator, update_optimizers_32)
                 print('increasing lr to: ' + str(lr))
-                #strategy.extended.update(optimizer_discriminator, update_optimizers)
-                #strategy.extended.update(optimizer_generator, update_optimizers)
                 #with strategy.scope():
                 #    optimizer_discriminator = 0 #RMSprop(lr)
                 #    optimizer_generator = 0 #RMSprop(lr)
