@@ -294,10 +294,11 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
     #Create loss objects and optimizers
 
+    lr1 = True
+    lr8 = False
+    lr32 = False
+
     with strategy.scope():
-        lr1 = tf.Variable(True)
-        lr8 = tf.Variable(False)
-        lr32 = tf.Variable(False)
         # optimizer_discriminator1 = RMSprop(0.001)
         # optimizer_generator1 = RMSprop(0.001)
         # optimizer_discriminator8 = RMSprop(0.008)
@@ -947,14 +948,17 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             if generator_loss[0] < 20 and not lr32:
                 if not lr8:
-                    strategy.extended.update(lr8, update_lr)
+                    #strategy.extended.update(lr8, update_lr)
+                    lr8 = True
                     strategy.extended.update(optimizer_discriminator, update_optimizers_8)
                     strategy.extended.update(optimizer_generator, update_optimizers_8)
+                    print('increasing lr to: 8')
                 else:
-                    strategy.extended.update(lr32, update_lr)
+                    #strategy.extended.update(lr32, update_lr)
+                    lr32 = True
                     strategy.extended.update(optimizer_discriminator, update_optimizers_32)
                     strategy.extended.update(optimizer_generator, update_optimizers_32)
-                print('increasing lr to: ' + str(lr))
+                    print('increasing lr to: 32')
                 #with strategy.scope():
                 #    optimizer_discriminator = 0 #RMSprop(lr)
                 #    optimizer_generator = 0 #RMSprop(lr)
