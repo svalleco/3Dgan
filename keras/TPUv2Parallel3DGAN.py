@@ -296,8 +296,12 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
     with strategy.scope():
         lr = tf.Variable(0.001)
-        optimizer_discriminator = RMSprop(lr)
-        optimizer_generator = RMSprop(lr)
+        optimizer_discriminator1 = RMSprop(0.001)
+        optimizer_generator1 = RMSprop(0.001)
+        optimizer_discriminator8 = RMSprop(0.008)
+        optimizer_generator8 = RMSprop(0.008)
+        optimizer_discriminator32 = RMSprop(0.032)
+        optimizer_generator32 = RMSprop(0.032)
 
     # with strategy.scope():
     #     # build the discriminator
@@ -508,6 +512,16 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
         #print(lr)
         #print(optimizer_discriminator)
+
+        if lr == 0.001:
+            optimizer_discriminator = optimizer_discriminator1
+            optimizer_generator = optimizer_generator1
+        if lr == 0.008:
+            optimizer_discriminator = optimizer_discriminator8
+            optimizer_generator = optimizer_generator8
+        else:
+            optimizer_discriminator = optimizer_discriminator32
+            optimizer_generator = optimizer_generator32
         
 
         # filefortests = '/data/redacost/filefortests.pkl'
@@ -758,7 +772,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         return opt.assign(RMSprop(lr))
 
     def update_lr(lr):
-        new_lr = lr * 2
+        if lr == 0.001:
+            new_lr = 0.008
+        elif lr == 0.008
+            new_lr = 0.032
         return lr.assign(new_lr)
 
 
@@ -921,8 +938,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
             if generator_loss[0] < 20 and lr != (0.001 * (batch_size / 64 ) ):
                 lr = strategy.extended.update(lr, update_lr)
                 print('increasing lr to: ' + str(lr))
-                strategy.extended.update(optimizer_discriminator, update_optimizers)
-                strategy.extended.update(optimizer_generator, update_optimizers)
+                #strategy.extended.update(optimizer_discriminator, update_optimizers)
+                #strategy.extended.update(optimizer_generator, update_optimizers)
                 #with strategy.scope():
                 #    optimizer_discriminator = 0 #RMSprop(lr)
                 #    optimizer_generator = 0 #RMSprop(lr)
