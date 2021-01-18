@@ -294,11 +294,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
     #Create loss objects and optimizers
 
-    lr1 = True
-    lr8 = False
-    lr32 = False
 
     with strategy.scope():
+        lr = tf.Variable(0.001)
+        change_lr = tf.Variable(False)
         # optimizer_discriminator1 = RMSprop(0.001)
         # optimizer_generator1 = RMSprop(0.001)
         # optimizer_discriminator8 = RMSprop(0.008)
@@ -543,8 +542,11 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         b_size = energy_batch.get_shape().as_list()[0]#.numpy()[0]
         print(b_size)
 
-        optimizer_discriminator.lr.assign(0.002)
-        optimizer_generator.lr.assign(0.002)
+        if change_lr:
+            print('change')
+            optimizer_discriminator.lr.assign(lr)
+            optimizer_generator.lr.assign(lr)
+            change_lr.assign(False)
 
         
         # Generate Fake events with same energy and angle as data batch
@@ -790,7 +792,11 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         return opt.lr.assign(0.032)
 
     def update_lr(lr):
-        return lr.assign(True)
+        new_lr = lr * 2
+        return lr.assign(new_lr)
+
+    def update_change_lr(change_lr):
+        return change_lr.assign(True)
 
 
 
@@ -949,22 +955,13 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
-            # if generator_loss[0] < 20 and not lr32:
-            #     if not lr8:
-            #         #strategy.extended.update(lr8, update_lr)
-            #         lr8 = True
-            #         strategy.extended.update(optimizer_discriminator, update_optimizers_8)
-            #         strategy.extended.update(optimizer_generator, update_optimizers_8)
-            #         print('increasing lr to: 8')
-            #     else:
-            #         #strategy.extended.update(lr32, update_lr)
-            #         lr32 = True
-            #         strategy.extended.update(optimizer_discriminator, update_optimizers_32)
-            #         strategy.extended.update(optimizer_generator, update_optimizers_32)
-            #         print('increasing lr to: 32')
-            #     #with strategy.scope():
-            #     #    optimizer_discriminator = 0 #RMSprop(lr)
-            #     #    optimizer_generator = 0 #RMSprop(lr)
+            if generator_loss[0] < 20 and lr < ((batch_size / 64) * 0.001):
+                strategy.extended.update(lr, update_lr)
+                strategy.extended.update(change_lr, update_change_lr)
+                print('increase lr to :' + str(lr))
+                #with strategy.scope():
+                #    optimizer_discriminator = 0 #RMSprop(lr)
+                #    optimizer_generator = 0 #RMSprop(lr)
 
             epoch_gen_loss.append(generator_loss)
             #index +=1
