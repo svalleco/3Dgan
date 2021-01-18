@@ -295,7 +295,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
     #Create loss objects and optimizers
 
     with strategy.scope():
-        lr = tf.Variable(0.001)
+        lr1 = tf.Variable(True)
+        lr8 = tf.Variable(False)
+        lr32 = tf.Variable(False)
         optimizer_discriminator1 = RMSprop(0.001)
         optimizer_generator1 = RMSprop(0.001)
         optimizer_discriminator8 = RMSprop(0.008)
@@ -513,16 +515,21 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         #print(lr)
         #print(optimizer_discriminator)
 
-        if lr == 0.001:
+        if lr1:
+            print('lr1')
             optimizer_discriminator = optimizer_discriminator1
             optimizer_generator = optimizer_generator1
-        if lr == 0.008:
+            print('opt')
+        elif lr8:
+            print('lr8')
             optimizer_discriminator = optimizer_discriminator8
             optimizer_generator = optimizer_generator8
-        else:
+        elif lr32:
+            print('lr32')
             optimizer_discriminator = optimizer_discriminator32
             optimizer_generator = optimizer_generator32
-        
+       
+        print('opt2')
 
         # filefortests = '/data/redacost/filefortests.pkl'
         # with open(filefortests, 'rb') as f:
@@ -772,11 +779,7 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         return opt.assign(RMSprop(lr))
 
     def update_lr(lr):
-        if lr == 0.001:
-            new_lr = 0.008
-        elif lr == 0.008
-            new_lr = 0.032
-        return lr.assign(new_lr)
+        return lr.assign(True)
 
 
 
@@ -935,8 +938,11 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
-            if generator_loss[0] < 20 and lr != (0.001 * (batch_size / 64 ) ):
-                lr = strategy.extended.update(lr, update_lr)
+            if generator_loss[0] < 20 and not lr32:
+                if not lr8:
+                    strategy.extended.update(lr8, update_lr)
+                else:
+                    strategy.extended.update(lr32, update_lr)
                 print('increasing lr to: ' + str(lr))
                 #strategy.extended.update(optimizer_discriminator, update_optimizers)
                 #strategy.extended.update(optimizer_generator, update_optimizers)
