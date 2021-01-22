@@ -1,7 +1,32 @@
+from __future__ import print_function
+
 import tensorflow as tf
 print(tf.__version__)
 
 import os
+from PTF_m4_1_ReLU import *
+from Functions_v1_5_8 import *
+
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from collections import defaultdict
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+import argparse
+import os
+from six.moves import range
+import sys
+import h5py 
+import numpy as np
+#from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import time
+import math as math
+
+
 
 #set parameters
 save_folder = "TF_K_1"         #Name of the Folder in which the results schould be safed
@@ -22,34 +47,12 @@ ReLU_epoch = 3
 save_only_best_weights = True
 latent_size = 200
 batch_size =  128                   #128     #batch_size must be less or equal test size, otherwise error
-keras_dformat = 'channels_last'    #last for CPU, first for GPU
+keras_dformat = 'channels_first'    #last for CPU, first for GPU
 wtf = 6.0                           #weight true fake loss
 wa = 0.2                            #weight auxiliary loss
 we = 0.1                            #weight ecal loss
+batch_size = 128
 
-
-from PTF_m4_1_ReLU import *
-from Functions_v1_5_8 import *
-
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
-from __future__ import print_function
-from collections import defaultdict
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
-import argparse
-import os
-from six.moves import range
-import sys
-import h5py 
-import numpy as np
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
-import time
-import math as math
 
 #model summary
 generator_ReLU(keras_dformat=keras_dformat).summary()
@@ -87,7 +90,7 @@ if train_file_by_file == False:
     print("ecal_test_shape: ", ecal_test.shape)
     print('*************************************************************************************')
 else:
-    files = create_files_list(train_file_by_file_path)
+    #files = create_files_list(train_file_by_file_path)
     X_test = []
     y_test = []
     ecal_test = []
@@ -96,7 +99,11 @@ Trainfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_1.tfrecords',\
             'gs://renato_bucket/EleEscanstf/EleEscan_1_2.tfrecords']
 Testfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_3.tfrecords']
 
-def epoch_cycle():
+def epoch_cycle(batch_size=128):
+    from PTF_m4_1_ReLU import discriminator, generator_LeakyReLU
+    #from Functions_v1_5_8 import *
+    import tfrecordconverter as tfconvert
+
 
     #-------------------------------------------------------------------------------------------------------
     # Initialization
@@ -120,7 +127,7 @@ def epoch_cycle():
     BATCH_SIZE_PER_REPLICA = batch_size
     batch_size = batch_size * strategy.num_replicas_in_sync
 
-    with strategy.scope()
+    with strategy.scope():
         discriminator = discriminator(keras_dformat = keras_dformat)
         generator = generator_LeakyReLU(keras_dformat = keras_dformat, latent_size = 200)
 
@@ -377,7 +384,7 @@ def epoch_cycle():
         
         if epoch == ReLU_epoch:
 
-            with strategy.scope()
+            with strategy.scope():
                 generator = generator_ReLU(keras_dformat = keras_dformat, latent_size = 200)
                 load_epoch = str(ReLU_epoch-1)
                 gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
@@ -501,5 +508,5 @@ def epoch_cycle():
     
     return
 
-
+epoch_cycle()
 

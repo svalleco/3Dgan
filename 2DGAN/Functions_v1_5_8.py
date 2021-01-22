@@ -10,7 +10,7 @@ from six.moves import range
 import sys
 import h5py 
 import numpy as np
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  #I need this for my plot
@@ -411,7 +411,7 @@ from six.moves import range
 import sys
 import h5py 
 import numpy as np
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import time
@@ -848,7 +848,7 @@ def generate(g, index, cond, latent=256, concat=1, batch_size=50):
     return generated_images
 
 import scipy as sp
-import ot
+#import ot
 def Gromov_metric(var, energies, m, angtype='mtheta', x=25, y=25, z=25, ang=1):
     metricp = 0
     metrice = 0
@@ -932,9 +932,9 @@ def analyse(g, read_data, save_data, gen_weights , sorted_path, optimizer, data_
     else:
         Trainfiles, Testfiles = DivideFiles(data_path + "EleEscan_1_1.h5", Fractions=[.9,.1], datasetnames=["ECAL"], Particles =[particle])
         if Test:
-        data_files = Testfiles
+            data_files = Testfiles
         else:
-        data_files = Trainfiles + Testfiles
+            data_files = Trainfiles + Testfiles
         start = time.time()
         #energies = [50, 100, 200, 250, 300, 400, 500]
         var = get_sorted(data_files, energies, flag=False, num_events1=10000, num_events2=2000, thresh=thresh)

@@ -8,7 +8,7 @@ import h5py
 
 import glob
 
-import analysis.utils.GANutils as gan
+#import analysis.utils.GANutils as gan
 
 
 def get_parser():
@@ -173,7 +173,7 @@ def RetrieveTFRecordpreprocessing(recorddatapaths, batch_size):
         data['X'] = tf.reshape(data['X'],[1, 25, 25, 25]) #need to get size [1, 25, 25, 25] for channel first [25, 25, 25, 1] for channel last
         #print(tf.shape(data['Y']))
         data['Y'] = tf.reshape(data['Y'],[1])
-        data['ang'] = tf.reshape(data['ang'],[1])
+        #data['ang'] = tf.reshape(data['ang'],[1])
         data['ecal'] = tf.reshape(data['ecal'],[1])
         #print(tf.shape(data['Y']))
         return data
