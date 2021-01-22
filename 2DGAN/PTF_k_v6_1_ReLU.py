@@ -8,10 +8,10 @@ save_folder = "TF_K_1"         #Name of the Folder in which the results schould 
 
 train_file_by_file = True              #True if you want to import the trainingsdata file by file
 train_on_folder = False                #True if you want to train on all data files within this folder, False if you want to train just with one file
-train_data_path = "/eos/home-f/frehm/TF2/Data/EleEscan_1_1/EleEscan_1_1.h5" #file
-train_folder_path = "/eos/home-f/frehm/TF2/Data//"     #there has to be a folder inside
-train_file_by_file_path = "/eos/home-f/frehm/TF2/File_by_file/"         #data on eos
-train_file_by_file_path = "/data/frehm/File_by_file/"                  #data on GPU
+#train_data_path = "/eos/home-f/frehm/TF2/Data/EleEscan_1_1/EleEscan_1_1.h5" #file
+#train_folder_path = "/eos/home-f/frehm/TF2/Data//"     #there has to be a folder inside
+#train_file_by_file_path = "/eos/home-f/frehm/TF2/File_by_file/"         #data on eos
+#train_file_by_file_path = "/data/frehm/File_by_file/"                  #data on GPU
 
 lrate_g = 0.0005
 lrate_d = 0.00010   #lr_d should be roughly the same as the ratio from g to d parameters
@@ -92,6 +92,10 @@ else:
     y_test = []
     ecal_test = []
 
+Trainfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_1.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_2.tfrecords']
+Testfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_3.tfrecords']
+
 def epoch_cycle():
 
     #-------------------------------------------------------------------------------------------------------
@@ -148,7 +152,7 @@ def epoch_cycle():
         plot_images(Xgen, epoch, save_folder, save=True, number=1)
         return
 
-    plot_gen_image_tf(latent_size)
+    #plot_gen_image_tf(latent_size)
 
     #learningrate decay with epochs
     def l_dec(initial_lrate, epoch, start_decay=80, decay_rate=0.012):
@@ -359,12 +363,12 @@ def epoch_cycle():
     for epoch in range(start_epoch, nb_epochs + 1):
         print('Epoch {} of {}'.format(epoch, nb_epochs))
         start_epoch = time.time()
-        lr_d = l_dec(lrate_d, epoch)
-        lr_g = l_dec(lrate_g, epoch)
+        #lr_d = l_dec(lrate_d, epoch)
+        #lr_g = l_dec(lrate_g, epoch)
 
         with strategy.scope():
-            optimizer_d = tf.optimizers.Adam(lr_d)
-            optimizer_g = tf.optimizers.Adam(lr_g)
+            optimizer_d = tf.optimizers.Adam(lrate_d)
+            optimizer_g = tf.optimizers.Adam(lrate_g)
 
         #nb_batches = int(X_train.shape[0] / batch_size)
         epoch_gen_loss = []
