@@ -428,7 +428,7 @@ def epoch_cycle(batch_size=128):
             d_loss.append( (d_loss_true[1] + d_loss_fake[1])/2)
             d_loss.append( (d_loss_true[2] + d_loss_fake[2])/2)
             d_loss.append( (d_loss_true[3] + d_loss_fake[3])/2)
-            epoch_disc_loss.append([d_loss[0].numpy(), d_loss[1].numpy(), d_loss[2].numpy(), d_loss[3].numpy()])  
+            epoch_disc_loss.append([d_loss[0], d_loss[1], d_loss[2], d_loss[3]])  
 
             epoch_gen_loss.append(np.mean(gen_losses, axis = 0))
             print('Time taken by batch', str(nbatch) ,' was', str(time.time()-file_time) , 'seconds.')
@@ -453,9 +453,9 @@ def epoch_cycle(batch_size=128):
             d_test_loss.append( (d_test_loss_true[1] + d_test_loss_fake[1])/2)
             d_test_loss.append( (d_test_loss_true[2] + d_test_loss_fake[2])/2)
             d_test_loss.append( (d_test_loss_true[3] + d_test_loss_fake[3])/2)
-            disc_test_loss_list.append([d_test_loss[0].numpy(), d_test_loss[1].numpy(), d_test_loss[2].numpy(), d_test_loss[3].numpy()])
+            disc_test_loss_list.append([d_test_loss[0], d_test_loss[1], d_test_loss[2], d_test_loss[3]])
 
-            gen_test_loss_list.append([gen_test_loss[0].numpy(), gen_test_loss[1].numpy(), gen_test_loss[2].numpy(), gen_test_loss[3].numpy()])
+            gen_test_loss_list.append([gen_test_loss[0], gen_test_loss[1], gen_test_loss[2], gen_test_loss[3]])
 
 
         ########################################################################################
