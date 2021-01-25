@@ -35,7 +35,7 @@ train_file_by_file = True              #True if you want to import the trainings
 train_on_folder = False                #True if you want to train on all data files within this folder, False if you want to train just with one file
 #train_data_path = "/eos/home-f/frehm/TF2/Data/EleEscan_1_1/EleEscan_1_1.h5" #file
 #train_folder_path = "/eos/home-f/frehm/TF2/Data//"     #there has to be a folder inside
-train_file_by_file_path = "/eos/user/r/redacost/EleScans"         #data on eos
+#train_file_by_file_path = "/eos/user/r/redacost/EleScans/"         #data on eos
 #train_file_by_file_path = "/data/frehm/File_by_file/"                  #data on GPU
 
 lrate_g = 0.0005
@@ -131,9 +131,11 @@ def epoch_cycle(batch_size=128):
     batch_size = batch_size * strategy.num_replicas_in_sync
 
     with strategy.scope():
+        change_gen = tf.Variable(False)
+        change_first = tf.Variable(False)
         discriminator = discriminator(keras_dformat = keras_dformat)
         generator = generator_LeakyReLU(keras_dformat = keras_dformat, latent_size = 200)
-
+       
     #generator = tf.saved_model.load(save_folder + "/Generator")
     #print(discriminator.trainable_variables)
     #print(generator.trainable_variables)
@@ -241,6 +243,7 @@ def epoch_cycle(batch_size=128):
         ecal_batch   = dataset.get('ecal')
 
         b_size = energy_batch.get_shape().as_list()[0]
+
 
         #discriminator true training
         with tf.GradientTape(watch_accessed_variables=False) as tape:
@@ -371,6 +374,18 @@ def epoch_cycle(batch_size=128):
         
         return d_test_loss_true, d_test_loss_fake, gen_test_loss
 
+    def generator_change(generator):
+        print('Changing generator')
+        load_epoch = str(ReLU_epoch-1)
+        gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
+        generator2 = generator_ReLU(keras_dformat = keras_dformat, latent_size=200)
+        generator2.load_weigths(gweights)
+        return generator.assign(generator2)
+
+    def update_change(change_first):
+        return change_first.assign(True)
+
+
     ########################################################################################
     # Main Cycle
     ########################################################################################
@@ -392,13 +407,15 @@ def epoch_cycle(batch_size=128):
         
         
         if epoch == ReLU_epoch:
+            strategy.extended.update(generator, generator_change)
+            strategy.extended.update(change_first, update_change)
 
-            with strategy.scope():
-                generator = generator_ReLU(keras_dformat = keras_dformat, latent_size = 200)
-                load_epoch = str(ReLU_epoch-1)
-                gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
-                print(gweights)
-                generator.load_weights(gweights)
+            #with strategy.scope():
+            #    generator = generator_ReLU(keras_dformat = keras_dformat, latent_size = 200)
+            #    load_epoch = str(ReLU_epoch-1)
+            #    gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
+            #    print(gweights)
+            #    generator.load_weights(gweights)
 
         #training
 
@@ -466,9 +483,9 @@ def epoch_cycle(batch_size=128):
 
         ###############################
         #validation script
-        validation_metric = validate(generator, percent=percent, keras_dformat=keras_dformat, data_path=train_file_by_file_path)
-        Gromov_Wasserstein_distance = analyse(generator, read_data=False, save_data=False, gen_weights="", data_path=train_file_by_file_path,
-        sorted_path="", optimizer = Gromov_metric)
+        #validation_metric = validate(generator, percent=percent, keras_dformat=keras_dformat, data_path=train_file_by_file_path)
+        #Gromov_Wasserstein_distance = analyse(generator, read_data=False, save_data=False, gen_weights="", data_path=train_file_by_file_path,
+        #sorted_path="", optimizer = Gromov_metric)
         ##############################
         #loss dict
         discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)   #mean disc loss for all epochs
@@ -478,8 +495,8 @@ def epoch_cycle(batch_size=128):
 
         train_history['generator'].append(generator_train_loss)
         train_history['discriminator'].append(discriminator_train_loss)
-        train_history['validation'].append(validation_metric)
-        train_history['Gromov_Wasserstein_validation'].append(Gromov_Wasserstein_distance)
+        #train_history['validation'].append(validation_metric)
+        #train_history['Gromov_Wasserstein_validation'].append(Gromov_Wasserstein_distance)
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
         end_d = time.time()
@@ -494,11 +511,11 @@ def epoch_cycle(batch_size=128):
         pickle.dump({'train': train_history, 'test': test_history}, open(save_folder+'/Pickle/3dgan-history_dict.pkl', 'wb'))
 
         #print loss table and plot generated image; also save them
-        loss_table(train_history, test_history, save_folder, epoch, validation_metric, save=True, timeforepoch = e)
-        plot_gen_image_tf(latent_size, epoch)
-        plot_loss(train_history, test_history, save_folder, save=True)
-        plot_validation(train_history, save_folder)
-        plot_gromov_w_distance(train_history, save_folder)
+        #loss_table(train_history, test_history, save_folder, epoch, validation_metric, save=True, timeforepoch = e)
+        #plot_gen_image_tf(latent_size, epoch)
+        #plot_loss(train_history, test_history, save_folder, save=True)
+        #plot_validation(train_history, save_folder)
+        #plot_gromov_w_distance(train_history, save_folder)
 
         #dump data
         if epoch >=ReLU_epoch-1 or epoch >= 5:
