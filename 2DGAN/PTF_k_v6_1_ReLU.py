@@ -327,6 +327,97 @@ def epoch_cycle(batch_size=128):
 
         return d_loss_true, d_loss_fake, gen_losses
 
+    def training_step_2ndgen(dataset):
+        #create batches
+        image_batch  = dataset.get('X')
+        energy_batch = dataset.get('Y')
+        ecal_batch   = dataset.get('ecal')
+
+        b_size = energy_batch.get_shape().as_list()[0]
+
+
+        #discriminator true training
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            tape.watch(discriminator.trainable_variables)
+            d_loss_true = disc_loss(generator2, discriminator, image_batch, energy_batch, ecal_batch, batch_size, BATCH_SIZE_PER_REPLICA, label ="ones", wtf=wtf, wa=wa, we=we, epoch=epoch)
+            d_grads = tape.gradient( d_loss_true[0] , discriminator.trainable_variables )
+        optimizer_d.apply_gradients( zip( d_grads , discriminator.trainable_variables) )
+
+        #discriminator fake training
+        with tf.GradientTape(watch_accessed_variables=False) as tape:
+            tape.watch(discriminator.trainable_variables)
+            noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=BATCH_SIZE_PER_REPLICA, epoch=epoch) 
+            generated_images = generator2(generator_input)
+            d_loss_fake = disc_loss(generator2, discriminator, generated_images, gen_aux, gen_ecal, batch_size, BATCH_SIZE_PER_REPLICA, label = "zeros", wtf=wtf, wa=wa, we=we, epoch=epoch)
+            #d_loss_fake[0] = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)
+            d_grads = tape.gradient( d_loss_fake[0] , discriminator.trainable_variables )
+        optimizer_d.apply_gradients( zip( d_grads , discriminator.trainable_variables) )
+
+        gen_losses = []
+        for i in range(2):
+            with tf.GradientTape(watch_accessed_variables=False) as tape:
+                tape.watch(generator2.trainable_variables)
+                g_loss = gen_loss(generator2, discriminator, batch_size=batch_size, batch_size_per_replica=BATCH_SIZE_PER_REPLICA, epoch=epoch, wtf=wtf, wa=wa, we=we)
+                g_grads = tape.gradient( g_loss[0] , generator2.trainable_variables )
+            optimizer_g.apply_gradients( zip( g_grads , generator2.trainable_variables ) )
+            gen_losses.append([g_loss[0], g_loss[1], g_loss[2], g_loss[3]])
+
+        print('end0')
+
+        #total_loss, loss_true_fake, loss_aux, loss_ecal
+        return d_loss_true[0], d_loss_true[1], d_loss_true[2], d_loss_true[3], \
+                d_loss_fake[0], d_loss_fake[1], d_loss_fake[2], d_loss_fake[3], \
+                gen_losses[0][0], gen_losses[0][1], gen_losses[0][2], gen_losses[0][3], \
+                gen_losses[1][0], gen_losses[1][1], gen_losses[1][2], gen_losses[1][3]
+
+    @tf.function
+    def distributed_training_step_2ndgen(dataset):
+        #X_train, epoch_disc_loss, epoch_gen_loss = 
+
+        #print('check100')
+        gen_losses = []
+
+        print('start')
+
+        #fake, energy, ang, ecal
+        d_loss_true_1, d_loss_true_2, d_loss_true_3, d_loss_true_4, \
+        d_loss_fake_1, d_loss_fake_2, d_loss_fake_3, d_loss_fake_4, \
+        g_loss_1, g_loss_2, g_loss_3, g_loss_4, \
+        g_loss_5, g_loss_6, g_loss_7, g_loss_8  = strategy.run(training_step_2ndgen, args=(next(dataset),))
+
+        print('end')
+        
+        d_loss_true_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_true_1, axis=None)
+        d_loss_true_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_true_2, axis=None)
+        d_loss_true_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_true_3, axis=None)
+        d_loss_true_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_true_4, axis=None)
+        d_loss_true = [d_loss_true_1, d_loss_true_2, d_loss_true_3, d_loss_true_4]
+
+        d_loss_fake_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_fake_1, axis=None)
+        d_loss_fake_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_fake_2, axis=None)
+        d_loss_fake_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_fake_3, axis=None)
+        d_loss_fake_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_fake_4, axis=None)
+        d_loss_fake = [d_loss_fake_1, d_loss_fake_2, d_loss_fake_3, d_loss_fake_4]
+
+    
+        g_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_1, axis=None)
+        g_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_2, axis=None)
+        g_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_3, axis=None)
+        g_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_4, axis=None)
+        g_loss = [g_loss_1, g_loss_2, g_loss_3, g_loss_4]
+
+        gen_losses.append(g_loss)
+
+        g_loss_5 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_5, axis=None)
+        g_loss_6 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_6, axis=None)
+        g_loss_7 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_7, axis=None)
+        g_loss_8 = strategy.reduce(tf.distribute.ReduceOp.SUM, g_loss_8, axis=None)
+        g_loss = [g_loss_5, g_loss_6, g_loss_7, g_loss_8]
+
+        gen_losses.append(g_loss)
+
+        return d_loss_true, d_loss_fake, gen_losses
+
     ########################################################################################
     # Testing Functions
     ########################################################################################
@@ -374,6 +465,53 @@ def epoch_cycle(batch_size=128):
         
         return d_test_loss_true, d_test_loss_fake, gen_test_loss
 
+    def testing_step_2ndgen(dataset):
+        image_batch  = dataset.get('X')
+        energy_batch = dataset.get('Y')
+        ecal_batch   = dataset.get('ecal')
+
+        d_test_loss_true = disc_loss(generator2, discriminator, image_batch, energy_batch, ecal_batch, batch_size, BATCH_SIZE_PER_REPLICA, label ="ones", wtf=wtf, wa=wa, we=we)
+        noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=BATCH_SIZE_PER_REPLICA, epoch=epoch) 
+        generated_images = generator(generator_input)
+        d_test_loss_fake = disc_loss(generator2, discriminator, generated_images, gen_aux, gen_ecal, batch_size, BATCH_SIZE_PER_REPLICA, label = "zeros", wtf=wtf, wa=wa, we=we)
+
+        gen_test_loss = gen_loss(generator2, discriminator, batch_size=batch_size, batch_size_per_replica=BATCH_SIZE_PER_REPLICA)
+
+        return d_test_loss_true[0], d_test_loss_true[1], d_test_loss_true[2], d_test_loss_true[3], \
+                d_test_loss_fake[0], d_test_loss_fake[1], d_test_loss_fake[2], d_test_loss_fake[3], \
+                gen_test_loss[0], gen_test_loss[1], gen_test_loss[2], gen_test_loss[3]
+
+    @tf.function
+    def distributed_testing_step_2ndgen(dataset):
+        d_test_loss_true_1, d_test_loss_true_2, d_test_loss_true_3, d_test_loss_true_4, \
+        d_test_loss_fake_1, d_test_loss_fake_2, d_test_loss_fake_3, d_test_loss_fake_4, \
+        gen_test_loss_1, gen_test_loss_2, gen_test_loss_3, gen_test_loss_4 = strategy.run(testing_step_2ndgen, args=(next(dataset),))
+
+        d_test_loss_true_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_true_1, axis=None)
+        d_test_loss_true_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_true_2, axis=None)
+        d_test_loss_true_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_true_3, axis=None)
+        d_test_loss_true_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_true_4, axis=None)
+        d_test_loss_true = [d_test_loss_true_1, d_test_loss_true_2, d_test_loss_true_3, d_test_loss_true_4]
+
+        d_test_loss_fake_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_fake_1, axis=None)
+        d_test_loss_fake_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_fake_2, axis=None)
+        d_test_loss_fake_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_fake_3, axis=None)
+        d_test_loss_fake_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_test_loss_fake_4, axis=None)
+        d_test_loss_fake = [d_test_loss_fake_1, d_test_loss_fake_2, d_test_loss_fake_3, d_test_loss_fake_4]
+
+        gen_test_loss_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_1, axis=None)
+        gen_test_loss_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_2, axis=None)
+        gen_test_loss_3 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_3, axis=None)
+        gen_test_loss_4 = strategy.reduce(tf.distribute.ReduceOp.SUM, gen_test_loss_4, axis=None)
+        gen_test_loss = [gen_test_loss_1, gen_test_loss_2, gen_test_loss_3, gen_test_loss_4]
+
+        
+        return d_test_loss_true, d_test_loss_fake, gen_test_loss
+
+    ########################################################################################
+    # Update Functions
+    ########################################################################################
+
     def generator_change(generator):
         print('Changing generator')
         load_epoch = str(ReLU_epoch-1)
@@ -407,8 +545,11 @@ def epoch_cycle(batch_size=128):
         
         
         if epoch == ReLU_epoch:
-            strategy.extended.update(generator, generator_change)
-            strategy.extended.update(change_first, update_change)
+            with strategy.scope():
+                load_epoch = str(ReLU_epoch-1)
+                gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
+                generator2 = generator_ReLU(keras_dformat = keras_dformat, latent_size=200)
+                generator2.load_weigths(gweights)
 
             #with strategy.scope():
             #    generator = generator_ReLU(keras_dformat = keras_dformat, latent_size = 200)
@@ -434,7 +575,10 @@ def epoch_cycle(batch_size=128):
             #     print("Learnrate Generator:     ", lr_g)
             #     print("Learnrate Discriminator: ", lr_d)
 
-            d_loss_true, d_loss_fake, gen_losses = distributed_training_step(dist_dataset_iter)
+            if epoch < ReLU_epoch
+                d_loss_true, d_loss_fake, gen_losses = distributed_training_step(dist_dataset_iter)
+            else:
+                d_loss_true, d_loss_fake, gen_losses = distributed_training_step_2ndgen(dist_dataset_iter)
 
             d_loss_true = [el.numpy() for el in d_loss_true]
             d_loss_fake = [el.numpy() for el in d_loss_fake]
@@ -461,7 +605,10 @@ def epoch_cycle(batch_size=128):
         for epochstep in range(steps_per_epoch_test):
             #create batches
 
-            d_test_loss_true, d_test_loss_fake, gen_test_loss = distributed_testing_step(dist_dataset_iter_test)
+            if epoch < ReLU_epoch
+                d_test_loss_true, d_test_loss_fake, gen_test_loss = distributed_testing_step(dist_dataset_iter_test)
+            else: 
+                d_test_loss_true, d_test_loss_fake, gen_test_loss = distributed_testing_step_2ndgen(dist_dataset_iter_test)
 
             d_test_loss_true = [el.numpy() for el in d_test_loss_true]
             d_test_loss_fake = [el.numpy() for el in d_test_loss_fake]
