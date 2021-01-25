@@ -333,12 +333,12 @@ def epoch_cycle(batch_size=128):
         energy_batch = dataset.get('Y')
         ecal_batch   = dataset.get('ecal')
 
-        d_test_loss_true = disc_loss(generator, discriminator, image_batch, energy_batch, ecal_batch, batch_size, label ="ones", wtf=wtf, wa=wa, we=we)
+        d_test_loss_true = disc_loss(generator, discriminator, image_batch, energy_batch, ecal_batch, batch_size, BATCH_SIZE_PER_REPLICA, label ="ones", wtf=wtf, wa=wa, we=we)
         noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size, epoch=epoch) 
         generated_images = generator(generator_input)
-        d_test_loss_fake = disc_loss(generator, discriminator, generated_images, gen_aux, gen_ecal, batch_size, label = "zeros", wtf=wtf, wa=wa, we=we)
+        d_test_loss_fake = disc_loss(generator, discriminator, generated_images, gen_aux, gen_ecal, batch_size, BATCH_SIZE_PER_REPLICA, label = "zeros", wtf=wtf, wa=wa, we=we)
 
-        gen_test_loss = gen_loss(generator, discriminator, batch_size)
+        gen_test_loss = gen_loss(generator, discriminator, batch_size=batch_size, batch_size_per_replica=BATCH_SIZE_PER_REPLICA,)
 
         return d_test_loss_true[0], d_test_loss_true[1], d_test_loss_true[2], d_test_loss_true[3], \
                 d_test_loss_fake[0], d_test_loss_fake[1], d_test_loss_fake[2], d_test_loss_fake[3], \
@@ -406,15 +406,15 @@ def epoch_cycle(batch_size=128):
 
         for epochstep in range(steps_per_epoch):
             file_time = time.time()
-            if train_file_by_file == True:
-                lr_d = l_dec(lrate_d, epoch*20+epochstep-20)
-                lr_g = l_dec(lrate_g, epoch*20+epochstep-20)
-                with strategy.scope():
-                    optimizer_d = tf.optimizers.Adam(lr_d)
-                    optimizer_g = tf.optimizers.Adam(lr_g)
+            # if train_file_by_file == True:
+            #     lr_d = l_dec(lrate_d, epoch*20+epochstep-20)
+            #     lr_g = l_dec(lrate_g, epoch*20+epochstep-20)
+            #     with strategy.scope():
+            #         optimizer_d = tf.optimizers.Adam(lr_d)
+            #         optimizer_g = tf.optimizers.Adam(lr_g)
 
-                print("Learnrate Generator:     ", lr_g)
-                print("Learnrate Discriminator: ", lr_d)
+            #     print("Learnrate Generator:     ", lr_g)
+            #     print("Learnrate Discriminator: ", lr_d)
 
             d_loss_true, d_loss_fake, gen_losses = distributed_training_step(dist_dataset_iter)
 
