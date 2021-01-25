@@ -96,8 +96,11 @@ else:
     ecal_test = []
 
 Trainfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_1.tfrecords',\
-            'gs://renato_bucket/EleEscanstf/EleEscan_1_2.tfrecords']
-Testfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_3.tfrecords']
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_2.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_3.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_4.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_5.tfrecords']
+Testfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_6.tfrecords']
 
 def epoch_cycle(batch_size=128):
     from PTF_m4_1_ReLU import discriminator, generator_LeakyReLU
