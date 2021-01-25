@@ -35,7 +35,7 @@ train_file_by_file = True              #True if you want to import the trainings
 train_on_folder = False                #True if you want to train on all data files within this folder, False if you want to train just with one file
 #train_data_path = "/eos/home-f/frehm/TF2/Data/EleEscan_1_1/EleEscan_1_1.h5" #file
 #train_folder_path = "/eos/home-f/frehm/TF2/Data//"     #there has to be a folder inside
-#train_file_by_file_path = "/eos/home-f/frehm/TF2/File_by_file/"         #data on eos
+train_file_by_file_path = "/eos/user/r/redacost/EleScans"         #data on eos
 #train_file_by_file_path = "/data/frehm/File_by_file/"                  #data on GPU
 
 lrate_g = 0.0005
