@@ -242,7 +242,7 @@ def epoch_cycle(batch_size=128):
         #discriminator true training
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(discriminator.trainable_variables)
-            d_loss_true = disc_loss(generator, discriminator, image_batch, energy_batch, ecal_batch, batch_size, label ="ones", wtf=wtf, wa=wa, we=we, epoch=epoch)
+            d_loss_true = disc_loss(generator, discriminator, image_batch, energy_batch, ecal_batch, batch_size, BATCH_SIZE_PER_REPLICA, label ="ones", wtf=wtf, wa=wa, we=we, epoch=epoch)
             d_grads = tape.gradient( d_loss_true[0] , discriminator.trainable_variables )
         optimizer_d.apply_gradients( zip( d_grads , discriminator.trainable_variables) )
 
@@ -251,7 +251,7 @@ def epoch_cycle(batch_size=128):
             tape.watch(discriminator.trainable_variables)
             noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size, epoch=epoch) 
             generated_images = generator(generator_input)
-            d_loss_fake = disc_loss(generator, discriminator, generated_images, gen_aux, gen_ecal, batch_size, label = "zeros", wtf=wtf, wa=wa, we=we, epoch=epoch)
+            d_loss_fake = disc_loss(generator, discriminator, generated_images, gen_aux, gen_ecal, batch_size, BATCH_SIZE_PER_REPLICA, label = "zeros", wtf=wtf, wa=wa, we=we, epoch=epoch)
             #d_loss_fake[0] = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)
             d_grads = tape.gradient( d_loss_fake[0] , discriminator.trainable_variables )
         optimizer_d.apply_gradients( zip( d_grads , discriminator.trainable_variables) )
@@ -260,7 +260,7 @@ def epoch_cycle(batch_size=128):
         for i in range(2):
             with tf.GradientTape(watch_accessed_variables=False) as tape:
                 tape.watch(generator.trainable_variables)
-                g_loss = gen_loss(generator, discriminator, batch_size=batch_size, epoch=epoch, wtf=wtf, wa=wa, we=we)
+                g_loss = gen_loss(generator, discriminator, batch_size=batch_size, batch_size_per_replica=BATCH_SIZE_PER_REPLICA, epoch=epoch, wtf=wtf, wa=wa, we=we)
                 g_grads = tape.gradient( g_loss[0] , generator.trainable_variables )
             optimizer_g.apply_gradients( zip( g_grads , generator.trainable_variables ) )
             gen_losses.append([g_loss[0], g_loss[1], g_loss[2], g_loss[3]])

@@ -284,22 +284,30 @@ def bit_flip_tf(x, prob = 0.05):
     return x
 
 
-def disc_loss(generator, discriminator,image_batch, energy_batch, ecal_batch, batch_size, label, latent_size=200, wtf=6.0, wa=0.2, we=0.1, epoch=0):
+def disc_loss(generator, discriminator,image_batch, energy_batch, ecal_batch, batch_size, batch_size_per_replica, label, latent_size=200, wtf=6.0, wa=0.2, we=0.1, epoch=0):
     discriminate = discriminator(image_batch)
 
     #true/fake loss
     if label == "ones":
-        labels = bit_flip_tf(tf.ones_like(discriminate[0])*0.9)     #true=1    
+        #labels = bit_flip_tf(tf.ones_like(discriminate[0])*0.9)     #true=1 
+        labels = bit_flip_tf(tf.ones_like(batch_size_per_replica)*0.9)   
     elif label == "zeros":
-        labels = bit_flip_tf(tf.zeros_like(discriminate[0])*0.1)    #fake=0
-    loss_true_fake = tf.reduce_mean(- labels * tf.math.log(discriminate[0] + 2e-7) - (1 - labels) * tf.math.log(1 - discriminate[0] + 2e-7))
+        #labels = bit_flip_tf(tf.zeros_like(discriminate[0])*0.1)    #fake=0
+        labels = bit_flip_tf(tf.zeros_like(batch_size_per_replica)*0.1)
+    #loss_true_fake = tf.reduce_mean(- labels * tf.math.log(discriminate[0] + 2e-7) - (1 - labels) * tf.math.log(1 - discriminate[0] + 2e-7))
+    loss_true_fake = (- labels * tf.math.log(discriminate[0] + 2e-7) - (1 - labels) * tf.math.log(1 - discriminate[0] + 2e-7))
+    loss_true_fake = tf.nn.compute_average_loss(loss_true_fake, global_batch_size=batch_size)
 
     #aux loss
-    loss_aux = tf.reduce_mean(tf.math.abs((energy_batch - discriminate[1])/(energy_batch + 2e-7))) *100
+    #loss_aux = tf.reduce_mean(tf.math.abs((energy_batch - discriminate[1])/(energy_batch + 2e-7))) *100
+    loss_aux = tf.math.abs((energy_batch - discriminate[1])/(energy_batch + 2e-7))
+    loss_aux = tf.nn.compute_average_loss(loss_aux, global_batch_size=batch_size) * 100
         
     #ecal loss
-    loss_ecal = tf.reduce_mean(tf.math.abs((ecal_batch - discriminate[2])/(ecal_batch + 2e-7))) *100
-   
+    #loss_ecal = tf.reduce_mean(tf.math.abs((ecal_batch - discriminate[2])/(ecal_batch + 2e-7))) *100
+    loss_ecal = tf.math.abs((ecal_batch - discriminate[2])/(ecal_batch + 2e-7))
+    loss_ecal = tf.nn.compute_average_loss(loss_ecal, global_batch_size=batch_size) * 100
+
     #total loss
     weight_true_fake = wtf
     weight_aux = wa
@@ -308,21 +316,30 @@ def disc_loss(generator, discriminator,image_batch, energy_batch, ecal_batch, ba
     return total_loss, loss_true_fake, loss_aux, loss_ecal
 
 
-def gen_loss(generator, discriminator, batch_size=128, latent_size=200, epoch=10, wtf=6.0, wa=0.2, we=0.1):
-    noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size, latent_size=latent_size, epoch=epoch) 
+def gen_loss(generator, discriminator, batch_size=128, , batch_size_per_replica=128, latent_size=200, epoch=10, wtf=6.0, wa=0.2, we=0.1):
+    noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size_per_replica, latent_size=latent_size, epoch=epoch) 
     generated_images = generator(generator_input)
     discriminator_fake = discriminator(generated_images)
     
     #true/fake
-    label_fake = bit_flip_tf(tf.ones_like(discriminator_fake[0])*0.9)   #ones = true
-    loss_true_fake = tf.reduce_mean(- label_fake * tf.math.log(discriminator_fake[0] + 2e-7) - 
-                               (1 - label_fake) * tf.math.log(1 - discriminator_fake[0] + 2e-7))
+    #label_fake = bit_flip_tf(tf.ones_like(discriminator_fake[0])*0.9)   #ones = true
+    label_fake = bit_flip_tf(tf.ones_like(batch_size_per_replica)*0.9)
+
+    #loss_true_fake = tf.reduce_mean(- label_fake * tf.math.log(discriminator_fake[0] + 2e-7) - 
+    #                           (1 - label_fake) * tf.math.log(1 - discriminator_fake[0] + 2e-7))
+
+    loss_true_fake = (- label_fake * tf.math.log(discriminator_fake[0] + 2e-7) - (1 - label_fake) * tf.math.log(1 - discriminator_fake[0] + 2e-7))
+    loss_true_fake = tf.nn.compute_average_loss(loss_true_fake, global_batch_size=batch_size)
     
     #aux
-    loss_aux = tf.reduce_mean(tf.math.abs((gen_aux - discriminator_fake[1])/(gen_aux + 2e-7))) *100
+    #loss_aux = tf.reduce_mean(tf.math.abs((gen_aux - discriminator_fake[1])/(gen_aux + 2e-7))) *100
+    loss_aux = tf.math.abs((gen_aux - discriminator_fake[1])/(gen_aux + 2e-7))
+    loss_aux = tf.nn.compute_average_loss(loss_aux, global_batch_size=batch_size) * 100
     
     #ecal
-    loss_ecal = tf.reduce_mean(tf.math.abs((gen_ecal - discriminator_fake[2])/(gen_ecal + 2e-7))) *100
+    #loss_ecal = tf.reduce_mean(tf.math.abs((gen_ecal - discriminator_fake[2])/(gen_ecal + 2e-7))) *100
+    loss_ecal = tf.math.abs((gen_ecal - discriminator_fake[2])/(gen_ecal + 2e-7))
+    loss_ecal = tf.nn.compute_average_loss(loss_ecal, global_batch_size=batch_size) * 100
     
     #total loss
     weight_true_fake = wtf
