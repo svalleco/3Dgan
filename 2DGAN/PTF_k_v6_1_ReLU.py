@@ -252,7 +252,7 @@ def epoch_cycle(batch_size=128):
         #discriminator fake training
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(discriminator.trainable_variables)
-            noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size, epoch=epoch) 
+            noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=BATCH_SIZE_PER_REPLICA, epoch=epoch) 
             generated_images = generator(generator_input)
             d_loss_fake = disc_loss(generator, discriminator, generated_images, gen_aux, gen_ecal, batch_size, BATCH_SIZE_PER_REPLICA, label = "zeros", wtf=wtf, wa=wa, we=we, epoch=epoch)
             #d_loss_fake[0] = tf.nn.compute_average_loss(binary_example_loss, global_batch_size=global_batch_size)
@@ -268,6 +268,8 @@ def epoch_cycle(batch_size=128):
             optimizer_g.apply_gradients( zip( g_grads , generator.trainable_variables ) )
             gen_losses.append([g_loss[0], g_loss[1], g_loss[2], g_loss[3]])
 
+        print('end0')
+
         #total_loss, loss_true_fake, loss_aux, loss_ecal
         return d_loss_true[0], d_loss_true[1], d_loss_true[2], d_loss_true[3], \
                 d_loss_fake[0], d_loss_fake[1], d_loss_fake[2], d_loss_fake[3], \
@@ -281,11 +283,15 @@ def epoch_cycle(batch_size=128):
         #print('check100')
         gen_losses = []
 
+        print('start')
+
         #fake, energy, ang, ecal
         d_loss_true_1, d_loss_true_2, d_loss_true_3, d_loss_true_4, \
         d_loss_fake_1, d_loss_fake_2, d_loss_fake_3, d_loss_fake_4, \
         g_loss_1, g_loss_2, g_loss_3, g_loss_4, \
         g_loss_5, g_loss_6, g_loss_7, g_loss_8  = strategy.run(training_step, args=(next(dataset),))
+
+        print('end')
         
         d_loss_true_1 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_true_1, axis=None)
         d_loss_true_2 = strategy.reduce(tf.distribute.ReduceOp.SUM, d_loss_true_2, axis=None)

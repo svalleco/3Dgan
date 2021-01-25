@@ -286,14 +286,18 @@ def bit_flip_tf(x, prob = 0.05):
 
 def disc_loss(generator, discriminator,image_batch, energy_batch, ecal_batch, batch_size, batch_size_per_replica, label, latent_size=200, wtf=6.0, wa=0.2, we=0.1, epoch=0):
     discriminate = discriminator(image_batch)
+    print(discriminate[0])
 
     #true/fake loss
     if label == "ones":
         #labels = bit_flip_tf(tf.ones_like(discriminate[0])*0.9)     #true=1 
-        labels = bit_flip_tf(tf.ones_like(batch_size_per_replica)*0.9)   
+        labels = bit_flip_tf(np.ones((batch_size_per_replica,1)).astype(np.float32)*0.9)   
     elif label == "zeros":
         #labels = bit_flip_tf(tf.zeros_like(discriminate[0])*0.1)    #fake=0
-        labels = bit_flip_tf(tf.zeros_like(batch_size_per_replica)*0.1)
+        labels = bit_flip_tf(np.zeros((batch_size_per_replica,1)).astype(np.float32)*0.1)
+
+    print(labels)
+
     #loss_true_fake = tf.reduce_mean(- labels * tf.math.log(discriminate[0] + 2e-7) - (1 - labels) * tf.math.log(1 - discriminate[0] + 2e-7))
     loss_true_fake = (- labels * tf.math.log(discriminate[0] + 2e-7) - (1 - labels) * tf.math.log(1 - discriminate[0] + 2e-7))
     loss_true_fake = tf.nn.compute_average_loss(loss_true_fake, global_batch_size=batch_size)
@@ -316,14 +320,14 @@ def disc_loss(generator, discriminator,image_batch, energy_batch, ecal_batch, ba
     return total_loss, loss_true_fake, loss_aux, loss_ecal
 
 
-def gen_loss(generator, discriminator, batch_size=128, , batch_size_per_replica=128, latent_size=200, epoch=10, wtf=6.0, wa=0.2, we=0.1):
+def gen_loss(generator, discriminator, batch_size=128, batch_size_per_replica=128, latent_size=200, epoch=10, wtf=6.0, wa=0.2, we=0.1):
     noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size_per_replica, latent_size=latent_size, epoch=epoch) 
     generated_images = generator(generator_input)
     discriminator_fake = discriminator(generated_images)
     
     #true/fake
     #label_fake = bit_flip_tf(tf.ones_like(discriminator_fake[0])*0.9)   #ones = true
-    label_fake = bit_flip_tf(tf.ones_like(batch_size_per_replica)*0.9)
+    label_fake = bit_flip_tf(np.ones((batch_size_per_replica,1)).astype(np.float32)*0.9)
 
     #loss_true_fake = tf.reduce_mean(- label_fake * tf.math.log(discriminator_fake[0] + 2e-7) - 
     #                           (1 - label_fake) * tf.math.log(1 - discriminator_fake[0] + 2e-7))
