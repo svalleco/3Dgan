@@ -273,8 +273,8 @@ def epoch_cycle(batch_size=128):
         #total_loss, loss_true_fake, loss_aux, loss_ecal
         return d_loss_true[0], d_loss_true[1], d_loss_true[2], d_loss_true[3], \
                 d_loss_fake[0], d_loss_fake[1], d_loss_fake[2], d_loss_fake[3], \
-                gen_losses[0], gen_losses[1], gen_losses[2], gen_losses[3], \
-                gen_losses[4], gen_losses[5], gen_losses[6], gen_losses[7]
+                gen_losses[0][0], gen_losses[0][1], gen_losses[0][2], gen_losses[0][3], \
+                gen_losses[1][0], gen_losses[1][1], gen_losses[1][2], gen_losses[1][3]
 
     @tf.function
     def distributed_training_step(dataset):
