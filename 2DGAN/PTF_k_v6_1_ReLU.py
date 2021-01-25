@@ -403,6 +403,7 @@ def epoch_cycle(batch_size=128):
         #training
 
         nbatch = 0
+        epoch_train_start = time.time()
 
         for epochstep in range(steps_per_epoch):
             file_time = time.time()
@@ -434,6 +435,7 @@ def epoch_cycle(batch_size=128):
             print('Time taken by batch', str(nbatch) ,' was', str(time.time()-file_time) , 'seconds.')
             nbatch += 1
 
+        print('Time taken by epoch train ', str(epoch) ,' was', str(time.time()-epoch_train_start) , 'seconds.')
         
         #testing
         disc_test_loss_list = []
