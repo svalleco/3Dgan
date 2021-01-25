@@ -402,7 +402,10 @@ def epoch_cycle(batch_size=128):
 
         #training
 
+        nbatch = 0
+
         for epochstep in range(steps_per_epoch):
+            file_time = time.time()
             if train_file_by_file == True:
                 lr_d = l_dec(lrate_d, epoch*20+epochstep-20)
                 lr_g = l_dec(lrate_g, epoch*20+epochstep-20)
@@ -417,7 +420,8 @@ def epoch_cycle(batch_size=128):
 
             d_loss_true = [el.numpy() for el in d_loss_true]
             d_loss_fake = [el.numpy() for el in d_loss_fake]
-            gen_losses = [el.numpy() for el in gen_losses]
+            gen_losses[0] = [el.numpy() for el in gen_losses[0]]
+            gen_losses[1] = [el.numpy() for el in gen_losses[1]]
 
             d_loss = []
             d_loss.append( (d_loss_true[0] + d_loss_fake[0])/2)
@@ -427,6 +431,8 @@ def epoch_cycle(batch_size=128):
             epoch_disc_loss.append([d_loss[0].numpy(), d_loss[1].numpy(), d_loss[2].numpy(), d_loss[3].numpy()])  
 
             epoch_gen_loss.append(np.mean(gen_losses, axis = 0))
+            print('Time taken by batch', str(nbatch) ,' was', str(time.time()-file_time) , 'seconds.')
+            nbatch += 1
 
         
         #testing
