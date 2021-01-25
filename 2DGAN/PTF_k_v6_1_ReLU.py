@@ -334,11 +334,11 @@ def epoch_cycle(batch_size=128):
         ecal_batch   = dataset.get('ecal')
 
         d_test_loss_true = disc_loss(generator, discriminator, image_batch, energy_batch, ecal_batch, batch_size, BATCH_SIZE_PER_REPLICA, label ="ones", wtf=wtf, wa=wa, we=we)
-        noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=batch_size, epoch=epoch) 
+        noise, gen_aux, generator_input, gen_ecal = func_for_gen(nb_test=BATCH_SIZE_PER_REPLICA, epoch=epoch) 
         generated_images = generator(generator_input)
         d_test_loss_fake = disc_loss(generator, discriminator, generated_images, gen_aux, gen_ecal, batch_size, BATCH_SIZE_PER_REPLICA, label = "zeros", wtf=wtf, wa=wa, we=we)
 
-        gen_test_loss = gen_loss(generator, discriminator, batch_size=batch_size, batch_size_per_replica=BATCH_SIZE_PER_REPLICA,)
+        gen_test_loss = gen_loss(generator, discriminator, batch_size=batch_size, batch_size_per_replica=BATCH_SIZE_PER_REPLICA)
 
         return d_test_loss_true[0], d_test_loss_true[1], d_test_loss_true[2], d_test_loss_true[3], \
                 d_test_loss_fake[0], d_test_loss_fake[1], d_test_loss_fake[2], d_test_loss_fake[3], \
