@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.compat.v1.keras.layers import BatchNormalization
+#from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import (Input, Dense, Reshape, Flatten, Lambda,
                           Dropout, Activation, Embedding)
 from tensorflow.keras.layers import LeakyReLU

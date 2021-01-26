@@ -543,8 +543,8 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
         print(b_size)
 
         if change_lr:
-            print('change')
-            optimizer_discriminator.lr.assign(lr)
+            #tf.print('change')
+            optimizer_discriminator.lr.assign(lr*2)
             optimizer_generator.lr.assign(lr)
             change_lr.assign(False)
 
@@ -932,10 +932,10 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
                 print ('fake_batch_loss', fake_batch_loss)
                 sys.exit()
 
-            # append mean of discriminator loss for real and fake events 
-            epoch_disc_loss.append([
-                (a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)
-            ])
+            # append mean of discriminator loss for real and fake events
+            disc_loss = [(a + b) / 2 for a, b in zip(real_batch_loss, fake_batch_loss)]
+
+            epoch_disc_loss.append(disc_loss)
 
             #return
 
@@ -955,7 +955,9 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
 
-            if generator_loss[0] < 20 and lr < ((batch_size / 64) * 0.001):
+            if disc_loss[0] < 10 and lr < (0.001):
+                print(disc_loss)
+            #    print(change_lr)
                 strategy.extended.update(lr, update_lr)
                 strategy.extended.update(change_lr, update_change_lr)
                 print('increase lr to :' + str(lr))
