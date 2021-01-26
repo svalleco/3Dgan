@@ -893,10 +893,12 @@ def Gan3DTrainAngle(strategy, discriminator, generator, datapath, nEvents, Weigh
 
         #with tf.profiler.experimental.Trace("Train", step_num=epoch):
 
-        for _ in range(steps_per_epoch):
+        for batch_step in range(steps_per_epoch):
             #Discriminator Training
             file_time = time.time()
-            real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(dist_dataset_iter)
+
+            with tf.profiler.experimental.Trace('train', step_num=batch_step, _r=1):
+                real_batch_loss, fake_batch_loss, gen_losses = distributed_discriminator_train_step(dist_dataset_iter)
 
             #Configure the loss so it is equal to the original values
             real_batch_loss = [el.numpy() for el in real_batch_loss]
