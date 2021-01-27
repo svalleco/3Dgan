@@ -319,28 +319,28 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
             file_index +=1
             # Generate Fake events with same energy and angle as data batch
-            #noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
-            with open(filefortests, 'rb') as f:
-                x = pickle.load(f) 
-            noise = np.asarray(x['noise'])
+            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
+            # with open(filefortests, 'rb') as f:
+            #     x = pickle.load(f) 
+            # noise = np.asarray(x['noise'])
             #print(noise)
-            print(len(energy_batch))
+            #print(len(energy_batch))
             # for layer in discriminator.layers:
             #     print(layer.get_config())#, layer.get_weights())
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
-            print(generated_images)
+            #print(generated_images)
             # Train discriminator first on real batch and then the fake batch
-            ganflip1 = x['ganflip1'] # gan.BitFlip(np.ones(batch_size).astype(np.float32))
-            ganflip2 = x['ganflip2'] # gan.BitFlip(np.zeros(batch_size).astype(np.float32))
-            # ganflip1 = gan.BitFlip(np.ones(batch_size).astype(np.float32))
-            # ganflip2 = gan.BitFlip(np.zeros(batch_size).astype(np.float32))
+            #ganflip1 = x['ganflip1'] # gan.BitFlip(np.ones(batch_size).astype(np.float32))
+            #ganflip2 = x['ganflip2'] # gan.BitFlip(np.zeros(batch_size).astype(np.float32))
+            ganflip1 = gan.BitFlip(np.ones(batch_size).astype(np.float32))
+            ganflip2 = gan.BitFlip(np.zeros(batch_size).astype(np.float32))
             real_batch_loss = discriminator.train_on_batch(image_batch, [ganflip1, energy_batch, ang_batch, ecal_batch, add_loss_batch])
             fake_batch_loss = discriminator.train_on_batch(generated_images, [ganflip2, energy_batch, ang_batch, ecal_batch, add_loss_batch])
 
-            print(real_batch_loss)
-            print(fake_batch_loss)
-            return
+            #print(real_batch_loss)
+            #print(fake_batch_loss)
+            #return
             
             # if index == 9:
             #     return
