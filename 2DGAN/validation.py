@@ -58,6 +58,7 @@ epoch = 30
 
 gweights = params.weightdir
 generator = generator_ReLU(keras_dformat = keras_dformat, latent_size=200)
+generator.load_weigths(gweights)
 
 def plot_gen_image_tf(latent_size, epoch=0):   #generate a image 
     tf.random.set_seed(1)     
