@@ -59,11 +59,26 @@ epoch = 30
 gweights = params.weightdir
 generator = generator_ReLU(keras_dformat = keras_dformat, latent_size=200)
 
+def plot_gen_image_tf(latent_size, epoch=0):   #generate a image 
+    tf.random.set_seed(1)     
+    noise, gen_aux, generator_input, gen_ecal = func_for_gen(1,latent_size=latent_size)
+    tf.random.set_seed(None)
+    generated_images = generator(generator_input)
+    try:
+        generated_images = np.squeeze(generated_images, axis=(1,))
+    except:
+        generated_images = np.squeeze(generated_images, axis=(-1,))
+    Xgen = generated_images
+    plot_images(Xgen, epoch, outpath, save=True, number=1)
+    return
+
+#plot_gen_image_tf(latent_size)
+
 
 
 #validation script
-validation_metric = validate(generator, percent=percent, keras_dformat=keras_dformat, data_path=data)
-Gromov_Wasserstein_distance = analyse(generator, read_data=False, save_data=False, gen_weights="", data_path=data, sorted_path="", optimizer = Gromov_metric)
+#validation_metric = validate(generator, percent=percent, keras_dformat=keras_dformat, data_path=data)
+#Gromov_Wasserstein_distance = analyse(generator, read_data=False, save_data=False, gen_weights="", data_path=data, sorted_path="", optimizer = Gromov_metric)
 ##############################
 #loss dict
 # discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)   #mean disc loss for all epochs
