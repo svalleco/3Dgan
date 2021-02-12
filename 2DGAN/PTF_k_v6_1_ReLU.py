@@ -99,8 +99,18 @@ Trainfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_1.tfrecords',\
             'gs://renato_bucket/EleEscanstf/EleEscan_1_2.tfrecords',\
             'gs://renato_bucket/EleEscanstf/EleEscan_1_3.tfrecords',\
             'gs://renato_bucket/EleEscanstf/EleEscan_1_4.tfrecords',\
-            'gs://renato_bucket/EleEscanstf/EleEscan_1_5.tfrecords']
-Testfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_1_6.tfrecords']
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_5.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_6.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_7.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_8.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_9.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_1_10.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_2_1.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_2_2.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_2_3.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_2_4.tfrecords']
+Testfiles = ['gs://renato_bucket/EleEscanstf/EleEscan_2_5.tfrecords',\
+            'gs://renato_bucket/EleEscanstf/EleEscan_2_6.tfrecords']
 
 def epoch_cycle(batch_size=128):
     from PTF_m4_1_ReLU import discriminator, generator_LeakyReLU
@@ -133,6 +143,7 @@ def epoch_cycle(batch_size=128):
     with strategy.scope():
         change_gen = tf.Variable(False)
         change_first = tf.Variable(False)
+        change_lr = tf.Variable(False)
         discriminator = discriminator(keras_dformat = keras_dformat)
         generator = generator_LeakyReLU(keras_dformat = keras_dformat, latent_size = 200)
        
@@ -244,6 +255,12 @@ def epoch_cycle(batch_size=128):
 
         b_size = energy_batch.get_shape().as_list()[0]
 
+        if change_lr:
+            #tf.print('change')
+            optimizer_d.lr.assign(lr_d)
+            optimizer_g.lr.assign(lr_g)
+            change_lr.assign(False)
+
 
         #discriminator true training
         with tf.GradientTape(watch_accessed_variables=False) as tape:
@@ -334,6 +351,12 @@ def epoch_cycle(batch_size=128):
         ecal_batch   = dataset.get('ecal')
 
         b_size = energy_batch.get_shape().as_list()[0]
+
+        if change_lr:
+            #tf.print('change')
+            optimizer_d.lr.assign(lr_d)
+            optimizer_g.lr.assign(lr_g)
+            change_lr.assign(False)
 
 
         #discriminator true training
@@ -523,21 +546,44 @@ def epoch_cycle(batch_size=128):
     def update_change(change_first):
         return change_first.assign(True)
 
+    def update_lr_d(lr_d,lrate_d, epoch):
+        new_lr = l_dec(lrate_d, epoch)
+        return lr_d.assign(new_lr)
+
+    def update_lr_g(lr_g,lrate_g, epoch):
+        new_lr = l_dec(lrate_g, epoch)
+        return lr_g.assign(new_lr)
+
+    def update_change_lr(change_lr):
+        return change_lr.assign(True)
+
 
     ########################################################################################
     # Main Cycle
     ########################################################################################
+    
+    lr_change_checkpoint = steps_per_epoch // 20
 
     start_epoch = 1             #i want to start traing at epoch 1
     for epoch in range(start_epoch, nb_epochs + 1):
         print('Epoch {} of {}'.format(epoch, nb_epochs))
         start_epoch = time.time()
-        #lr_d = l_dec(lrate_d, epoch)
-        #lr_g = l_dec(lrate_g, epoch)
 
-        with strategy.scope():
-            optimizer_d = tf.optimizers.Adam(lrate_d)
-            optimizer_g = tf.optimizers.Adam(lrate_g)
+        if epoch == 1:
+            with strategy.scope():
+                lr_d_start = l_dec(lrate_d, epoch)
+                lr_g_start = l_dec(lrate_g, epoch)
+                lr_d = tf.Variable(lr_d_start)
+                lr_g = tf.Variable(lr_g_start)
+                optimizer_d = tf.optimizers.Adam(lr_d)
+                optimizer_g = tf.optimizers.Adam(lr_g)
+        else:
+            print('change')
+            strategy.extended.update(lr_d, update_lr_d, args=(lrate_d, epoch,))
+            strategy.extended.update(lr_g, update_lr_g, args=(lrate_g, epoch,))
+            strategy.extended.update(change_lr, update_change_lr)
+            print("Learnrate Generator:     ", lr_g)
+            print("Learnrate Discriminator: ", lr_d)
 
         #nb_batches = int(X_train.shape[0] / batch_size)
         epoch_gen_loss = []
@@ -545,11 +591,15 @@ def epoch_cycle(batch_size=128):
         
         
         if epoch == ReLU_epoch:
+            #with strategy.scope():
+            load_epoch = str(ReLU_epoch-1)
+            gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
+            print(gweights)
+            #gen2.load_weigths(gweights)
             with strategy.scope():
-                load_epoch = str(ReLU_epoch-1)
-                gweights = save_folder + "/Weights/gen/params_generator_epoch_" + load_epoch + ".hdf5"
-                generator2 = generator_ReLU(keras_dformat = keras_dformat, latent_size=200)
-                generator2.load_weigths(gweights)
+                gen2 = generator_ReLU(keras_dformat = keras_dformat, latent_size=200)
+                generator2=gen2
+            print('loaded')
 
             #with strategy.scope():
             #    generator = generator_ReLU(keras_dformat = keras_dformat, latent_size = 200)
@@ -562,6 +612,7 @@ def epoch_cycle(batch_size=128):
 
         nbatch = 0
         epoch_train_start = time.time()
+        epoch_change_lr = 0
 
         for epochstep in range(steps_per_epoch):
             file_time = time.time()
@@ -575,7 +626,15 @@ def epoch_cycle(batch_size=128):
             #     print("Learnrate Generator:     ", lr_g)
             #     print("Learnrate Discriminator: ", lr_d)
 
-            if epoch < ReLU_epoch
+            #Previously it changed per file
+            if epochstep % lr_change_checkpoint == 0:
+                print('change')
+                strategy.extended.update(lr_d, update_lr_d, args=(lrate_d, epoch*20+epoch_change_lr-20,))
+                strategy.extended.update(lr_g, update_lr_g, args=(lrate_g, epoch*20+epoch_change_lr-20,))
+                strategy.extended.update(change_lr, update_change_lr)
+                epoch_change_lr =+ 1
+
+            if epoch < ReLU_epoch:
                 d_loss_true, d_loss_fake, gen_losses = distributed_training_step(dist_dataset_iter)
             else:
                 d_loss_true, d_loss_fake, gen_losses = distributed_training_step_2ndgen(dist_dataset_iter)
@@ -605,7 +664,7 @@ def epoch_cycle(batch_size=128):
         for epochstep in range(steps_per_epoch_test):
             #create batches
 
-            if epoch < ReLU_epoch
+            if epoch < ReLU_epoch:
                 d_test_loss_true, d_test_loss_fake, gen_test_loss = distributed_testing_step(dist_dataset_iter_test)
             else: 
                 d_test_loss_true, d_test_loss_fake, gen_test_loss = distributed_testing_step_2ndgen(dist_dataset_iter_test)
@@ -627,47 +686,50 @@ def epoch_cycle(batch_size=128):
         ########################################################################################
         # Validation
         ########################################################################################
+        if epoch >ReLU_epoch-1 or epoch >= 5:
+            ###############################
+            #validation script
+            validation_metric = validate(generator2, percent=percent, keras_dformat=keras_dformat, data_path='gs://renato_bucket/EleEscans/')
+            Gromov_Wasserstein_distance = analyse(generator2, read_data=False, save_data=False, gen_weights="", data_path='gs://renato_bucket/EleEscans/', sorted_path="", optimizer = Gromov_metric)
+            ##############################
+            #loss dict
+            discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)   #mean disc loss for all epochs
+            generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
+            discriminator_test_loss = np.mean(np.array(disc_test_loss_list), axis=0)
+            generator_test_loss = np.mean(np.array(gen_test_loss_list), axis=0)
 
-        ###############################
-        #validation script
-        #validation_metric = validate(generator, percent=percent, keras_dformat=keras_dformat, data_path=train_file_by_file_path)
-        #Gromov_Wasserstein_distance = analyse(generator, read_data=False, save_data=False, gen_weights="", data_path=train_file_by_file_path,
-        #sorted_path="", optimizer = Gromov_metric)
-        ##############################
-        #loss dict
-        discriminator_train_loss = np.mean(np.array(epoch_disc_loss), axis=0)   #mean disc loss for all epochs
-        generator_train_loss = np.mean(np.array(epoch_gen_loss), axis=0)
-        discriminator_test_loss = np.mean(np.array(disc_test_loss_list), axis=0)
-        generator_test_loss = np.mean(np.array(gen_test_loss_list), axis=0)
+            train_history['generator'].append(generator_train_loss)
+            train_history['discriminator'].append(discriminator_train_loss)
+            train_history['validation'].append(validation_metric)
+            train_history['Gromov_Wasserstein_validation'].append(Gromov_Wasserstein_distance)
+            test_history['generator'].append(generator_test_loss)
+            test_history['discriminator'].append(discriminator_test_loss)
+            end_d = time.time()
 
-        train_history['generator'].append(generator_train_loss)
-        train_history['discriminator'].append(discriminator_train_loss)
-        #train_history['validation'].append(validation_metric)
-        #train_history['Gromov_Wasserstein_validation'].append(Gromov_Wasserstein_distance)
-        test_history['generator'].append(generator_test_loss)
-        test_history['discriminator'].append(discriminator_test_loss)
-        end_d = time.time()
+            #calculate time for epoch
+            end_batch = time.time()
+            e = int(end_batch-start_epoch)
+            print('Time for Epoch: {:02d}:{:02d}:{:02d}'.format(e // 3600, (e % 3600 // 60), e % 60))
 
-        #calculate time for epoch
-        end_batch = time.time()
-        e = int(end_batch-start_epoch)
-        print('Time for Epoch: {:02d}:{:02d}:{:02d}'.format(e // 3600, (e % 3600 // 60), e % 60))
+            #save history
+            pickle.dump([train_history, test_history], open(save_folder+'/Pickle/3dgan-history.pkl', 'wb'))
+            pickle.dump({'train': train_history, 'test': test_history}, open(save_folder+'/Pickle/3dgan-history_dict.pkl', 'wb'))
 
-        #save history
-        pickle.dump([train_history, test_history], open(save_folder+'/Pickle/3dgan-history.pkl', 'wb'))
-        pickle.dump({'train': train_history, 'test': test_history}, open(save_folder+'/Pickle/3dgan-history_dict.pkl', 'wb'))
-
-        #print loss table and plot generated image; also save them
-        #loss_table(train_history, test_history, save_folder, epoch, validation_metric, save=True, timeforepoch = e)
-        #plot_gen_image_tf(latent_size, epoch)
-        #plot_loss(train_history, test_history, save_folder, save=True)
-        #plot_validation(train_history, save_folder)
-        #plot_gromov_w_distance(train_history, save_folder)
+            #print loss table and plot generated image; also save them
+            loss_table(train_history, test_history, save_folder, epoch, validation_metric, save=True, timeforepoch = e)
+            plot_gen_image_tf(latent_size, epoch)
+            plot_loss(train_history, test_history, save_folder, save=True)
+            plot_validation(train_history, save_folder)
+            plot_gromov_w_distance(train_history, save_folder)
 
         #dump data
-        if epoch >=ReLU_epoch-1 or epoch >= 5:
+        if epoch == ReLU_epoch-1:
             generator.save_weights(save_folder+"/Weights/gen/params_generator_epoch_"+str(epoch)+".hdf5",overwrite=True)
             discriminator.save_weights(save_folder+"/Weights/disc/params_discriminator_epoch_"+str(epoch)+".hdf5",overwrite=True)
+        elif epoch >ReLU_epoch-1 or epoch >= 5:
+            generator2.save_weights(save_folder+"/Weights/gen/params_generator_epoch_"+str(epoch)+".hdf5",overwrite=True)
+            discriminator.save_weights(save_folder+"/Weights/disc/params_discriminator_epoch_"+str(epoch)+".hdf5",overwrite=True)
+
     
 
         
