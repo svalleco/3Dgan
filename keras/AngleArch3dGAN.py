@@ -14,20 +14,6 @@ def ecal_sum(image, daxis):
     sum = K.sum(image, axis=daxis)
     return sum
 
-# counts for various bin entries   
-def count(image, daxis):
-    limits=[0.05, 0.03, 0.02, 0.0125, 0.008, 0.003] # bin boundaries used
-    bin1 = K.sum(K.tf.where(image > limits[0], K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin2 = K.sum(K.tf.where(K.tf.logical_and(image < limits[0], image > limits[1]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin3 = K.sum(K.tf.where(K.tf.logical_and(image < limits[1], image > limits[2]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin4 = K.sum(K.tf.where(K.tf.logical_and(image < limits[2], image > limits[3]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin5 = K.sum(K.tf.where(K.tf.logical_and(image < limits[3], image > limits[4]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin6 = K.sum(K.tf.where(K.tf.logical_and(image < limits[4], image > limits[5]), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin7 = K.sum(K.tf.where(K.tf.logical_and(image < limits[5], image > 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bin8 = K.sum(K.tf.where(K.tf.equal(image, 0.0), K.ones_like(image), K.zeros_like(image)), axis=daxis)
-    bins = K.expand_dims(K.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1), axis=-1)
-    return bins
-                                        
 # angle calculation 
 def ecal_angle(image, daxis):
     image = K.squeeze(image, axis=daxis)# squeeze along channel axis
@@ -138,9 +124,8 @@ def discriminator(power=1.0, dformat='channels_last'):
     inv_image = Lambda(K.pow, arguments={'a':1./power})(image) #get back original image
     ang = Lambda(ecal_angle, arguments={'daxis':daxis})(inv_image) # angle calculation
     ecal = Lambda(ecal_sum, arguments={'daxis':daxis2})(inv_image) # sum of energies
-    add_loss = Lambda(count, arguments={'daxis':daxis2})(inv_image) # loss for bin counts
-    Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss]).summary()
-    return Model(inputs=[image], outputs=[fake, aux, ang, ecal, add_loss])
+    Model(inputs=[image], outputs=[fake, aux, ang, ecal]).summary()
+    return Model(inputs=[image], outputs=[fake, aux, ang, ecal])
 
 
 def generator(latent_size=256, return_intermediate=False, dformat='channels_last'):

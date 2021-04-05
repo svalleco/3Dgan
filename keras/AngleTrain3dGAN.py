@@ -69,7 +69,7 @@ def main():
     xscale = params.xscale
     xpower = params.xpower
     analyse=params.analyse # if analysing
-    loss_weights=[params.gen_weight, params.aux_weight, params.ang_weight, params.ecal_weight, params.hist_weight]
+    loss_weights=[params.gen_weight, params.aux_weight, params.ang_weight, params.ecal_weight]
     dformat=params.dformat
     thresh = params.thresh # threshold for data
     angtype = params.angtype
@@ -81,25 +81,22 @@ def main():
 
     if tlab:
        if not warm:
-         datapath = 'path4'
+         datapath = 'tlab'
        outpath = '/gkhattak/'
          
-    if datapath=='path1':
-       datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                                         
-    elif datapath=='path2':
+    if datapath=='reduced':
+       datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                                         
+    elif datapath=='full':
        datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate                              
        events_per_file = 10000
        energies = [0, 50, 100, 200, 250, 300, 400, 500]
-    elif datapath=='path3':
-       datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # caltech                                                      
-       events_per_file = 10000
-       energies = [0, 50, 100, 200, 250, 300, 400, 500]
-    elif datapath=='path4':
+    elif datapath=='eos':
        datapath = "/eos/user/g/gkhattak/VarAngleData/*Measured3ThetaEscan/*.h5"  # Data path 100-200 GeV                                             
-    elif datapath=='path5':
+    elif datapath=='tlab':
        datapath = "/gkhattak/data/*RandomAngle100GeV/*.h5"
        energies = [0, 10, 50, 90]
-
+    else:
+       datapath =datapath + "/*Measured3ThetaEscan/*.h5"
     weightdir = outpath + 'weights/3dgan_weights_' + params.name
     pklfile = outpath + 'results/3dgan_history_' + params.name + '.pkl'# loss history
     resultfile = outpath + 'results/3dgan_analysis' + params.name + '.pkl'# optimization metric history   
@@ -125,7 +122,7 @@ def get_parser():
     parser.add_argument('--nbepochs', action='store', type=int, default=120, help='Number of epochs to train for.')
     parser.add_argument('--batchsize', action='store', type=int, default=64, help='batch size per update')
     parser.add_argument('--latentsize', action='store', type=int, default=256, help='size of random N(0, 1) latent space to sample')
-    parser.add_argument('--datapath', action='store', type=str, default='path2', help='HDF5 files to train from.')
+    parser.add_argument('--datapath', action='store', type=str, default='reduced', help='HDF5 files to train from.')
     parser.add_argument('--outpath', action='store', type=str, default='', help='Dir to save output from a training.')
     parser.add_argument('--dformat', action='store', type=str, default='channels_last')
     parser.add_argument('--nEvents', action='store', type=int, default=400000, help='Maximum Number of events used for Training')
@@ -145,26 +142,10 @@ def get_parser():
     parser.add_argument('--particle', action='store', type=str, default='Ele', help='Type of particle')
     parser.add_argument('--lr', action='store', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--warm', action='store', default=False, help='Start from pretrained weights or random initialization')
-    parser.add_argument('--prev_gweights', type=str, default='surfsara_128n/params_generator_epoch_193.hdf5', help='Initial generator weights for warm start')
-    parser.add_argument('--prev_dweights', type=str, default='surfsara_128n/params_discriminator_epoch_193.hdf5', help='Initial discriminator weights for warm start')
-    parser.add_argument('--name', action='store', type=str, default='_bin_test', help='Unique identifier can be set for each training')
+    parser.add_argument('--prev_gweights', type=str, default='3dgan_weights__remove_bin/params_generator_epoch_111.hdf5', help='Initial generator weights for warm start')
+    parser.add_argument('--prev_dweights', type=str, default='3dgan_weights__remove_bin/params_discriminator_epoch_111.hdf5', help='Initial discriminator weights for warm start')
+    parser.add_argument('--name', action='store', type=str, default='training', help='Unique identifier can be set for each training')
     return parser
-
-# A histogram fucntion that counts cells in different bins
-def hist_count(x, p=1.0, daxis=(1, 2, 3)):
-    limits=np.array([0.05, 0.03, 0.02, 0.0125, 0.008, 0.003]) # bin boundaries used
-    limits= np.power(limits, p)
-    bin1 = np.sum(np.where(x>(limits[0]) , 1., 0.), axis=daxis)
-    bin2 = np.sum(np.where((x<(limits[0])) & (x>(limits[1])), 1., 0.), axis=daxis)
-    bin3 = np.sum(np.where((x<(limits[1])) & (x>(limits[2])), 1., 0.), axis=daxis)
-    bin4 = np.sum(np.where((x<(limits[2])) & (x>(limits[3])), 1., 0.), axis=daxis)
-    bin5 = np.sum(np.where((x<(limits[3])) & (x>(limits[4])), 1., 0.), axis=daxis)
-    bin6 = np.sum(np.where((x<(limits[4])) & (x>(limits[5])), 1., 0.), axis=daxis)
-    bin7 = np.sum(np.where((x<(limits[5])) & (x>0.), 1., 0.), axis=daxis)
-    bin8 = np.sum(np.where(x==0, 1., 0.), axis=daxis)
-    bins = np.concatenate([bin1, bin2, bin3, bin4, bin5, bin6, bin7, bin8], axis=1)
-    bins[np.where(bins==0)]=1. # so that an empty bin will be assigned a count of 1 to avoid unstability
-    return bins
 
 #get data for training
 def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtype='theta', thresh=1e-4, daxis=-1):
@@ -193,7 +174,7 @@ def GetDataAngle(datafile, xscale =1, xpower=1, yscale = 100, angscale=1, angtyp
 def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pklfile, nb_epochs=30, batch_size=128, latent_size=200, loss_weights=[3, 0.1, 25, 0.1, 0.1], lr=0.001, rho=0.9, decay=0.0, g_weights='params_generator_epoch_', d_weights='params_discriminator_epoch_', xscale=1, xpower=1, angscale=1, angtype='theta', yscale=100, thresh=1e-4, analyse=False, resultfile="", energies=[], dformat='channels_last', particle='Ele', verbose=False, warm=False, prev_gweights='', prev_dweights=''):
     start_init = time.time()
     f = [0.9, 0.1] # train, test fractions 
-    loss_ftn = hist_count # function used for additional loss
+    #loss_ftn = hist_count # function used for additional loss
     
     # apply settings according to data format
     if dformat=='channels_last':
@@ -207,7 +188,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     print('[INFO] Building discriminator')
     discriminator.compile(
         optimizer=RMSprop(lr),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
 
@@ -222,15 +203,15 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
     latent = Input(shape=(latent_size, ), name='combined_z')   
     fake_image = generator( latent)
     discriminator.trainable = False
-    fake, aux, ang, ecal, add_loss= discriminator(fake_image)
+    fake, aux, ang, ecal= discriminator(fake_image)
     combined = Model(
         input=[latent],
-        output=[fake, aux, ang, ecal, add_loss],
+        output=[fake, aux, ang, ecal],
         name='combined_model'
     )
     combined.compile(
         optimizer=RMSprop(lr),
-        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error', 'mean_absolute_percentage_error'],
+        loss=['binary_crossentropy', 'mean_absolute_percentage_error', 'mae', 'mean_absolute_percentage_error'],
         loss_weights=loss_weights
     )
 
@@ -304,15 +285,15 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
             energy_batch = Y_train[(file_index * batch_size):(file_index + 1) * batch_size]
             ecal_batch = ecal_train[(file_index *  batch_size):(file_index + 1) * batch_size]
             ang_batch = ang_train[(file_index * batch_size):(file_index + 1) * batch_size]
-            add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+            #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
             file_index +=1
             # Generate Fake events with same energy and angle as data batch
             noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
             generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1)
             generated_images = generator.predict(generator_ip, verbose=0)
             # Train discriminator first on real batch and then the fake batch
-            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
-            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch, add_loss_batch])
+            real_batch_loss = discriminator.train_on_batch(image_batch, [gan.BitFlip(np.ones(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch])
+            fake_batch_loss = discriminator.train_on_batch(generated_images, [gan.BitFlip(np.zeros(batch_size).astype(np.float32)), energy_batch, ang_batch, ecal_batch])
 
             #if ecal sum has 100% loss(generating empty events) then end the training 
             if fake_batch_loss[3] == 100.0 and index >10:
@@ -335,18 +316,16 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
                 generator_ip = np.concatenate((energy_batch.reshape(-1, 1), ang_batch.reshape(-1, 1), noise), axis=1) # sampled angle same as g4 theta
                 gen_losses.append(combined.train_on_batch(
                     [generator_ip],
-                    [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch, add_loss_batch]))
-            for l in combined.layers[2].layers:
-               print(l.name)
-            #grad = get_layer_output_grad(combined, combined.input, combined.output, layer=3)
-            #weights = combined.layers[2].layers[-1].get_weights()
-            #print(weights)
-            for o, out in enumerate(combined.output):
-              out = combined.output[o]
-              print('out {} = {}'.format(o, out))
-              weights = combined.layers[1].trainable_weights
-              grad = K.gradients(out, weights)
-              print('grad', grad)
+                    [trick, energy_batch.reshape(-1, 1), ang_batch, ecal_batch]))
+            #for l in combined.layers[2].layers:
+            #   print(l.name)
+            
+            #for o, out in enumerate(combined.output):
+            #  out = combined.output[o]
+            #  print('out {} = {}'.format(o, out))
+            #  weights = combined.layers[1].trainable_weights
+            #  grad = K.gradients(out, weights)
+            #  print('grad', grad)
             
             generator_loss = [(a + b) / 2 for a, b in zip(*gen_losses)]
             epoch_gen_loss.append(generator_loss)
@@ -394,7 +373,7 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
            energy_batch = Y_test[(file_index * batch_size):(file_index + 1) * batch_size]
            ecal_batch = ecal_test[(file_index *  batch_size):(file_index + 1) * batch_size]
            ang_batch = ang_test[(file_index * batch_size):(file_index + 1) * batch_size]
-           add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
+           #add_loss_batch = np.expand_dims(loss_ftn(image_batch, xpower, daxis2), axis=-1)
            file_index +=1
            # Generate fake events                                                            
            noise = np.random.normal(0, 1, (batch_size, latent_size-2)).astype(np.float32)
@@ -406,13 +385,13 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
            ang = np.concatenate((ang_batch, ang_batch))
            ecal = np.concatenate((ecal_batch, ecal_batch))
            aux_y = np.concatenate((energy_batch, energy_batch), axis=0)
-           add_loss= np.concatenate((add_loss_batch, add_loss_batch), axis=0)
+           #add_loss= np.concatenate((add_loss_batch, add_loss_batch), axis=0)
            index +=1
            # evaluate discriminator loss           
-           disc_test_loss.append(discriminator.evaluate( X, [y, aux_y, ang, ecal, add_loss], verbose=False, batch_size=batch_size))
+           disc_test_loss.append(discriminator.evaluate( X, [y, aux_y, ang, ecal], verbose=False, batch_size=batch_size))
            # evaluate generator loss
            gen_test_loss.append(combined.evaluate(generator_ip,
-                    [np.ones(batch_size), energy_batch, ang_batch, ecal_batch, add_loss_batch]
+                    [np.ones(batch_size), energy_batch, ang_batch, ecal_batch]
                     , verbose=False, batch_size=batch_size))
         # make loss dict 
         print('Total Test batches were {}'.format(index))
@@ -425,10 +404,10 @@ def Gan3DTrainAngle(discriminator, generator, datapath, nEvents, WeightsDir, pkl
         test_history['generator'].append(generator_test_loss)
         test_history['discriminator'].append(discriminator_test_loss)
         # print losses
-        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s} | {6:8s}'.format(
+        print('{0:<20s} | {1:6s} | {2:12s} | {3:12s}| {4:5s} | {5:8s}'.format(
             'component', *discriminator.metrics_names))
         print('-' * 65)
-        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}| {6:<10.2f}'
+        ROW_FMT = '{0:<20s} | {1:<4.2f} | {2:<10.2f} | {3:<10.2f}| {4:<10.2f} | {5:<10.2f}'
         print(ROW_FMT.format('generator (train)',
                              *train_history['generator'][-1]))
         print(ROW_FMT.format('generator (test)',
