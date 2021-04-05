@@ -30,6 +30,29 @@ def fill_hist_2D(h, x, y):
    for i in np.arange(n):
       h.Fill(x[i], y[i])
 
+def FillHist3D_wt(h, d):
+   n = d.shape[0]
+   x = d.shape[1]
+   y = d.shape[2]
+   z = d.shape[3]
+   for i in np.arange(n):
+     for j in np.arange(x):
+      for k in np.arange(y):
+        for l in np.arange(z):
+           h.Fill(j, k, l, d[i, j, k, l])
+
+def Filltuple3D_wt(h, d):
+   
+   x = d.shape[-3]
+   y = d.shape[-2]
+   z = d.shape[-1]
+   #for i in np.arange(n):
+   for j in np.arange(x):
+      for k in np.arange(y):
+        for l in np.arange(z):
+           if d[j, k, l]>0:  h.Fill(j, k, l, d[j, k, l])
+
+
 # normalize in different modes
 def normalize(hist, mod=0):
    if mod==0:
