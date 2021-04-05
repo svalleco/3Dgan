@@ -149,7 +149,7 @@ def get_parser():
     parser.add_argument('--outdir', action='store', type=str, default='results/best_epoch_gan_training/', help='Directory to store the analysis plots.')
     parser.add_argument('--sortdir', action='store', type=str, default='SortedData', help='Directory to store sorted data.')
     parser.add_argument('--nbEvents', action='store', type=int, default=20000, help='Max limit for events used for Testing')
-    parser.add_argument('--eventsperfile', action='store', type=int, default=5000, help='Number of events in a file')
+    parser.add_argument('--eventsperfile', action='store', type=int, default=10000, help='Number of events in a file')
     parser.add_argument('--binevents', action='store', type=int, default=10000, help='Number of events in each bin')
     parser.add_argument('--start', action='store', type=int, default=0, help='plot beginning from epoch')
     parser.add_argument('--stop', action='store', type=int, default=500, help='plot till epoch')
@@ -361,18 +361,18 @@ def postproc(n, scale=1):
 def analyse(g, read_data, save_data, gen_weights, datapath, sorted_path, optimizer, xscale=100, power=1, particle="Ele", thresh=1e-6, ang=1, latent = 256, concat=1, energies=[110, 150, 190], nbEvents=100000, eventsperfile=5000, dscale=1.):
    print ("Started")
    
-   Test = False
+   Test = True
    m = 2
    var = {}
    sorted_path= sorted_path 
    total=0   
-   Trainfiles, Testfiles = gan.DivideFiles(datapath, Fractions=[.9,.1], datasetnames=["ECAL"], Particles =[particle])
+   Trainfiles, Testfiles = gan.DivideFiles(datapath, Fractions=[.5,.5], datasetnames=["ECAL"], Particles =[particle])
    if Test:
      data_files = Testfiles
    else:
      data_files = Trainfiles
    nb_files = int(math.ceil(nbEvents/eventsperfile))
-   data_files = data_files[:nb_files]
+   data_files = data_files[-1* nb_files:]
    print(data_files)
    start = time.time()
    if ang:
