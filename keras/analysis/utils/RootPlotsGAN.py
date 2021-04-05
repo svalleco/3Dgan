@@ -36,7 +36,7 @@ def flip(m, axis):
    return m[tuple(indexer)]
 
 # computes correlation of a set of features and returns Fisher's Transform and names of features
-def get_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hits, ratio):
+def get_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, hits, ratio, ang=0):
    x = sumx.shape[1]
    y = sumy.shape[1]
    z = sumz.shape[1]
@@ -54,14 +54,18 @@ def get_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, h
       names = names + ['momentx' + str(i), 'momenty' + str(i), 'momentz' + str(i)]
    array = np.hstack((array, ecal.reshape(-1, 1), energy.reshape(-1, 1)))
    array = np.hstack((array, hits.reshape(-1, 1), ratio.reshape(-1, 1)))
-   names = names + ['ecal sum', 'p energy', 'hits', 'ratio1_total']
+   if ang:
+     array = np.hstack((array, ang.reshape(-1, 1)))
+     names = names + ['ecal sum', 'p energy', 'hits', 'ratio1_total', 'theta']
+   else:
+     names = names + ['ecal sum', 'p energy', 'hits', 'ratio1_total']
    cor= np.corrcoef(array, rowvar=False)
    cor= get_dia(cor)
    fisher= np.arctanh(cor)
    return flip(fisher, axis=0), names
 
 # returns correlation of a set of features and names of features
-def get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3):
+def get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, ang=None):
    names = ['']
    m=2
    for i in range(m):
@@ -72,7 +76,12 @@ def get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1,
       names = names + ['Mx' + str(i+1), 'My' + str(i+1), 'Mz' + str(i+1)]
    array = np.hstack((array, ecal.reshape(-1, 1), energy.reshape(-1, 1)))
    array = np.hstack((array, hits.reshape(-1, 1), ratio1.reshape(-1, 1), ratio2.reshape(-1, 1), ratio3.reshape(-1, 1)))
-   names = names + ['$E_{sum}$', '$E_p$', 'H', 'R1', 'R2', 'R3']
+   if ang is not None:
+     ang = np.absolute(ang - 1.5708)
+     array = np.hstack((array, ang.reshape(-1, 1)))
+     names = names + ['$E_{sum}$', '$E_p$', 'H', 'R1', 'R2', 'R3', 'ang']
+   else:
+     names = names + ['$E_{sum}$', '$E_p$', 'H', 'R1', 'R2', 'R3']
    cor= np.corrcoef(array, rowvar=False)
    cor = get_dia2(cor)
    return flip(cor, axis=0), names
@@ -105,14 +114,14 @@ def plot_correlation(sumx, sumy, sumz, momentx, momenty, momentz, ecal, gsumx, g
                               out_file, 'GAN{}_{}'.format(labels[i], i), compare=True, gprev=actcorr, leg=leg)
 
 # Compute and plot correlation
-def plot_correlation_small(momentx, momenty, momentz, ecal, gmomentx, gmomenty, gmomentz, gecal, energy, events1, events2, out_file, labels, leg=True, stest=True):
+def plot_correlation_small(momentx, momenty, momentz, ecal, gmomentx, gmomenty, gmomentz, gecal, energy, events1, events2, out_file, labels, leg=True, stest=True, ang=0):
    ecal = ecal["n_0"]
    hits = my.get_hits(events1)
-   actcorr = plot_corr_python_small(momentx, momenty, momentz, ecal, energy, my.get_hits(events1), my.ratio1_total(events1), my.ratio2_total(events1), my.ratio3_total(events1), out_file, 'G4', leg=leg)
+   actcorr = plot_corr_python_small(momentx, momenty, momentz, ecal, energy, my.get_hits(events1), my.ratio1_total(events1), my.ratio2_total(events1), my.ratio3_total(events1), out_file, 'G4', leg=leg, ang=ang)
    for i, key in enumerate(gmomentx):
       gcorr = plot_corr_python_small(gmomentx[key], gmomenty[key], gmomentz[key],
                gecal[key], energy, my.get_hits(events2[key]), my.ratio1_total(events2[key]), my.ratio2_total(events2[key]), my.ratio3_total(events2[key]),
-                                     out_file, 'GAN{}'.format(labels[i]), compare=stest, gprev=actcorr, leg=leg)
+                                     out_file, 'GAN{}'.format(labels[i]), compare=stest, gprev=actcorr, leg=leg, ang=ang)
                        
 
                                                                               
@@ -150,8 +159,8 @@ def plot_corr_python(sumx, sumy, sumz, momentx, momenty, momentz, ecal, energy, 
    return corr
 
 #plot correlation using Python
-def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, out_file, label, compare=False, gprev=0, leg=True):
-   corr, names = get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3)
+def plot_corr_python_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, out_file, label, compare=False, gprev=0, leg=True, ang=0):
+   corr, names = get_correlation_small(momentx, momenty, momentz, ecal, energy, hits, ratio1, ratio2, ratio3, ang=ang)
    x = np.arange(corr.shape[0]+ 1)
    y = np.arange(corr.shape[1]+ 1)
    X, Y = np.meshgrid(x, y)
@@ -1560,12 +1569,12 @@ def plot_angle_error_hist(ang1, ang2, y, out_file, angle, angtype, labels, p, if
    else:
       c1.Print(out_file + '.C')
                                               
-def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True, grid=True, leg=True):
+def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True, grid=True, leg=True, norm=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    if grid: c1.SetGrid()
    hps=[]
    for i, key in enumerate(ang1):
-      hps.append(ROOT.TH2F("G4" + labels[i],"G4" + labels[i], 50, 0.5, 3, 50, 0.5, 2.5))
+      hps.append(ROOT.TH2F("G4" + labels[i],"G4" + labels[i], 50, 0.75, 2.5, 50, 0.75, 2.5))
       hp= hps[i]
       n = y.shape[0]
       hp.SetStats(0)
@@ -1574,6 +1583,7 @@ def plot_angle_2Dhist(ang1, ang2, y, out_file, angtype, labels, p, ifpdf=True, g
       hp.GetYaxis().SetTitle("3d Angle from GAN")
       for j in np.arange(n):
          hp.Fill(ang1[key][j], ang2[key][j])
+      if norm: my.normalize(hp)
       hp.Draw("colz")
       c1.Update()
       
@@ -1771,7 +1781,7 @@ def get_plots_angle(var, labels, plots_dir, energies, angles, angtype, m, n, ifp
          elif corr>1:
            plot_correlation_small(var["momentX_act" + str(energy)], var["momentY_act" + str(energy)], var["momentZ_act" + str(energy)], var["ecal_act" + str(energy)],  var["momentX_gan" + str(energy)],
                                   var["momentY_gan" + str(energy)], var["momentZ_gan" + str(energy)], var["ecal_gan" + str(energy)], var["energy" + str(energy)], var["events_act" + str(energy)],
-                                  var["events_gan" + str(energy)], os.path.join(comdir, correlationfile+ "small"), labels, leg=leg, stest=stest)
+                                  var["events_gan" + str(energy)], os.path.join(comdir, correlationfile+ "small"), labels, leg=leg, stest=stest, ang= var["angle" + str(energy)] )
            plots+=1
                                          
          if cell:
