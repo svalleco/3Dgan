@@ -39,7 +39,7 @@ weightdir = '../weights/'
 c=TCanvas("c" ,"Ecal/Ep versus Ep for Data and Generated Events" ,200 ,10 ,700 ,500) #make nice
 #c.SetGrid()
 gStyle.SetOptStat(0)
-p =[0, 500]
+p =[100, 400]
 #c.SetLogx ()
 numdata=10000
 latent = 256
@@ -47,7 +47,7 @@ dscale  = 50.0
 power = 0.85
 thresh = 0
 particles =['e^{-}', 'GAN e^{-}', '#gamma', 'GAN #gamma']
-filename = 'results/sampling_Ele_Gamma_wtfit3.pdf'
+filename = 'results/sampling_Ele_Gamma_wtfit_rd.pdf'
 color =[2, 3, 4, 6]
 #Get Actual Data
 datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/EleEscan/EleEscan_RandomAngle_1_1.h5"
@@ -84,12 +84,12 @@ x4 = np.power(gan.generate(g, numdata, [y2/100., ang2], latent=latent, concat=2)
 x4[x4 < thresh] =0
 x4 = x4/dscale
 
-legend = ROOT.TLegend(.8, .65, .89, .89)
+legend = ROOT.TLegend(.7, .55, .89, .89)
 legend.SetBorderSize(0)
 Eprofs=[]
 i=0
 for X, Y in zip([x, x3, x2, x4], [y, y, y2, y2]):
-  Eprofs.append(TProfile("Eprof"+str(i), "Sampling fraction vs. Ep;Ep [GeV];#S_{f}", 100, p[0], p[1])) 
+  Eprofs.append(TProfile("Eprof"+str(i), "Sampling fraction vs. Ep;Ep [GeV];#S_{f}", 20, p[0], p[1])) 
   Data = np.sum(X, axis=(1, 2, 3))
   Eprof= Eprofs[i]
   Eprof.SetStats(0)
@@ -110,6 +110,10 @@ for X, Y in zip([x, x3, x2, x4], [y, y, y2, y2]):
   c.Update()
   legend.AddEntry(Eprof, particles[i] ,"l")
   i+=1
+k1 = Eprofs[0].KolmogorovTest(Eprofs[1], 'UU NORM')
+k2 = Eprofs[2].KolmogorovTest(Eprofs[3], 'UU NORM')
+legend.AddEntry(Eprofs[1], particles[1] + ' (k={:.4f})'.format(k1) ,"l")
+legend.AddEntry(Eprofs[3], particles[3] + ' (k={:.4f})'.format(k2) ,"l")
 legend.Draw()
 c.Print(filename)
 print ' The plot is saved in.....{}'.format(filename)
