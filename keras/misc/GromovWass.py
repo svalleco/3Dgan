@@ -14,7 +14,7 @@ import time
 import math
 import ROOT
 from scipy.stats import wasserstein_distance as wass
-#import ot
+import ot
 import scipy as sp
 
 if os.environ.get('HOSTNAME') == 'tlab-gpu-gtx1080ti-06.cern.ch': # Here a check for host can be used
@@ -36,11 +36,11 @@ def main():
       datapath = '/gkhattak/*Measured3ThetaEscan/*.h5'
       genpath = '/gkhattak/weights/' + weightdir
     else:
-      datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
+      datapath = "/storage/group/gpu/bigdata/gkhattak/*Measured3ThetaEscan/*VarAngleMeas_*.h5" # path to data
       genpath = "../weights/" + weightdir # path to weights
     #datapath = "/data/shared/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5" # culture plate 
     sorted_path = 'Anglesorted'  # where sorted data is to be placed
-    plotsdir = 'results/optimization_gw_2_500' # plot directory
+    plotsdir = 'results/optimization_gw_2_500_filt6/' # plot directory
     particle = "Ele" 
     scale = 1
     threshold = 0
@@ -146,7 +146,7 @@ def moving_average(iterable, n=5):
         if len(d) == n:
             yield sum(d)/n
 
-def moving_avg(result, num=5):
+def moving_avg(result, num=6):
     avg =[]
     for i, r in enumerate(result):
         if i==0:
