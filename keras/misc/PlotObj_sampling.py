@@ -23,34 +23,50 @@ try:
     import setGPU #if Caltech
 except:
     pass
-sys.path.insert(0,'../keras/')
+sys.path.insert(0,'../')
 import analysis.utils.GANutils as gan
 def main():
-    results=[]
-    resultfiles = ['result_log.txt', 'result_32n.txt', 'result_log_128n.txt', 'result_256n.txt']
-    labels = ['single node', '32 node', '128 node', '256 node']
+    resultfiles = ['result_withoutsqrt.txt', 'result_binp85.txt', 'result_gan_training.txt']
+    labels = ['initial', 'sqrt', 'final']
     feats = ['total error', 'moments', 'shower shapes', 'sampling fraction', 'angle']
-    feat = 2
-    plotdir = 'obj_plots_shapes_32node/'
+    ylims =[1, 1, 1, 0.2, 0.1]
+    leg = 0
+    plotdir = 'results/obj_plots_gan_training_avg5/'
     gan.safe_mkdir(plotdir)
     min_epochs =1000
-    for resfile in resultfiles:
-      file = open(resfile)
-      result=[]
-      print('Opening {}'.format(resfile)) 
-      for line in file:
-        fields = line.strip().split()
-        fields = [float(_) for _ in fields]
-        result.append(fields[feat])
-      if min_epochs > len(result):
-        min_epochs = len(result)
-      file.close
-      results.append(result)
-    epochs = np.arange(min_epochs)
-    PlotResultsRoot(results[:2], labels[:2], feat, feats, plotdir, epochs, start=0, end=300, ang=0)
+    for i, feat in enumerate(feats):
+      print(i, feat)
+      results=[]
+      for resfile in resultfiles[2:]:
+        file = open(resfile)
+        result=[]
+        print('Opening {}'.format(resfile)) 
+        for line in file:
+          fields = line.strip().split()
+          fields = [float(_) for _ in fields]
+          result.append(fields[i])
+        if min_epochs > len(result):
+          min_epochs = len(result)
+        file.close
+        results.append(result)
+      epochs = np.arange(min_epochs)
+      PlotResultsRoot(results, labels[2:], i, feats, plotdir, epochs, plotfile='obj_'+ feat, ylim=ylims[i], start=0, end=300, ang=0, leg = 0, avg=5)
+
+def moving_avg(result, num=5):
+    avg =[]
+    for i, r in enumerate(result):
+        if i==0:
+           avg.append(r)
+        elif i < num:
+           cumsum = np.sum(np.array(result[:i+1]))
+           avg.append(cumsum/(i + 1))
+        else:
+           cumsum = np.sum(np.array(result[i-num:i]))
+           avg.append(cumsum/num)
+    return avg
 
 #Plots results in a root file
-def PlotResultsRoot(results, labels, feat, feats, resultdir, epochs, start=0, end=60, fits="", plotfile='obj_result', ang=1, leg=1):
+def PlotResultsRoot(results, labels, feat, feats, resultdir, epochs, ylim=1, start=0, end=60, fits="", plotfile='obj_result', ang=1, leg=1, avg=0):
     c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500)
     legend = ROOT.TLegend(.5, .6, .89, .89)
     legend.SetBorderSize(0)
@@ -67,13 +83,15 @@ def PlotResultsRoot(results, labels, feat, feats, resultdir, epochs, start=0, en
       for j in np.arange(len(epoch)):
          sf_e[i][j]= item[j]
       print(sf_e[i])   
+      if avg > 0:
+         sf_e[i]= np.array(moving_avg(sf_e[i], avg))   
       gsf.append(ROOT.TGraph(len(epoch), epoch, sf_e[i]))     
       gsf[i].SetLineColor(color[i])
       mg.Add(gsf[i])
       legend.AddEntry(gsf[i], labels[i])
       c1.Update()
     mg.SetTitle("Mean relative Error on {};Epochs;Error".format(feats[feat]))
-    mg.GetYaxis().SetRangeUser(0, 1)
+    mg.GetYaxis().SetRangeUser(0, ylim)
     mg.Draw('ALP')
     if leg: legend.Draw()
     c1.Update()
