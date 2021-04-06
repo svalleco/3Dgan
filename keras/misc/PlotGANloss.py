@@ -9,6 +9,7 @@ import matplotlib.colors as colors
 sys.path.insert(0,'../')
 from analysis.utils.GANutils import safe_mkdir
 import argparse
+from matplotlib.pyplot import cm
 
 try:
     import cPickle as pickle
@@ -24,7 +25,7 @@ def main():
    outdir = params.outdir #dir for plots
    ylim = [params.ylim1, params.ylim2, params.ylim3, params.ylim4, params.ylim5, params.ylim6, params.ylim7] #limits for different plots
    start_epoch =params.start_epoch #starting from epoch
-   end_epoch = 60
+   end_epoch = params.end_epoch
    fit_order = params.fit_order #order of fit
    num_ang_losses = params.num_ang_losses # number of angle losses
    num_add_loss = params.num_add_loss # additional losses
@@ -89,6 +90,7 @@ def get_parser():
     parser.add_argument('--ylim6', type=float, default=2.25, help='y max for Generator BCE only')
     parser.add_argument('--ylim7', type=float, default=50., help='y max for combined test & train losses')
     parser.add_argument('--start_epoch', type=int, default=0, help='can be used to remove initial epochs')
+    parser.add_argument('--end_epoch', type=int, default=60, help='can be used to remove later epochs')
     parser.add_argument('--fit_order', type=int, default=3, help='order of polynomial used for fit')
     parser.add_argument('--num_ang_losses', type=int, default=1, help='number of losses used for angle')
     parser.add_argument('--num_add_loss', type=int, default=1, help='number of additional losses')
@@ -120,9 +122,11 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
            gen_test.append(np.asarray(x['test']['generator']))
            disc_test.append(np.asarray(x['test']['discriminator']))
 
-   color= ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
-           '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
-                         '#bcbd22', '#17becf']
+   #color= ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728',
+   #        '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',
+   #                      '#bcbd22', '#17becf']
+   color= ['#1f77b4', '#ff7f0e', 'r', '#2ca02c', '#d62728',                                                                                                                                                    
+            '#9467bd', '#8c564b', '#e377c2', '#7f7f7f',                                                                                                                                                                 '#bcbd22', '#17becf']
    loop = np.arange(len(lossnames))
    index = len(lossfiles)
    #Plots for Testing and Training Losses
@@ -194,11 +198,12 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
    plt.title('{} losses for Generator'.format(losstype[1]))
    epochs = np.arange(start_epoch, end_epoch)
    min_loss = []
+   
    for h in np.arange(index):
      loss = np.zeros((end_epoch))
      loss[:gen_test[h][:,1].shape[0]] = gen_test[h][:end_epoch,1]
      min_loss.append( np.amin(gen_test[h][start_epoch:,1]))
-     plt.plot(epochs, loss[start_epoch:], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[1], losstype[1], min_loss[h]))
+     plt.plot(epochs, loss[start_epoch:end_epoch], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[1], losstype[1], min_loss[h]))
    if leg: plt.legend()
    plt.xlabel('Epochs starting from epoch' + str(start_epoch))
    plt.ylabel('Loss')
@@ -216,7 +221,7 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
      loss = np.zeros((end_epoch))
      loss[:gen_train[h][:,1].shape[0]] = gen_train[h][:end_epoch,1]
      min_loss.append( np.amin(gen_train[h][start_epoch:,1]))
-     plt.plot(epochs, loss[start_epoch:], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[1], losstype[1], min_loss[h]))
+     plt.plot(epochs, loss[start_epoch:end_epoch], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[1], losstype[1], min_loss[h]))
      #fit = np.polyfit(epochs, gen_train[start_epoch:,1], order)
      #plt.plot(epochs, np.polyval(fit, epochs), label='Gen fit ({} degree polynomial)'.format(order), linestyle='--')
    if leg: plt.legend()
@@ -234,8 +239,8 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
    for h in np.arange(index):
      loss = np.zeros((end_epoch))
      loss[:gen_train[h][:,-1].shape[0]] = gen_train[h][:end_epoch,-1]
-     min_loss.append( np.amin(gen_train[h][start_epoch:,-1]))
-     plt.plot(epochs, loss[start_epoch:], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[-1], losstype[-1], min_loss[h]))
+     min_loss.append( np.amin(gen_train[h][start_epoch:end_epoch,-1]))
+     plt.plot(epochs, loss[start_epoch:end_epoch], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[-1], losstype[-1], min_loss[h]))
    if leg: plt.legend()
    plt.xlabel('Epochs starting from epoch' + str(start_epoch))
    plt.ylabel('Loss')
@@ -252,7 +257,7 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
      loss = np.zeros((end_epoch))
      loss[:gen_test[h][:,-1].shape[0]] = gen_test[h][:end_epoch,-1]
      min_loss.append( np.amin(gen_test[h][start_epoch:,-1]))
-     plt.plot(epochs, loss[start_epoch:], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[-1], losstype[-1], min_loss[h]))
+     plt.plot(epochs, loss[start_epoch:end_epoch], label=labels[h] +'Gen {} ({}) min={:.4f}'.format(lossnames[-1], losstype[-1], min_loss[h]))
    if leg: plt.legend()
    plt.xlabel('Epochs starting from epoch' + str(start_epoch))
    plt.ylabel('Loss')
@@ -265,8 +270,9 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
        fig = fig + 1
        plt.figure(fig)
        plt.title('{} Testing losses for GAN'.format(losstype[1]))
-       plt.plot(gen_test[h][:,1], label=labels[h] +'Gen {} ({})'.format(lossnames[1], losstype[1]))
-       plt.plot(disc_test[h][:,1], label=labels[h] +'Disc {} ({})'.format(lossnames[1], losstype[1]))
+       epochs = np.arange(start_epoch, min(end_epoch, gen_test[h][:,1].shape[0]))
+       plt.plot(epochs, gen_test[h][:,1][start_epoch:end_epoch], label=labels[h] +'Gen {} ({})'.format(lossnames[1], losstype[1]))
+       plt.plot(epochs, disc_test[h][:,1][start_epoch:end_epoch], label=labels[h] +'Disc {} ({})'.format(lossnames[1], losstype[1]))
        if leg: plt.legend()
        plt.xlabel('Epochs')  
        plt.ylabel('Loss')                            
@@ -276,9 +282,12 @@ def plot_loss(lossfiles, labels, ymax, lossdir, start_epoch, end_epoch, weights,
      fig = fig + 1
      plt.figure(fig)
      plt.title('{} Testing losses for GAN'.format(losstype[1]))
+     epochs = np.arange(start_epoch, end_epoch)
+     #colors=iter(cm.rainbow(np.linspace(0,1,index)))
      for h in np.arange(index):
-       plt.plot(gen_test[h][:,1], label=labels[h] +'Gen {} {} ({})'.format(labels[h], lossnames[1], losstype[1]))
-       plt.plot(disc_test[h][:,1], label=labels[h] +'Disc {} {} ({})'.format(labels[h], lossnames[1], losstype[1]))
+       epochs = np.arange(start_epoch, min(end_epoch, gen_test[h][:,1].shape[0]))
+       plt.plot(epochs, gen_test[h][:,1][start_epoch:end_epoch], color= color[h], label=labels[h] +'Gen {} {} ({})'.format(labels[h], lossnames[1], losstype[1]))
+       plt.plot(epochs, disc_test[h][:,1][start_epoch:end_epoch], color= color[h], linestyle='dashed', label=labels[h] +'Disc {} {} ({})'.format(labels[h], lossnames[1], losstype[1]))
      if leg: plt.legend()
      plt.xlabel('Epochs')
      plt.ylabel('Loss')
