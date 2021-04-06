@@ -65,6 +65,8 @@ def main():
       print('maximum ChPi energy is {}'.format(np.amax(params['ChPi_energy'])))
       print('maximum Ele predicted energy is {}'.format(np.amax(params['Ele_reg_energy_prediction'])))
       print('maximum ChPi predicted energy is {}'.format(np.amax(params['ChPi_reg_energy_prediction'])))
+      print('Ele classification error is {}'.format(params['Ele_error']))
+      print('ChPi classification error is {}'.format(params['ChPi_error']))
       print('##################################################################################')
 
       results.append(params)
