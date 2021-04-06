@@ -21,11 +21,11 @@ def main():
     from AngleArch3dGAN import generator, discriminator
 
     #Weights
-    disc_weight1="../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_discriminator_epoch_021.hdf5"
-    gen_weight1= "../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5"
+    disc_weight1="../weights/3dgan_weights__remove_bin_2_500GeV/params_discriminator_epoch_022.hdf5"
+    gen_weight1= "../weights/3dgan_weights__remove_bin_2_500GeV/params_generator_epoch_022.hdf5"
 
     #Path to store results
-    plotsdir = "results/analysis_grid_epsilon_2_500GeV_ep21/"
+    plotsdir = "results/analysis_grid_remove_bin_2_500GeV_ep22/"
     safe_mkdir(plotsdir)
     #Parameters
     latent = 256 # latent space
@@ -36,7 +36,7 @@ def main():
     thresh_hits = 3e-4
     m = 3  # number of moments
     angloss= 1 # total number of losses...1 or 2
-    addloss= 1 # additional loss like count loss
+    addloss= 0 # additional loss like count loss
     concat = 2 # if concatenting angle to latent space
     cell=0 # 1 if making plots for cell energies for energy bins and 2 if plotting also per angle bins. Exclude for quick plots.
     corr=1 # if making correlation plots
