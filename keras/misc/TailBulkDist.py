@@ -15,9 +15,9 @@ sys.path.insert(0,'../')
 import analysis.utils.GANutils as gan
 import analysis.utils.ROOTutils as r
 import setGPU
-
+import keras.backend as K
 def main():
-   datapath = "/data/shared/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
+   datapath = "/storage/group/gpu/bigdata/gkhattak/EleMeasured3ThetaEscan/Ele_VarAngleMeas_100_200_000.h5"
    #datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/EleEscan/EleEscan_RandomAngle_1_1.h5"
    #datapath3 = '/bigdata/shared/LCD/NewV1/EleEscan/EleEscan_1_1.h5'
    genweight1 = "../weights/3dgan_weights_gan_training_epsilon_k2/params_generator_epoch_049.hdf5"
@@ -41,7 +41,7 @@ def main():
    power=0.85
    latent = 256 # latent space for generator
    concat=2
-   
+   K.set_image_data_format('channels_first')
    g=generator(latent) # build generator
    g.load_weights(genweight1) # load weights        
    x_gen1 = gan.generate(g, numdata, [y/100, ang], latent, concat=concat)
@@ -110,7 +110,7 @@ def GetData2(datafile, numevents, scale=1, thresh=1e-6):
    return x, y
                      
 
-def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set_range=0, ifpdf=True):
+def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=1, set_range=0, ifpdf=True):
    c1 = ROOT.TCanvas("c1" ,"" ,200 ,10 ,700 ,500) #make
    #c1.SetGrid()
    ROOT.gPad.SetLogx()
@@ -118,13 +118,13 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set
    title = "Cell energy deposits for 100-200 GeV "
    legend = ROOT.TLegend(.11, .11, .3, .3)
    legend.SetBorderSize(0)
-   color =2
+   colors = [2, 4, 6, 8]
    if logy:
       ROOT.gPad.SetLogy()
       title = title + " (log)"
    hds=[]
    for i, (event, label) in enumerate(zip(events, labels)):
-      hds.append(ROOT.TH1F(label, "", 100, -12, 2))
+      hds.append(ROOT.TH1F(label, "", 100, -12, 0))
       hd = hds[i]
       hd.SetStats(0)
       r.BinLogX(hd)
@@ -132,7 +132,7 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set
       r.fill_hist(hd, data)
       if norm:
         r.normalize(hd, norm-1)
-      hd.SetLineColor(color)
+      hd.SetLineColor(colors[i])
       if i ==0:                  
         hd.SetTitle(title)
         hd.GetXaxis().SetTitle("Ecal Single cell depositions [GeV]")
@@ -140,7 +140,6 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set
         hd.GetYaxis().CenterTitle()
         hd.Draw()
         hd.Draw('sames hist')
-        color+=2
       else:
         hd.Draw('sames')
         hd.Draw('sames hist')
@@ -148,7 +147,6 @@ def plot_ecal_flatten_hist(events, out_file, energy, labels, logy=0, norm=0, set
          maxbin = hd.GetMaximumBin()
          val = hd.GetBinContent(maxbin)
          hds[0].SetMaximum(1.1 * val)
-        color+=1
         c1.Update()
         #r.stat_pos(hd)
       legend.AddEntry(hd,label ,"l")
