@@ -16,6 +16,26 @@ def BinLogX(h):
    axis.Set(bins, new_bins)
    new_bins=None
 
+def bmre(h1x, h2x, d=10):
+   x1 = h1x.GetArray()
+   x1.SetSize(h1x.GetNbinsX())
+   x1 = np.array(x1)
+   x1 = x1[1:]
+   x2 = h2x.GetArray()
+   x2.SetSize(h2x.GetNbinsX())
+   x2 = np.array(x2)
+   x2 =x2[1:]
+   print(x1)
+   print(x2)
+   er = np.abs(np.where(x1>1e-5, (x1-x2)/(x1), 0))
+   print(er)
+   d = int(er.shape[0]/4)
+   print(er.shape[0]/4, d)
+   error = np.mean(er[d:-d])
+   return (error)
+
+
+
 #Fill a histogram from 1D numpy array
 def fill_hist(hist, array):
    [hist.Fill(_) for _ in array]
