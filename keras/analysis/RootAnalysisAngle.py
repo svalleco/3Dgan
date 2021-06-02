@@ -21,7 +21,7 @@ try:
 except:
     pass
 
-sys.path.insert(0,'../')
+#sys.path.insert(0,'../')
 
 def main():
    parser = get_parser()
