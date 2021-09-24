@@ -11,35 +11,22 @@ from neon.transforms import Rectlin, Logistic, GANCost, Tanh
 from neon.util.argparser import NeonArgparser
 from neon.util.persist import ensure_dirs_exist
 from neon.layers.layer import Dropout
-from neon.data.dataiterator import ArrayIterator
+from neon.data.hdf5iterator import HDF5Iterator
 from neon.optimizers import GradientDescentMomentum, RMSProp, Adam
 from gen_data_norm import gen_rhs
 from neon.backends import gen_backend
 from temporary_utils import temp_3Ddata
 import numpy as np
-from sklearn.cross_validation import train_test_split
 # import matplotlib.pyplot as plt
 import h5py
 
 # load up the data set
-X, y = temp_3Ddata()
-X[X < 1e-6] = 0
-mean = np.mean(X, axis=0, keepdims=True)
-max_elem = np.max(np.abs(X))
-print(np.max(np.abs(X)),'max abs element')
-print(np.min(X),'min element')
-X = (X- mean)/max_elem
-print(X.shape, 'X shape')
-print(np.max(X),'max element after normalisation')
-print(np.min(X),'min element after normalisation')
-X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.9, random_state=42)
-print(X_train.shape, 'X train shape')
-print(y_train.shape, 'y train shape')
 
-gen_backend(backend='gpu', batch_size=100)
-train_set = ArrayIterator(X=X_train, y=y_train, nclass=2, lshape=(1, 25, 25, 25))
-valid_set = ArrayIterator(X=X_test, y=y_test, nclass=2)
+print 'starting HDF5Iterator'
+train_set = HDF5Iterator('EGshuffled_train.h5')
+valid_set = HDF5Iterator('EGshuffled_test.h5')
 
+print 'train_set OK'
 #tate=lt.plot(X_train[0, 12])
 #plt.savefigure('data_img.png')
 
@@ -100,7 +87,7 @@ G_layers = [
 
 layers = GenerativeAdversarial(generator=Sequential(G_layers, name="Generator"),
                                discriminator=Sequential(D_layers, name="Discriminator"))
-
+print 'layers defined'
 # setup optimizer
 # optimizer = RMSProp(learning_rate=1e-4, decay_rate=0.9, epsilon=1e-8)
 optimizer = GradientDescentMomentum(learning_rate=1e-3, momentum_coef = 0.9)
@@ -123,6 +110,7 @@ callbacks = Callbacks(gan, eval_set=valid_set)
 callbacks.add_callback(GANCostCallback())
 #callbacks.add_save_best_state_callback("./best_state.pkl")
 
+print 'starting training'
 # run fit
 gan.fit(train_set, num_epochs=nb_epochs, optimizer=optimizer,
         cost=cost, callbacks=callbacks)
@@ -130,7 +118,7 @@ gan.fit(train_set, num_epochs=nb_epochs, optimizer=optimizer,
 # gan.save_params('our_gan.prm')
 
 x_new = np.random.randn(100, latent_size) 
-inference_set = ArrayIterator(x_new, None, nclass=2, lshape=(latent_size))
+inference_set = HDF5Iterator(x_new, None, nclass=2, lshape=(latent_size))
 my_generator = Model(gan.layers.generator)
 my_generator.save_params('our_gen.prm')
 my_discriminator = Model(gan.layers.discriminator)
