@@ -8,7 +8,7 @@ from keras.layers.convolutional import (UpSampling3D, UpSampling2D,Conv3D, ZeroP
 from keras.models import Model, Sequential
 import math
 import tensorflow as tf
-from BN2 import BatchNormalization as BatchNormalization2
+#from BN2 import BatchNormalization as BatchNormalization2
 # calculate sum of intensities
 def ecal_sum(image, daxis):
     sum = K.expand_dims(K.sum(image, axis=daxis))
