@@ -29,20 +29,21 @@ def main():
   concat =2
   get_shuffled= True # whether to make plots for shuffled
   labels =["MC", "GAN"] # labels
-  outdir = 'results/CellsHistGan_0_500GeV_25_25_5/' # dir for results
+  outdir = 'results/CellsHistGan_mid_xy20_stest/' # dir for results
   gan.safe_mkdir(outdir) 
   #datapath = "/data/shared/gkhattak/*Measured3ThetaEscan/*.h5" # Data path
-  datapath = "/storage/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"      
+  datapath = "/storage/af/group/gpu/bigdata/LCDLargeWindow/LCDLargeWindow/varangle/*scan/*scan_RandomAngle_*.h5"      
   data_files = gan.GetDataFiles(datapath, ['Ele']) # get list of files
   energies =[0]# energy bins
-  angles=[62, 90, 118]
-  xc = 25
-  yc = 25
-  zc= 5
+  xc = 20
+  yc = 20
+  zc= 12
+  stat = 1
+  leg = 1
   g = generator(latent)       # build generator
   gen_weight1= "../weights/3dgan_weights_gan_training_epsilon_2_500GeV/params_generator_epoch_021.hdf5" # weights for generator
   g.load_weights(gen_weight1) # load weights
-  sorted_data = gan.get_sorted_angle(data_files[-3:], energies, thresh=thresh, tolerance1=2.5) # load data in a dict
+  sorted_data = gan.get_sorted_angle(data_files[-3:], energies, num_events1=15000, thresh=thresh, tolerance1=2.5) # load data in a dict
   print('data center non zero', np.count_nonzero(sorted_data["events_act" + str(0)][:, xc, yc, zc]))
   print('data center min', np.amin(sorted_data["events_act" + str(0)][:, xc, yc, zc]))
   # for each energy bin
@@ -95,17 +96,33 @@ def main():
           roo.fill_hist(hists_gan[i], ecal_gan[:, x, y, z])
           outfile = filename + '{}x_{}y_{}z'.format(x+xc-w, y+yc-w, z+zc-w)
           c.append(ROOT.TCanvas("c"+str(i) ,"c"+str(i) ,200 ,10 ,700 ,500))
+          if stat:
+             legend = ROOT.TLegend(.5, .7, .9, .9)
+          else:
+             legend = ROOT.TLegend(.7, .7, .9, .9)
           hists_g4[i].SetLineColor(2)
           hists_gan[i].SetLineColor(4)
           hists_g4[i].SetStats(0)
           hists_gan[i].SetStats(0)
+          roo.normalize(hists_g4[i])
+          roo.normalize(hists_gan[i])
           hists_g4[i].GetYaxis().SetTitle("Entries")
           hists_g4[i].GetXaxis().SetTitle("Energy [GeV]")
-          ymax = max(hists_g4[i].GetMaximum(), hists_gan[i].GetMaximum())
-          hists_g4[i].GetXaxis().SetRangeUser(0, 0.1)#1.1 * ymax)
+          #emax = max(hists_g4[i].GetMaximum(), hists_gan[i].GetMaximum())
+          #hists_g4[i].GetXaxis().SetRangeUser(0, 1.1 * emax)
           hists_g4[i].Draw()
           hists_g4[i].Draw('hist')
           hists_gan[i].Draw('sames hist')
+          roo.Max(hists_g4[i], hists_gan[i])
+          legend.AddEntry(hists_g4[i], "G4 ", "l")
+          if stat:
+            k = hists_g4[i].KolmogorovTest(hists_gan[i])
+            legend.AddEntry(hists_gan[i], "GAN {}".format(k), "l")
+          else:
+            legend.AddEntry(hists_gan[i], "GAN", "l")
+          c[i].Update()
+          if leg:
+            legend.Draw()
           c[i].Update()
           c[i].Print(outfile + ".pdf")
           i+=1
